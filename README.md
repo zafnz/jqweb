@@ -6,6 +6,11 @@ Renders json like jq, but as a webpage
     brew install zafnz/tap/jqweb              # macOS
     go install github.com/zafnz/jqweb@latest  # with Go installed
 
+On Linux, or macOS without Homebrew, this puts the latest release in
+`~/.local/bin`:
+
+    curl -fsSL https://raw.githubusercontent.com/zafnz/jqweb/main/install.sh | sh
+
 Or download a binary for macOS, Linux or Windows from
 [Releases](https://github.com/zafnz/jqweb/releases) and put it on your `$PATH`.
 The macOS builds are signed and notarized.

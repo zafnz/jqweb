@@ -22,7 +22,9 @@ import (
 	"unicode/utf8"
 )
 
-const versionString = "0.1.0"
+// versionString is set by the linker at release time:
+// -X main.versionString=<tag>
+var versionString = "dev"
 
 func usage() {
 	fmt.Fprint(os.Stderr, `usage: jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [<input-file>]

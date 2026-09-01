@@ -15,9 +15,9 @@ Or download a binary for macOS, Linux or Windows from
 [Releases](https://github.com/zafnz/jqweb/releases) and put it on your `$PATH`.
 The macOS builds are signed and notarized.
 
-## Example
+## Example Usage
 
-**Quick view of json output. (See screenshot on right)**
+**Quick view of json output. (See screenshot below, or <a href="https://raw.githubusercontent.com/zafnz/jqweb/main/example.html">view here</a>)**
 ```
 $ curl -s 'https://en.wikipedia.org/api/rest_v1/?spec' | jqweb
 jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)

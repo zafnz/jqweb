@@ -22,6 +22,8 @@ import (
 	"unicode/utf8"
 )
 
+const versionString = "0.1.0"
+
 func usage() {
 	fmt.Fprint(os.Stderr, `usage: jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [<input-file>]
 
@@ -39,10 +41,11 @@ With no -p and no -o, it listens on a random available port.
 
 func main() {
 	var (
-		port   int
-		output string
-		host   string
-		open   bool
+		port    int
+		output  string
+		host    string
+		open    bool
+		version bool
 	)
 	flag.IntVar(&port, "p", 0, "")
 	flag.IntVar(&port, "port", 0, "")
@@ -51,6 +54,9 @@ func main() {
 	flag.StringVar(&host, "host", "127.0.0.1", "")
 	flag.BoolVar(&open, "open", false, "")
 	flag.BoolVar(&open, "O", false, "")
+	flag.BoolVar(&version, "version", false, "")
+	flag.BoolVar(&version, "v", false, "")
+
 	flag.Usage = usage
 	flag.CommandLine.Parse(reorderArgs(os.Args[1:]))
 
@@ -58,6 +64,11 @@ func main() {
 	flag.Visit(func(f *flag.Flag) { set[f.Name] = true })
 	portSet := set["p"] || set["port"]
 	outSet := set["o"] || set["output"]
+
+	if version {
+		fmt.Fprintf(os.Stdout, "jqweb %s\n", versionString)
+		os.Exit(0)
+	}
 
 	if flag.NArg() > 1 {
 		fmt.Fprintln(os.Stderr, "jqweb: at most one input file")
@@ -150,6 +161,7 @@ func reorderArgs(args []string) []string {
 		"-p": true, "--port": true,
 		"-o": true, "--output": true,
 		"-O": false, "--open": false,
+		"-v": false, "--version": false,
 		"--host": true,
 	}
 	var flags, pos []string

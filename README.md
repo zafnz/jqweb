@@ -1,6 +1,15 @@
 # jqweb
 Renders json like jq, but as a webpage
 
+## Install
+
+    brew install zafnz/tap/jqweb              # macOS
+    go install github.com/zafnz/jqweb@latest  # with Go installed
+
+Or download a binary for macOS, Linux or Windows from
+[Releases](https://github.com/zafnz/jqweb/releases) and put it on your `$PATH`.
+The macOS builds are signed and notarized.
+
 ## Example
 
 **Quick view of json output. (See screenshot on right)**

@@ -34,3 +34,5 @@ go.work.sum
 simple.json
 simple.html
 jqweb
+# GoReleaser
+dist/

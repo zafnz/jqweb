@@ -2,13 +2,14 @@
 Renders json like jq, but as a webpage
 
 ## Example
-<img src="demo.png" alt="jqweb rendering the Wikipedia REST API spec" width="600" align="right">
 
 **Quick view of json output. (See screenshot on right)**
 ```
-$ curl -s 'https://en.wikipedia.org/api/rest_v1/?spec' | ./jqweb
+$ curl -s 'https://en.wikipedia.org/api/rest_v1/?spec' | jqweb
 jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)
 ```
+
+<img src="demo.png" alt="jqweb rendering the Wikipedia REST API spec" width="480">
 
 **Output to an html file for offline viewing**
 ```bash
@@ -22,6 +23,19 @@ $ jqweb --host 0.0.0.0 --port 9000 < input.json
 jqweb: serving on http://[::]:9000/ (Ctrl-C to stop)
 ```
 <br clear="right">
+
+## Usage
+usage: `jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [<input-file>]`
+
+Reads JSON from <input-file> ("-" or absent: stdin) and renders it as a
+self-contained interactive HTML page, served on a random port or written to file
+```
+  -p, --port <port>    serve the page on http://<host>:<port>/
+      --host <ip>      bind address for -p (default 127.0.0.1)
+  -o, --output <file>  write the page to <file>; "-" writes to stdout
+```
+With no -p and no -o, it listens on a random available port.
+
 
 ## Why?
 

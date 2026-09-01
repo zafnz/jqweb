@@ -7,9 +7,16 @@ Renders json like jq, but as a webpage
 ```
 $ curl -s 'https://en.wikipedia.org/api/rest_v1/?spec' | jqweb
 jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)
+
+# You can also use -O (or --open) to automatically open your 
+# default web browser
+
+$ curl -s 'https://en.wikipedia.org/api/rest_v1/?spec' | jqweb -O
+jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)
 ```
 
-<img src="demo.png" alt="jqweb rendering the Wikipedia REST API spec" width="480">
+<img src="demo.png" alt="jqweb rendering the Wikipedia REST API spec" width="580">
+
 
 **Output to an html file for offline viewing**
 ```bash
@@ -25,7 +32,7 @@ jqweb: serving on http://[::]:9000/ (Ctrl-C to stop)
 <br clear="right">
 
 ## Usage
-usage: `jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [<input-file>]`
+usage: `jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [-O|--open] [<input-file>]`
 
 Reads JSON from <input-file> ("-" or absent: stdin) and renders it as a
 self-contained interactive HTML page, served on a random port or written to file
@@ -33,6 +40,7 @@ self-contained interactive HTML page, served on a random port or written to file
   -p, --port <port>    serve the page on http://<host>:<port>/
       --host <ip>      bind address for -p (default 127.0.0.1)
   -o, --output <file>  write the page to <file>; "-" writes to stdout
+  -O, --open           opens your default web browser with the output
 ```
 With no -p and no -o, it listens on a random available port.
 

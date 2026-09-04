@@ -1,6 +1,6 @@
 // jqweb renders a JSON document as a self-contained interactive HTML page:
-// a collapsible tree with jq-style coloring, text filtering, and per-key
-// copy-path buttons.
+// a collapsible tree with jq-style coloring, text filtering, path lookup, and
+// per-key copy-path buttons.
 package main
 
 import (
@@ -702,7 +702,7 @@ main { padding: 10px 14px 60px; }
   <span class="name">jqweb &middot; {{TITLE}}</span>
   <button id="expand" type="button">Expand all</button>
   <button id="collapse" type="button">Collapse all</button>
-  <input id="q" type="search" placeholder="Filter keys and values (press /)" autocomplete="off" spellcheck="false">
+  <input id="q" type="search" placeholder="Filter keys and values, or paste a path (press /)" autocomplete="off" spellcheck="false">
   <span id="stats"></span>
 </header>
 <main id="tree">{{TREE}}</main>
@@ -792,16 +792,136 @@ main { padding: 10px 14px 60px; }
     }, 900);
   }
 
-  /* ---- filter ---- */
+  /* ---- search ---- */
   var timer = null;
   input.addEventListener('input', function () {
     clearTimeout(timer);
-    timer = setTimeout(runFilter, 120);
+    timer = setTimeout(run, 120);
   });
   document.addEventListener('keydown', function (e) {
     if (e.key === '/' && e.target !== input) { e.preventDefault(); input.focus(); }
-    if (e.key === 'Escape' && e.target === input) { input.value = ''; runFilter(); }
+    if (e.key === 'Escape' && e.target === input) { input.value = ''; run(); }
   });
+
+  /* Text containing "." or "[" may be a path such as .a.b[3].c, so it is tried
+     as one first; a bare word is always a text filter. A path that does not
+     resolve falls back to text filtering unless it was written with a leading
+     dot, which takes it as a path regardless. */
+  function run() {
+    var raw = input.value.trim();
+    if (!raw) { reset(); return; }
+    if (/[.[]/.test(raw)) {
+      var segs = parsePath(raw);
+      if (segs) {
+        var found = resolvePath(segs);
+        if (found.depth === segs.length) {
+          showPath(found.node, true);
+          stats.textContent = pathOf(found.node);
+          return;
+        }
+        if (raw.charAt(0) === '.') {
+          showPath(found.node, found.depth > 0);
+          stats.textContent = found.depth ? 'no path past ' + pathOf(found.node) : 'no such path';
+          return;
+        }
+      }
+    }
+    textFilter(raw.toLowerCase());
+  }
+
+  function reset() {
+    each('.node', function (n) { n.classList.remove('hidden', 'hit'); });
+    stats.textContent = '';
+  }
+
+  /* ---- path navigation ---- */
+  var pathChar = /[^.[\]"'\s]/;
+
+  /* parsePath splits a jq-style path such as .a.b[3]["x y"] into key and index
+     segments. The leading dot is optional. Returns null for text that is not a
+     path. */
+  function parsePath(str) {
+    var s = str.trim();
+    if (s === '.') return [];
+    var segs = [], i = 0;
+    if (s.charAt(0) !== '.' && s.charAt(0) !== '[') {
+      while (i < s.length && pathChar.test(s.charAt(i))) i++;
+      if (!i) return null;
+      segs.push({ key: s.slice(0, i) });
+    }
+    while (i < s.length) {
+      var c = s.charAt(i), q, j, start;
+      if (c === '.') {
+        i++;
+        if (s.charAt(i) === '[') continue;
+        start = i;
+        while (i < s.length && pathChar.test(s.charAt(i))) i++;
+        if (i === start) return null;
+        segs.push({ key: s.slice(start, i) });
+      } else if (c === '[') {
+        q = s.charAt(i + 1);
+        if (q === '"' || q === "'") {
+          j = i + 2;
+          while (j < s.length && s.charAt(j) !== q) j += s.charAt(j) === '\\' ? 2 : 1;
+          if (s.charAt(j) !== q || s.charAt(j + 1) !== ']') return null;
+          if (q === '"') {
+            try { segs.push({ key: JSON.parse(s.slice(i + 1, j + 1)) }); }
+            catch (e) { return null; }
+          } else {
+            segs.push({ key: s.slice(i + 2, j).replace(/\\(['\\])/g, '$1') });
+          }
+          i = j + 2;
+        } else {
+          j = s.indexOf(']', i + 1);
+          if (j < 0 || !/^-?\d+$/.test(s.slice(i + 1, j))) return null;
+          segs.push({ index: parseInt(s.slice(i + 1, j), 10) });
+          i = j + 1;
+        }
+      } else {
+        return null;
+      }
+    }
+    return segs.length ? segs : null;
+  }
+
+  /* Walks segs from the root, returning the deepest node reached and how many
+     segments matched; depth === segs.length is a full match. */
+  function resolvePath(segs) {
+    var node = rootNode, i = 0;
+    for (; i < segs.length; i++) {
+      var next = childMatching(node, segs[i]);
+      if (!next) break;
+      node = next;
+    }
+    return { node: node, depth: i };
+  }
+
+  function childMatching(node, seg) {
+    var kids = node.querySelectorAll(':scope > .kids > .node'), i;
+    if (seg.key !== undefined) {
+      for (i = 0; i < kids.length; i++) {
+        if (kids[i].dataset.key === seg.key) return kids[i];
+      }
+      return null;
+    }
+    i = seg.index < 0 ? kids.length + seg.index : seg.index;
+    return kids[i] && kids[i].dataset.index === String(i) ? kids[i] : null;
+  }
+
+  /* Shows target with its whole subtree, plus the ancestors leading to it. */
+  function showPath(target, mark) {
+    each('.node', function (n) { n.classList.add('hidden'); n.classList.remove('hit'); });
+    for (var n = target; n; n = n.parentElement && n.parentElement.closest('.node')) {
+      n.classList.remove('hidden', 'collapsed');
+    }
+    if (mark) target.classList.add('hit');
+    Array.prototype.forEach.call(target.querySelectorAll('.node'), function (d) {
+      d.classList.remove('hidden');
+    });
+    target.scrollIntoView({ block: 'center' });
+  }
+
+  /* ---- text filter ---- */
 
   /* Lowercased key + leaf value text for one node, cached on the element. */
   function ownText(n) {
@@ -815,13 +935,7 @@ main { padding: 10px 14px 60px; }
     return n._q;
   }
 
-  function runFilter() {
-    var needle = input.value.trim().toLowerCase();
-    if (!needle) {
-      each('.node', function (n) { n.classList.remove('hidden', 'hit'); });
-      stats.textContent = '';
-      return;
-    }
+  function textFilter(needle) {
     var hits = 0;
     /* Returns whether this subtree contains a match. "forced" keeps the whole
        subtree of a matching node visible without counting it as a match. */

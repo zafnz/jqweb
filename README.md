@@ -59,6 +59,18 @@ self-contained interactive HTML page, served on a random port or written to file
 With no -p and no -o, it listens on a random available port.
 
 
+## Search
+
+The search box filters keys and values as you type, and also accepts a jq-style
+path. Paste `.list.of.things[302].item`, or any prefix of it such as
+`.list.of.things`, and the page shows that node with everything under it. The
+copy button on each line puts that line's path on the clipboard, so a copied
+path can be pasted straight back into the box.
+
+The leading dot is optional, `["quoted keys"]` and negative array indices such
+as `[-1]` both work, and text that does not resolve to a path is used as a
+filter instead.
+
 ## Why?
 
 Sometimes it's easier to view it in your webbrowser then search through large json output to

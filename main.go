@@ -17,6 +17,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -24,7 +25,21 @@ import (
 
 // versionString is set by the linker at release time:
 // -X main.versionString=<tag>
-var versionString = "dev"
+var versionString = ""
+
+// releaseVersion reports the release tag when the linker set one, otherwise the
+// module version recorded by "go install", otherwise "dev" for a local build.
+func releaseVersion() string {
+	if versionString != "" {
+		return versionString
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok {
+		if v := bi.Main.Version; v != "" && v != "(devel)" {
+			return strings.TrimPrefix(v, "v")
+		}
+	}
+	return "dev"
+}
 
 func usage() {
 	fmt.Fprint(os.Stderr, `usage: jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [<input-file>]
@@ -68,7 +83,7 @@ func main() {
 	outSet := set["o"] || set["output"]
 
 	if version {
-		fmt.Fprintf(os.Stdout, "jqweb %s\n", versionString)
+		fmt.Fprintf(os.Stdout, "jqweb %s\n", releaseVersion())
 		os.Exit(0)
 	}
 

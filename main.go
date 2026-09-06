@@ -126,13 +126,12 @@ func main() {
 		title = filepath.Base(inName)
 	}
 
-	root, perr := parse(data)
-	if perr != nil {
-		fmt.Fprintf(os.Stderr, "jqweb: %s: %s\n", displayName, perr)
+	if err := check(data); err != nil {
+		fmt.Fprintf(os.Stderr, "jqweb: %s: %s\n", displayName, err)
 		os.Exit(1)
 	}
 
-	page := []byte(renderPage(root, title))
+	page := []byte(renderPage(data, title))
 
 	if outSet {
 		if output == "-" {
@@ -243,104 +242,63 @@ func openBrowser(url string) error {
 	return cmd.Start()
 }
 
-// ---- JSON parsing (order-preserving) ----
+// ---- JSON validation ----
 
-type kind int
-
-const (
-	kNull kind = iota
-	kBool
-	kNum
-	kStr
-	kArr
-	kObj
-)
-
-// value is a parsed JSON value. encoding/json's map decoding loses object key
-// order, so objects are kept as parallel keys/vals slices in input order.
-// Numbers are kept as their input literal via json.Number.
-type value struct {
-	kind kind
-	b    bool
-	num  json.Number
-	str  string
-	keys []string // object keys, input order (kObj only)
-	vals []*value // object member values or array elements
-}
-
-func parse(data []byte) (*value, error) {
+// check reports whether data is a single well-formed JSON document. The page
+// embeds the document itself and renders it in the browser, so nothing is kept
+// from this pass but the error.
+func check(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
-	v, err := parseValue(dec)
-	if err != nil {
-		return nil, describeErr(data, err)
+	if err := checkValue(dec); err != nil {
+		return describeErr(data, err)
 	}
 	if dec.More() {
 		off := dec.InputOffset()
 		line, col := lineCol(data, off)
 		if moreValues(dec) {
-			return nil, fmt.Errorf("input has more than one top-level JSON value (line %d, column %d); "+
+			return fmt.Errorf("input has more than one top-level JSON value (line %d, column %d); "+
 				"jqweb renders a single document, so pipe a JSON stream through `jq -s .` to wrap it in an array", line, col)
 		}
-		return nil, fmt.Errorf("trailing data after top-level value (line %d, column %d)", line, col)
+		return fmt.Errorf("trailing data after top-level value (line %d, column %d)", line, col)
 	}
-	return v, nil
+	return nil
 }
 
-func parseValue(dec *json.Decoder) (*value, error) {
+func checkValue(dec *json.Decoder) error {
 	tok, err := dec.Token()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	switch t := tok.(type) {
-	case nil:
-		return &value{kind: kNull}, nil
-	case bool:
-		return &value{kind: kBool, b: t}, nil
-	case json.Number:
-		return &value{kind: kNum, num: t}, nil
-	case string:
-		return &value{kind: kStr, str: t}, nil
-	case json.Delim:
-		switch t {
-		case '[':
-			v := &value{kind: kArr}
-			for dec.More() {
-				el, err := parseValue(dec)
-				if err != nil {
-					return nil, err
-				}
-				v.vals = append(v.vals, el)
+	d, ok := tok.(json.Delim)
+	if !ok {
+		return nil
+	}
+	switch d {
+	case '[':
+		for dec.More() {
+			if err := checkValue(dec); err != nil {
+				return err
 			}
-			if _, err := dec.Token(); err != nil { // consume ']'
-				return nil, err
-			}
-			return v, nil
-		case '{':
-			v := &value{kind: kObj}
-			for dec.More() {
-				kt, err := dec.Token()
-				if err != nil {
-					return nil, err
-				}
-				key, ok := kt.(string)
-				if !ok {
-					return nil, fmt.Errorf("object key is not a string: %v", kt)
-				}
-				el, err := parseValue(dec)
-				if err != nil {
-					return nil, err
-				}
-				v.keys = append(v.keys, key)
-				v.vals = append(v.vals, el)
-			}
-			if _, err := dec.Token(); err != nil { // consume '}'
-				return nil, err
-			}
-			return v, nil
 		}
+	case '{':
+		for dec.More() {
+			kt, err := dec.Token()
+			if err != nil {
+				return err
+			}
+			if _, ok := kt.(string); !ok {
+				return fmt.Errorf("object key is not a string: %v", kt)
+			}
+			if err := checkValue(dec); err != nil {
+				return err
+			}
+		}
+	default:
+		return fmt.Errorf("unexpected token %v", d)
 	}
-	return nil, fmt.Errorf("unexpected token %v", tok)
+	_, err = dec.Token() // consume the closing delimiter
+	return err
 }
 
 // moreValues reports whether the data left in dec begins with at least one
@@ -542,104 +500,28 @@ func lineCol(data []byte, off int64) (int, int) {
 	return line, col
 }
 
-// ---- HTML rendering ----
+// ---- page assembly ----
 
-func renderPage(root *value, title string) string {
-	var r htmlRenderer
-	r.node(root, nil, -1, false)
+// renderPage embeds the document in the page as compact JSON; the script in
+// pageTemplate parses it and builds the tree in the browser.
+func renderPage(data []byte, title string) string {
+	var buf bytes.Buffer
+	if err := json.Compact(&buf, data); err != nil {
+		// check has already accepted the document, so this cannot fail.
+		buf.Reset()
+		buf.Write(data)
+	}
 	return strings.NewReplacer(
 		"{{TITLE}}", html.EscapeString(title),
-		"{{TREE}}", r.b.String(),
+		"{{DATA}}", scriptSafe(buf.String()),
 	).Replace(pageTemplate)
 }
 
-type htmlRenderer struct {
-	b strings.Builder
-}
-
-// node emits one tree node. key is non-nil for object members, idx >= 0 for
-// array elements; the root has neither. comma appends a trailing comma.
-func (r *htmlRenderer) node(v *value, key *string, idx int, comma bool) {
-	attrs := ""
-	if key != nil {
-		attrs = ` data-key="` + html.EscapeString(*key) + `"`
-	} else if idx >= 0 {
-		attrs = ` data-index="` + strconv.Itoa(idx) + `"`
-	}
-
-	const copyBtn = `<button class="cp" title="Copy path">&#x29C9;</button>`
-	keyPart := ""
-	endBtn := copyBtn // unkeyed nodes get the button at the end of the line
-	if key != nil {
-		keyPart = `<span class="key">` + html.EscapeString(jsonQuote(*key)) + `</span>` + copyBtn + `<span class="pn">: </span>`
-		endBtn = ""
-	}
-	commaHTML := ""
-	if comma {
-		commaHTML = `<span class="c">,</span>`
-	}
-
-	switch v.kind {
-	case kObj, kArr:
-		open, close, noun := "{", "}", "key"
-		if v.kind == kArr {
-			open, close, noun = "[", "]", "item"
-		}
-		n := len(v.vals)
-		if n == 0 {
-			r.b.WriteString(`<div class="node leaf"` + attrs + `><div class="line"><span class="sp"></span>` +
-				keyPart + `<span class="p">` + open + close + `</span>` + commaHTML + endBtn + `</div></div>`)
-			return
-		}
-		if n != 1 {
-			noun += "s"
-		}
-		r.b.WriteString(`<div class="node branch"` + attrs + `><div class="line"><button class="toggle" aria-label="Toggle"></button>` +
-			keyPart + `<span class="p">` + open + `</span>` +
-			`<span class="fold"> &#x2026; ` + strconv.Itoa(n) + ` ` + noun + ` <span class="p">` + close + `</span>` + commaHTML + `</span>` +
-			endBtn + `</div><div class="kids">`)
-		for i, child := range v.vals {
-			childComma := i < n-1
-			if v.kind == kObj {
-				k := v.keys[i]
-				r.node(child, &k, -1, childComma)
-			} else {
-				r.node(child, nil, i, childComma)
-			}
-		}
-		r.b.WriteString(`</div><div class="closer"><span class="p">` + close + `</span>` + commaHTML + `</div></div>`)
-	default:
-		r.b.WriteString(`<div class="node leaf"` + attrs + `><div class="line"><span class="sp"></span>` +
-			keyPart + leafHTML(v) + commaHTML + endBtn + `</div></div>`)
-	}
-}
-
-func leafHTML(v *value) string {
-	switch v.kind {
-	case kNull:
-		return `<span class="v null">null</span>`
-	case kBool:
-		if v.b {
-			return `<span class="v bool">true</span>`
-		}
-		return `<span class="v bool">false</span>`
-	case kNum:
-		return `<span class="v num">` + html.EscapeString(v.num.String()) + `</span>`
-	case kStr:
-		return `<span class="v str">` + html.EscapeString(jsonQuote(v.str)) + `</span>`
-	}
-	return ""
-}
-
-// jsonQuote returns s as a JSON string literal without escaping <, >, & to
-// < etc., so the page shows the characters themselves (they are
-// HTML-escaped separately).
-func jsonQuote(s string) string {
-	var b bytes.Buffer
-	e := json.NewEncoder(&b)
-	e.SetEscapeHTML(false)
-	e.Encode(s)
-	return strings.TrimRight(b.String(), "\n")
+// scriptSafe escapes "<" as its \u003c escape so that a string containing
+// "</script" cannot end the script element holding the JSON. In JSON, "<"
+// only ever appears inside a string, where \u003c denotes the same character.
+func scriptSafe(s string) string {
+	return strings.ReplaceAll(s, "<", `\u003c`)
 }
 
 const pageTemplate = `<!doctype html>
@@ -720,13 +602,138 @@ main { padding: 10px 14px 60px; }
   <input id="q" type="search" placeholder="Filter keys and values, or paste a path (press /)" autocomplete="off" spellcheck="false">
   <span id="stats"></span>
 </header>
-<main id="tree">{{TREE}}</main>
+<main id="tree"></main>
+<script id="data" type="application/json">{{DATA}}</script>
 <script>
 (function () {
   'use strict';
   var tree = document.getElementById('tree');
   var input = document.getElementById('q');
   var stats = document.getElementById('stats');
+
+  /* ---- parse ---- */
+
+  /* The embedded document is compact JSON, parsed here rather than with
+     JSON.parse because the tree shows object keys in document order and
+     numbers exactly as written, neither of which survives JSON.parse. A node
+     is {t:'o',k:keys,v:children}, {t:'a',v:children} or {t:'l',h:leafHTML}. */
+  function parseJSON(src) {
+    var i = 0;
+
+    function ws() { while (i < src.length && src.charCodeAt(i) <= 32) i++; }
+
+    /* Reads a string literal starting at src[i] and returns its value. */
+    function str() {
+      var start = i++;
+      while (src.charCodeAt(i) !== 34) i += src.charCodeAt(i) === 92 ? 2 : 1;
+      return JSON.parse(src.slice(start, ++i));
+    }
+
+    function value() {
+      ws();
+      var c = src.charAt(i), keys, vals, lit, start;
+      if (c === '{') {
+        i++; keys = []; vals = []; ws();
+        if (src.charAt(i) === '}') {
+          i++;
+        } else {
+          for (;;) {
+            ws();
+            keys.push(str());
+            ws(); i++;                 /* ':' */
+            vals.push(value());
+            ws();
+            if (src.charAt(i++) === '}') break;
+          }
+        }
+        return { t: 'o', k: keys, v: vals };
+      }
+      if (c === '[') {
+        i++; vals = []; ws();
+        if (src.charAt(i) === ']') {
+          i++;
+        } else {
+          for (;;) {
+            vals.push(value());
+            ws();
+            if (src.charAt(i++) === ']') break;
+          }
+        }
+        return { t: 'a', v: vals };
+      }
+      if (c === '"') return { t: 'l', h: span('str', esc(quote(str()))) };
+      start = i;
+      while (i < src.length && ',]}'.indexOf(src.charAt(i)) < 0 && src.charCodeAt(i) > 32) i++;
+      lit = src.slice(start, i);
+      return { t: 'l', h: span(lit === 'null' ? 'null' : lit === 'true' || lit === 'false' ? 'bool' : 'num', lit) };
+    }
+
+    return value();
+  }
+
+  function span(cls, text) { return '<span class="v ' + cls + '">' + text + '</span>'; }
+
+  /* JSON.stringify leaves U+2028 and U+2029 raw; they are escaped so the tree
+     shows them instead of an invisible separator. */
+  function quote(s) {
+    return JSON.stringify(s).replace(/[\u2028\u2029]/g, function (c) {
+      return '\\u202' + (c === '\u2028' ? '8' : '9');
+    });
+  }
+
+  var escMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&#34;', "'": '&#39;' };
+  function esc(s) { return s.replace(/[&<>"']/g, function (c) { return escMap[c]; }); }
+
+  /* ---- render ---- */
+
+  var CP = '<button class="cp" title="Copy path">&#x29C9;</button>';
+
+  function renderTree(root) {
+    var out = [];
+    emit(out, root, null, -1, false);
+    return out.join('');
+  }
+
+  /* Emits one tree node. key is non-null for object members, idx >= 0 for
+     array elements; the root has neither. comma appends a trailing comma. */
+  function emit(out, node, key, idx, comma) {
+    var attrs = key !== null ? ' data-key="' + esc(key) + '"'
+      : idx >= 0 ? ' data-index="' + idx + '"' : '';
+    var keyPart = '', endBtn = CP;   /* unkeyed nodes get the button at the end of the line */
+    if (key !== null) {
+      keyPart = '<span class="key">' + esc(quote(key)) + '</span>' + CP +
+        '<span class="pn">: </span>';
+      endBtn = '';
+    }
+    var c = comma ? '<span class="c">,</span>' : '';
+
+    if (node.t === 'l') {
+      out.push('<div class="node leaf"' + attrs + '><div class="line"><span class="sp"></span>' +
+        keyPart + node.h + c + endBtn + '</div></div>');
+      return;
+    }
+    var obj = node.t === 'o';
+    var open = obj ? '{' : '[';
+    var close = obj ? '}' : ']';
+    var n = node.v.length;
+    if (!n) {
+      out.push('<div class="node leaf"' + attrs + '><div class="line"><span class="sp"></span>' +
+        keyPart + '<span class="p">' + open + close + '</span>' + c + endBtn + '</div></div>');
+      return;
+    }
+    var noun = (obj ? 'key' : 'item') + (n === 1 ? '' : 's');
+    out.push('<div class="node branch"' + attrs +
+      '><div class="line"><button class="toggle" aria-label="Toggle"></button>' +
+      keyPart + '<span class="p">' + open + '</span>' +
+      '<span class="fold"> &#x2026; ' + n + ' ' + noun + ' <span class="p">' + close + '</span>' +
+      c + '</span>' + endBtn + '</div><div class="kids">');
+    for (var j = 0; j < n; j++) {
+      emit(out, node.v[j], obj ? node.k[j] : null, obj ? -1 : j, j < n - 1);
+    }
+    out.push('</div><div class="closer"><span class="p">' + close + '</span>' + c + '</div></div>');
+  }
+
+  tree.innerHTML = renderTree(parseJSON(document.getElementById('data').textContent));
   var rootNode = tree.querySelector(':scope > .node');
 
   tree.addEventListener('click', function (e) {

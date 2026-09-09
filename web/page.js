@@ -1,3 +1,7 @@
+/* The interactive half of the page: builds the tree from the embedded
+   document, then wires up expanding and collapsing, copying a path, and the
+   search box. Everything here needs the DOM; the parsing, rendering and path
+   reading it calls live in core.js. */
 (function () {
   'use strict';
   var tree = document.getElementById('tree');
@@ -5,9 +9,15 @@
   var stats = document.getElementById('stats');
   var parseJSON = jqweb.parseJSON, renderTree = jqweb.renderTree, parsePath = jqweb.parsePath;
 
+  /* Build the whole tree in one write. The document is served inside the page
+     as JSON rather than as markup, which keeps the file smaller and lets the
+     tree be rendered here where the collapsing state lives. */
   tree.innerHTML = renderTree(parseJSON(document.getElementById('data').textContent));
   var rootNode = tree.querySelector(':scope > .node');
 
+  /* One delegated listener for every line in the tree, however many there
+     are: a click either hits a copy button, a toggle, or the collapsed
+     summary, which expands the node it belongs to. */
   tree.addEventListener('click', function (e) {
     var cp = e.target.closest('.cp');
     if (cp) { copyPath(cp); return; }
@@ -17,6 +27,8 @@
     if (fold) { fold.closest('.node').classList.remove('collapsed'); }
   });
 
+  /* Collapse all leaves the root expanded, so the document is still readable
+     rather than a single line. */
   document.getElementById('expand').addEventListener('click', function () {
     each('.node.branch', function (n) { n.classList.remove('collapsed'); });
   });
@@ -24,13 +36,21 @@
     each('.node.branch', function (n) { if (n !== rootNode) n.classList.add('collapsed'); });
   });
 
+  /* Runs fn over every node in the tree matching sel. querySelectorAll gives
+     a NodeList, which in older browsers has no forEach of its own. */
   function each(sel, fn) {
     Array.prototype.forEach.call(tree.querySelectorAll(sel), fn);
   }
 
   /* ---- copy path ---- */
+
+  /* A key that can be written as .name rather than ["name"]. */
   var identRe = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
+  /* Builds the jq-style path of a node by walking up its ancestors and
+     reading back the data attributes emit() wrote, prepending each segment as
+     it goes. The result is what parsePath() reads, so a copied path can be
+     pasted straight into the search box. */
   function pathOf(node) {
     var segs = [];
     var n = node;
@@ -41,19 +61,25 @@
         var k = n.dataset.key;
         segs.unshift(identRe.test(k) ? '.' + k : '[' + JSON.stringify(k) + ']');
       }
+      /* Skip the .kids wrapper between a node and its parent node. */
       n = n.parentElement && n.parentElement.closest('.node');
     }
     var p = segs.join('');
-    if (!p) return '.';
-    if (p.charAt(0) === '[') p = '.' + p;
+    if (!p) return '.';                       /* the root itself */
+    if (p.charAt(0) === '[') p = '.' + p;     /* jq writes .[0], not [0] */
     return p;
   }
 
+  /* Copies the path of the line a copy button belongs to, and reports the
+     outcome on the button itself. */
   function copyPath(btn) {
     var path = pathOf(btn.closest('.node'));
     copyText(path, function (ok) { flash(btn, ok); });
   }
 
+  /* Copies text, calling done(ok) when it settles. The clipboard API needs a
+     secure context, which a page opened from a file:// URL is not, and can
+     still be refused when it is available, so both paths fall back. */
   function copyText(t, done) {
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(t).then(
@@ -64,6 +90,9 @@
     }
   }
 
+  /* The pre-clipboard-API copy: put the text in an off-screen textarea,
+     select it, and have the document copy the selection. Deprecated, but it
+     is what works without a secure context. */
   function legacyCopy(t) {
     var ta = document.createElement('textarea');
     ta.value = t;
@@ -77,6 +106,7 @@
     return ok;
   }
 
+  /* Briefly turns a copy button into a tick or a cross, then restores it. */
   function flash(btn, ok) {
     btn.classList.add(ok ? 'ok' : 'fail');
     btn.textContent = ok ? '✓' : '✗';
@@ -87,11 +117,15 @@
   }
 
   /* ---- search ---- */
+
+  /* Searching walks the whole tree, so wait for a pause in typing rather than
+     doing it on every keystroke. */
   var timer = null;
   input.addEventListener('input', function () {
     clearTimeout(timer);
     timer = setTimeout(run, 120);
   });
+  /* "/" focuses the search box, Escape clears it. */
   document.addEventListener('keydown', function (e) {
     if (e.key === '/' && e.target !== input) { e.preventDefault(); input.focus(); }
     if (e.key === 'Escape' && e.target === input) { input.value = ''; run(); }
@@ -113,6 +147,8 @@
           stats.textContent = pathOf(found.node);
           return;
         }
+        /* A leading dot means the text was meant as a path, so say where it
+           stopped resolving rather than silently filtering instead. */
         if (raw.charAt(0) === '.') {
           showPath(found.node, found.depth > 0);
           stats.textContent = found.depth ? 'no path past ' + pathOf(found.node) : 'no such path';
@@ -123,11 +159,16 @@
     textFilter(raw.toLowerCase());
   }
 
+  /* Clears any filtering and shows the whole document again. Collapsed state
+     is left alone: it is the reader's, not the search's. */
   function reset() {
     each('.node', function (n) { n.classList.remove('hidden', 'hit'); });
     stats.textContent = '';
   }
 
+  /* Walks segs from the root, returning the deepest node reached and how many
+     segments matched; depth === segs.length is a full match. A partial match
+     is still useful, since it says where a path stopped resolving. */
   function resolvePath(segs) {
     var node = rootNode, i = 0;
     for (; i < segs.length; i++) {
@@ -138,14 +179,20 @@
     return { node: node, depth: i };
   }
 
+  /* The child of node named by one path segment, or null. */
   function childMatching(node, seg) {
     var kids = node.querySelectorAll(':scope > .kids > .node'), i;
+    /* Keys are compared as text, because an object's members are in document
+       order rather than sorted, so there is nothing to look them up by. */
     if (seg.key !== undefined) {
       for (i = 0; i < kids.length; i++) {
         if (kids[i].dataset.key === seg.key) return kids[i];
       }
       return null;
     }
+    /* A negative index counts from the end, as in jq. The data-index check
+       keeps a path from resolving against an object, whose children are in
+       the same place but carry keys instead. */
     i = seg.index < 0 ? kids.length + seg.index : seg.index;
     return kids[i] && kids[i].dataset.index === String(i) ? kids[i] : null;
   }
@@ -153,6 +200,7 @@
   /* Shows target with its whole subtree, plus the ancestors leading to it. */
   function showPath(target, mark) {
     each('.node', function (n) { n.classList.add('hidden'); n.classList.remove('hit'); });
+    /* Reveal and expand the line of ancestors, so the target is reachable. */
     for (var n = target; n; n = n.parentElement && n.parentElement.closest('.node')) {
       n.classList.remove('hidden', 'collapsed');
     }
@@ -165,11 +213,15 @@
 
   /* ---- text filter ---- */
 
-  /* Lowercased key + leaf value text for one node, cached on the element. */
+  /* Lowercased key + leaf value text for one node, cached on the element.
+     Filtering reads every node on every keystroke, and the text of a node
+     never changes, so it is worth keeping. */
   function ownText(n) {
     if (n._q === undefined) {
       var s = '';
       if (n.dataset.key !== undefined) s += n.dataset.key.toLowerCase() + '\n';
+      /* Only this node's own value, not its descendants': the > combinators
+         stop querySelector from reaching into a child node. */
       var v = n.querySelector(':scope > .line > .v');
       if (v) s += v.textContent.toLowerCase();
       n._q = s;
@@ -177,6 +229,8 @@
     return n._q;
   }
 
+  /* Hides every node whose key and value do not contain needle, keeping the
+     ones that lead to or hang off a match, and reports how many matched. */
   function textFilter(needle) {
     var hits = 0;
     /* Returns whether this subtree contains a match. "forced" keeps the whole
@@ -184,6 +238,8 @@
     function walk(node, forced) {
       var own = ownText(node).indexOf(needle) !== -1;
       if (own) hits++;
+      /* Recurse before deciding: a node with no match of its own is still
+         kept when a descendant matched. */
       var childKeep = false;
       var kids = node.querySelectorAll(':scope > .kids > .node');
       for (var i = 0; i < kids.length; i++) {
@@ -191,6 +247,7 @@
       }
       node.classList.toggle('hidden', !(own || forced || childKeep));
       node.classList.toggle('hit', own);
+      /* A match inside a collapsed branch would be invisible otherwise. */
       if (childKeep) node.classList.remove('collapsed');
       return own || childKeep;
     }

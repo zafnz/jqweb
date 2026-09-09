@@ -334,6 +334,73 @@ func TestRenderPageEscapesTitle(t *testing.T) {
 	}
 }
 
+func TestStripComments(t *testing.T) {
+	tests := []struct{ name, in, want string }{
+		{"whole line", "a();\n/* note */\nb();", "a();\nb();"},
+		{"trailing", "a(); /* note */", "a();"},
+		{"leading", "/* note */ a();", " a();"},
+		{"multi-line", "a();\n/* one\n   two */\nb();", "a();\nb();"},
+		{"code either side of a multi-line comment", "a(); /* one\n   two */ b();", "a();\n b();"},
+		{"two on one line", "a(); /* x */ b(); /* y */", "a();  b();"},
+		{"blank lines go too", "a();\n\n\nb();", "a();\nb();"},
+		{"nothing to do", "a();\nb();", "a();\nb();"},
+
+		// A "/*" that is not a comment must survive.
+		{"in a single-quoted string", `var s = '/* not a comment */';`, `var s = '/* not a comment */';`},
+		{"in a double-quoted string", `var s = "/* no */";`, `var s = "/* no */";`},
+		{"in a template literal", "var s = `/* no */`;", "var s = `/* no */`;"},
+		{"after an escaped quote", `var s = 'it\'s /* no */';`, `var s = 'it\'s /* no */';`},
+		{"a real comment after a string", `var s = 'x'; /* note */`, `var s = 'x';`},
+
+		// Lines the reader gives up on are emitted exactly as written.
+		{"regular expression", `var re = /[/*]/;`, `var re = /[/*]/;`},
+		{"regular expression with a comment", `var re = /a/; /* note */`, `var re = /a/; /* note */`},
+		{"division", `var x = a / b; /* note */`, `var x = a / b; /* note */`},
+		{"unterminated template literal", "var s = `open; /* note */", "var s = `open; /* note */"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := stripComments(tt.in); got != tt.want {
+				t.Errorf("stripComments(%q)\n got %q\nwant %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestStripCommentsIsIdempotent(t *testing.T) {
+	for _, name := range []string{"web/core.js", "web/page.js"} {
+		once := stripComments(asset(name))
+		if twice := stripComments(once); twice != once {
+			t.Errorf("%s: stripping twice differs from stripping once", name)
+		}
+	}
+}
+
+// The comments go, the code stays.
+func TestPageShipsWithoutComments(t *testing.T) {
+	page := renderPage([]byte(`{"a":1}`), "t")
+	for _, gone := range []string{
+		"Pure helpers shared by the page", // core.js file comment
+		"recursive-descent scanner",       // inside parseJSON
+		"the reader's, not the search's",  // inside page.js
+	} {
+		if strings.Contains(page, gone) {
+			t.Errorf("page still contains the comment %q", gone)
+		}
+	}
+	for _, want := range []string{
+		"function parseJSON(src)",
+		"return segs.length ? segs : null;",
+		`var escMap = { '&': '&amp;',`,
+		"function textFilter(needle)",
+		`var pathChar = /[^.[\]"'\s]/;`, // a line the stripper leaves alone
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("page is missing the code %q", want)
+		}
+	}
+}
+
 func TestInlineTrimsOnlyTheTrailingNewline(t *testing.T) {
 	css := asset("web/page.css")
 	if !strings.HasSuffix(css, "\n") {

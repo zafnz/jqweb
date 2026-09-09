@@ -81,6 +81,9 @@ under Node; `web/page.js` is the DOM wiring on top of it.
     go test ./...    # Go: argument handling, input validation, page assembly
     node --test      # JavaScript: web/core.test.js
 
+Comments are stripped from the two scripts as the page is built, so the source
+reads for a person and the rendered page does not carry them.
+
 ## Why?
 
 Sometimes it's easier to view it in your webbrowser then search through large json output to

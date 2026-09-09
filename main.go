@@ -525,7 +525,7 @@ func scriptSafe(s string) string {
 	return strings.ReplaceAll(s, "<", `\u003c`)
 }
 
-//go:embed web/page.html web/page.css web/page.js
+//go:embed web/page.html web/page.css web/core.js web/page.js
 var assets embed.FS
 
 // pageTemplate is the page shell with its stylesheet and script inlined,
@@ -535,8 +535,14 @@ var pageTemplate = buildTemplate()
 func buildTemplate() string {
 	return strings.NewReplacer(
 		"{{STYLE}}", inline("web/page.css"),
-		"{{SCRIPT}}", inline("web/page.js"),
+		"{{SCRIPT}}", script(),
 	).Replace(asset("web/page.html"))
+}
+
+// script returns the page's JavaScript: the pure core, then the DOM wiring
+// that drives it.
+func script() string {
+	return inline("web/core.js") + "\n" + inline("web/page.js")
 }
 
 // asset returns the contents of an embedded file.

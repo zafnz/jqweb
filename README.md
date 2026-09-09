@@ -71,6 +71,16 @@ The leading dot is optional, `["quoted keys"]` and negative array indices such
 as `[-1]` both work, and text that does not resolve to a path is used as a
 filter instead.
 
+## Development
+
+The page is assembled at build time from `web/page.html`, `web/page.css` and
+two scripts, all pulled in with `go:embed`. `web/core.js` holds the parser,
+the HTML renderer and the path reader and never touches the DOM, so it runs
+under Node; `web/page.js` is the DOM wiring on top of it.
+
+    go test ./...    # Go: argument handling, input validation, page assembly
+    node --test      # JavaScript: web/core.test.js
+
 ## Why?
 
 Sometimes it's easier to view it in your webbrowser then search through large json output to

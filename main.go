@@ -311,7 +311,7 @@ func moreValues(dec *json.Decoder) bool {
 }
 
 func describeErr(data []byte, err error) error {
-	if err == io.EOF || err == io.ErrUnexpectedEOF {
+	if isTruncated(err) {
 		if len(bytes.TrimSpace(data)) == 0 {
 			return fmt.Errorf("empty input")
 		}
@@ -343,6 +343,21 @@ func describeErr(data []byte, err error) error {
 		return fmt.Errorf("%v (line %d, column %d)", err, line, col)
 	}
 	return err
+}
+
+// isTruncated reports whether err means the input ran out mid-document.
+//
+// Which error that is depends on the Go version: through Go 1.26 the decoder
+// returned io.EOF, but Go 1.27 reports More() as true inside an unclosed
+// container, so the decoder reads on and returns a syntax error instead. The
+// message is the only thing distinguishing it from a real syntax error, since
+// its offset is the end of the input either way.
+func isTruncated(err error) bool {
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	var se *json.SyntaxError
+	return errors.As(err, &se) && se.Error() == "unexpected end of JSON input"
 }
 
 // exactErr re-parses data in one pass to obtain a syntax error whose Offset

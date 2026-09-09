@@ -11,12 +11,18 @@ permissions:
 jobs:
   go:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor from go.mod and the current release. Decoder behaviour has
+        # differed between them before, and the error messages depend on it.
+        go-version: ["1.26", "stable"]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version: stable
+          go-version: ${{ matrix.go-version }}
 
       - name: gofmt
         run: |

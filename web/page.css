@@ -1,0 +1,61 @@
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: #101114; color: #d4d7dd;
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+header {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 14px; background: #17191d; border-bottom: 1px solid #26292f;
+}
+header .name { color: #8a9199; margin-right: 4px; }
+header button {
+  font: inherit; color: #d4d7dd; background: #22252b;
+  border: 1px solid #33373f; border-radius: 4px; padding: 3px 10px; cursor: pointer;
+}
+header button:hover { background: #2a2e35; }
+#q {
+  font: inherit; flex: 1 1 220px; max-width: 420px; color: inherit;
+  background: #101114; border: 1px solid #33373f; border-radius: 4px;
+  padding: 4px 9px; outline: none;
+}
+#q:focus { border-color: #4a90d9; }
+#stats { color: #8a9199; }
+main { padding: 10px 14px 60px; }
+
+.line { white-space: pre-wrap; word-break: break-word; border-radius: 3px; }
+.line:hover { background: rgba(255,255,255,.045); }
+.toggle, .sp { display: inline-block; width: 1.15em; }
+.toggle {
+  background: none; border: none; padding: 0; margin: 0;
+  color: #7d848d; cursor: pointer; font: inherit; text-align: left;
+}
+.toggle::before { content: "\25BE"; }
+.node.collapsed > .line > .toggle::before { content: "\25B8"; }
+.kids { margin-left: .55em; padding-left: .8em; border-left: 1px solid #24272c; }
+.closer { padding-left: 1.15em; }
+.node.collapsed > .kids, .node.collapsed > .closer { display: none; }
+.node:not(.collapsed) > .line > .fold { display: none; }
+.fold { color: #7d848d; cursor: pointer; }
+
+.key { color: #6cb6ff; font-weight: 600; }
+.str { color: #57d364; }
+.num { color: #d4d7dd; }
+.bool { color: #d4d7dd; font-weight: 600; }
+.null { color: #8a9199; font-weight: 600; }
+.p { color: #eceef2; font-weight: 600; }
+.pn { color: #d4d7dd; }
+.c { color: #8a9199; }
+
+.cp {
+  background: none; border: none; padding: 0 5px;
+  font: inherit; font-size: .92em; color: #8a9199; cursor: pointer; opacity: .35;
+}
+.line:hover .cp, .cp:focus { opacity: 1; }
+.cp.ok { color: #57d364; opacity: 1; }
+.cp.fail { color: #e5534b; opacity: 1; }
+
+.node.hidden { display: none; }
+.node.hit > .line { background: rgba(210,168,60,.16); }

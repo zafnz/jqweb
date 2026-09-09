@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}} &middot; jqweb</title>
+<style>
+{{STYLE}}
+</style>
+</head>
+<body>
+<header>
+  <span class="name">jqweb &middot; {{TITLE}}</span>
+  <button id="expand" type="button">Expand all</button>
+  <button id="collapse" type="button">Collapse all</button>
+  <input id="q" type="search" placeholder="Filter keys and values, or paste a path (press /)" autocomplete="off" spellcheck="false">
+  <span id="stats"></span>
+</header>
+<main id="tree"></main>
+<script id="data" type="application/json">{{DATA}}</script>
+<script>
+{{SCRIPT}}
+</script>
+</body>
+</html>

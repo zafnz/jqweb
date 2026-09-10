@@ -261,6 +261,37 @@ test('a query can be run more than once', () => {
   }
 });
 
+test('index counts characters where jq counts bytes', () => {
+  /* Not in the corpus, because this is the one place the engine knowingly
+     disagrees with jq: jq reports UTF-8 byte offsets from indices, which do
+     not line up with its own slices or its own length. "h\u00e9llo\ud83d\ude00x"
+     has its x at character 6 and byte 10; jq says 10 and then slices from
+     there to nothing. */
+  const doc = '"h\\u00e9llo\\ud83d\\ude00x"';
+  assert.deepStrictEqual(run('index("x")', doc), ['6']);
+  assert.deepStrictEqual(run('length', doc), ['7']);
+  assert.deepStrictEqual(run('.[index("x"):]', doc), ['"x"']);
+  /* Everything ASCII, which is nearly every use, agrees with jq exactly. */
+  assert.deepStrictEqual(run('index("X")', '"aXbXc"'), ['1']);
+  assert.deepStrictEqual(run('.[index("X"):]', '"aXbXc"'), ['"XbXc"']);
+});
+
+test('index finds a subsequence in an array, not one element', () => {
+  assert.deepStrictEqual(run('index([[2]])', '[1,[2],3]'), ['1']);
+  assert.deepStrictEqual(run('indices([2])', '[1,[2],3]'), ['[]']);
+  assert.deepStrictEqual(run('index(null)', '[null,1]'), ['0']);
+  assert.deepStrictEqual(run('index("a")', 'null'), ['null']);
+  assert.strictEqual(error('index(1)', '"abc"'), 'run: cannot look for number in a string');
+  assert.strictEqual(error('index("a")', '{"a":1}'), 'run: cannot look inside object');
+});
+
+test('an index of 0 is still a truthy select', () => {
+  /* select keeps anything but false and null, so a match at the start counts.
+     This is the reason index reads well inside select. */
+  assert.deepStrictEqual(run('[.[] | select(index("a"))]', '["abc","bca","xyz"]'),
+    ['["abc","bca"]']);
+});
+
 test('regex flags outside the supported set are refused', () => {
   assert.deepStrictEqual(run('test("A"; "i")', '"a"'), ['true']);
   assert.strictEqual(error('test("a"; "x")', '"a"'), 'run: unsupported regex flag "x"');

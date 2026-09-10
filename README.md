@@ -99,9 +99,15 @@ construction, and about 60 builtins are there: `select`, `map`, `map_values`,
 `keys`, `length`, `type`, `has`, `to_entries`, `from_entries`, `with_entries`,
 `add`, `any`, `all`, `sort_by`, `group_by`, `unique_by`, `min_by`, `max_by`,
 `flatten`, `range`, `limit`, `first`, `last`, `join`, `split`, `test`,
-`startswith`, `contains`, `tostring`, `tonumber`, `tojson`, `recurse` and the
-type filters. Regular expressions are JavaScript's rather than Oniguruma's,
-which differ in the corners.
+`startswith`, `contains`, `index`, `rindex`, `indices`, `tostring`, `tonumber`,
+`tojson`, `recurse` and the type filters.
+
+Two things differ from jq on purpose. Regular expressions are JavaScript's
+rather than Oniguruma's, which part ways in the corners. `index` and `indices`
+count characters into a string, where jq counts UTF-8 bytes; jq's own slices
+count characters, so in jq `.[index("x"):]` cuts in the wrong place as soon as
+the text before the match is not all ASCII. Pure ASCII behaves identically
+either way.
 
 Variables and `as`, `def`, `reduce`, `foreach`, assignment, `path`, string
 interpolation and format strings are not. A query using one says so by name

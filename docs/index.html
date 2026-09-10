@@ -411,7 +411,7 @@ if (typeof module === 'object' && module.exports) module.exports = jqweb;
       fault(e.message, e.pos);
       return;
     }
-    if (query.path) { showSegments(query.path); return; }
+    if (query.path) { showFound(resolvePath(query.path), query.path.length); return; }
     try {
       out = query.run(rootValue);
     } catch (e) {
@@ -424,17 +424,17 @@ if (typeof module === 'object' && module.exports) module.exports = jqweb;
     if (/[.[]/.test(raw)) {
       var segs = parsePath(raw);
       if (segs) {
-        if (resolvePath(segs).depth === segs.length || raw.charAt(0) === '.') {
-          showSegments(segs);
+        var found = resolvePath(segs);
+        if (found.depth === segs.length || raw.charAt(0) === '.') {
+          showFound(found, segs.length);
           return;
         }
       }
     }
     textFilter(raw.toLowerCase());
   }
-  function showSegments(segs) {
-    var found = resolvePath(segs);
-    if (found.depth === segs.length) {
+  function showFound(found, want) {
+    if (found.depth === want) {
       showPath(found.node, true);
       stats.textContent = pathOf(found.node);
       return;

@@ -204,6 +204,19 @@
     {"q":"[.mixed[] | booleans]","out":["[true]"]},
     {"q":"[.mixed[] | nulls]","out":["[null]"]},
     {"q":"[.mixed[] | iterables]","out":["[[4],{\"five\":5}]"]},
-    {"q":".empty | any, all","out":["false","true"]}
+    {"q":".empty | any, all","out":["false","true"]},
+    {"q":"[.items[] | select(.tags | index(\"x\")) | .id]","out":["[1,3]"]},
+    {"q":"[.items[] | select(.name | index(\"mm\"))] | length","out":["1"]},
+    {"q":".name | index(\"we\")","out":["2"]},
+    {"q":".name | index(\"zz\")","out":["null"]},
+    {"q":".tags | index(\"json\")","out":["1"]},
+    {"q":".tags | rindex(\"cli\")","out":["2"]},
+    {"q":"[.items[].n] | indices(2)","out":["[1]"]},
+    {"q":"\"abcabc\" | indices(\"bc\")","out":["[1,4]"]},
+    {"q":"\"aaaa\" | indices(\"aa\")","out":["[0,1,2]"]},
+    {"q":"[0,1,2,3,1,4,2] | indices([1,2])","out":["[1]"]},
+    {"q":".name | indices(\"\")","out":["[]"]},
+    {"q":".missing | index(\"a\")","out":["null"]},
+    {"q":".name | index(\"jqweb\")","out":["0"]}
   ]
 }

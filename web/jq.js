@@ -1025,6 +1025,49 @@ var jqjs = (function () {
     return equal(a, b);
   }
 
+  /* Where one value turns up inside another: every offset in a string at which
+     a substring starts, every index in an array at which a subsequence starts,
+     or every index holding an element equal to a scalar. Matches may overlap,
+     as they do in jq, so "aaaa" has "aa" at 0, 1 and 2.
+
+     String offsets count characters. jq counts UTF-8 bytes here, which
+     disagrees with its own slices and its own length -- .[index("x"):] cuts in
+     the wrong place in jq whenever the text before the match is not all
+     ASCII. Counting characters keeps that working. */
+  function indicesOf(x, want) {
+    var tx = typeOf(x), tw = typeOf(want), out = [], cs, ws, i, j;
+    if (tx === 'null') return NULL;
+    if (tx === 'string') {
+      if (tw !== 'string') throw runErr('cannot look for ' + tw + ' in a string');
+      ws = chars(want.r);
+      cs = chars(x.r);
+      for (i = 0; ws.length && i + ws.length <= cs.length; i++) {
+        for (j = 0; j < ws.length && cs[i + j] === ws[j]; j++) { /* count the match */ }
+        if (j === ws.length) out.push(leafOf(i));
+      }
+      return arrayOf(out);
+    }
+    if (tx !== 'array') throw runErr('cannot look inside ' + tx);
+    /* An array argument is a run to find, not one element to match, so
+       [1,[2],3] holds [[2]] at 1 but does not hold [2] anywhere. */
+    if (tw === 'array') {
+      for (i = 0; want.v.length && i + want.v.length <= x.v.length; i++) {
+        for (j = 0; j < want.v.length && equal(x.v[i + j], want.v[j]); j++) { /* count */ }
+        if (j === want.v.length) out.push(leafOf(i));
+      }
+      return arrayOf(out);
+    }
+    for (i = 0; i < x.v.length; i++) if (equal(x.v[i], want)) out.push(leafOf(i));
+    return arrayOf(out);
+  }
+
+  /* index and rindex are the first and last of those, or null when there are
+     none. Nothing is ever found in null, which has no indices at all. */
+  function endIndex(found, last) {
+    if (found.t !== 'a' || !found.v.length) return NULL;
+    return last ? found.v[found.v.length - 1] : found.v[0];
+  }
+
   /* The names from_entries accepts for the key and the value of an entry. A
      key falls through to the next spelling when it is null or false; a value
      does not, so an entry may hold a null on purpose. */
@@ -1135,6 +1178,15 @@ var jqjs = (function () {
     },
     'in/1': function (x, args) {
       return overArg(args[0], x, function (c) { return hasKey(c, x) ? TRUE : FALSE; });
+    },
+    'indices/1': function (x, args) {
+      return overArg(args[0], x, function (w) { return indicesOf(x, w); });
+    },
+    'index/1': function (x, args) {
+      return overArg(args[0], x, function (w) { return endIndex(indicesOf(x, w), false); });
+    },
+    'rindex/1': function (x, args) {
+      return overArg(args[0], x, function (w) { return endIndex(indicesOf(x, w), true); });
     },
     'contains/1': function (x, args) {
       return overArg(args[0], x, function (b) { return containsIn(x, b) ? TRUE : FALSE; });

@@ -55,8 +55,8 @@ it out. `script()` and `style()` in `main.go` pick the file list, and
 | `theme.js` | both | runs in `<head>`, picks the palette before the body parses |
 | `page.css` | both | the palette, both themes |
 | `jq.js` | default only | the jq engine |
-| `suggest.js` | default only | builds the queries a clicked line could mean. No DOM. |
-| `query.js` | default only | search box as a query, results view, suggestion list |
+| `suggest.js` | default only | builds the queries a clicked line could mean, and the object construction the picked lines add up to. No DOM. |
+| `query.js` | default only | search box as a query, results view, suggestion list, column picking |
 | `query.css` | default only | mode select, suggestion list, error box, results |
 
 `page.js` must work with the other three absent. It calls `jqui()` when
@@ -87,6 +87,11 @@ outputs, and an array makes `,`, `[]` and `select` fall out for free. Nothing
 short-circuits as a result, so no builtin may produce an endless stream.
 
 ## Rules that bite
+
+**Picking a column does not run anything.** The results on screen are what the
+fields are being picked from, and the projection replaces them, so a click adds
+a member to the query in the box and waits for Enter. Running on each click
+takes the rest of the fields off the screen after the first one.
 
 **Offline, always.** A rendered page is one file that has to work with no
 network: no CDN, no web fonts, no remote images. The GitHub mark in the toolbar

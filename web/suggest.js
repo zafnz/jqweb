@@ -9,13 +9,19 @@
    what it returns, which is what lets someone pick by outcome instead of by
    reasoning about jq.
 
+   project() is the other half of the same job. A reading narrows the document
+   down to the records you were after; what you usually want next is one field
+   out of each of them, which is a query nothing about the clicked line can
+   predict. It takes the lines picked out of a result and writes the object
+   construction that keeps them.
+
    Everything here is text in, text out, over the node form core.js parses to.
    Nothing touches the DOM and nothing runs a query. */
 var jqsuggest = (function () {
   'use strict';
 
   var core = typeof jqweb !== 'undefined' ? jqweb : require('./core.js');
-  var pathText = core.pathText, stringify = core.stringify;
+  var pathText = core.pathText, stringify = core.stringify, quote = core.quote;
 
   /* How many ancestors to offer a pivot on. The outermost are the ones worth
      asking about -- they are where "the others like this" live -- and a deeply
@@ -30,6 +36,15 @@ var jqsuggest = (function () {
      "which records have this field" is the useful question about a big value
      anyway. */
   var MAX_LITERAL = 60;
+
+  /* The key a segment list ends under, or null if it is reached through
+     indices alone. */
+  function keyOf(segs) {
+    for (var i = segs.length - 1; i >= 0; i--) {
+      if (segs[i].key !== undefined) return segs[i].key;
+    }
+    return null;
+  }
 
   /* The node segs leads to, or null if it leads nowhere. */
   function nodeAt(doc, segs) {
@@ -77,12 +92,25 @@ var jqsuggest = (function () {
     return out;
   }
 
+  /* Whether a pivot is a collection of records, which is where a search of
+     each member's whole subtree is worth offering. Every member being a
+     container is what a list of records looks like. A container with scalars
+     in it is a record itself, and one with a single member is a step on the
+     way down to one; asking either which of its members holds the value fills
+     the list with readings that return one. */
+  function collection(n) {
+    if (n.v.length < 2) return false;
+    for (var i = 0; i < n.v.length; i++) if (n.v[i].t === 'l') return false;
+    return true;
+  }
+
   /* How good a reading is, all else being equal, lowest first. Counts decide
      the order the reader sees, but several readings of the same line routinely
      return the same number, and then this picks between them: a named pivot
-     beats the whole document, asking about the key the value sat under beats
-     ignoring it, and both beat a search that gives up on structure. */
-  var RANK = { pivot: 1, anyKey: 2, anywhere: 3, line: 4, unnamed: 1 };
+     beats the whole document, the path the value was clicked at beats a search
+     of the member holding it, that beats leaving the key open, and all of them
+     beat a search that gives up on structure. */
+  var RANK = { pivot: 1, deep: 2, anyKey: 3, anywhere: 4, line: 5, unnamed: 1 };
 
   /* The queries a line might have meant, roughly widest reading first. Each is
      {q: text, why: a few words, shape: 'keys' or 'results', rank: a number}.
@@ -111,6 +139,10 @@ var jqsuggest = (function () {
       segs.length > 0 && segs[segs.length - 1].index !== undefined;
     /* Segments from a pivot's member down to the value's own container. */
     var below = inArray ? segs.slice(0, -1) : segs;
+    /* The key the value sat under, which is all a reading that has given up
+       on the path has left to ask about. Null for a value reached only
+       through indices, which is nothing to search on. */
+    var key = keyOf(below);
 
     function add(q, why, shape, rank) {
       if (!q || seen[q]) return null;
@@ -146,6 +178,25 @@ var jqsuggest = (function () {
           ' | select(' + condition('', test, literal, holds) + ')',
         where, 'results', RANK.pivot + unnamed);
       }
+      /* The same question asked of each member as a whole rather than of one
+         path through it. A list of records holds them in more than one shape
+         often enough -- a Pod keeps its containers at .spec.containers and a
+         Deployment one level further down -- and then no exact path finds all
+         of them. What it returns is the member, which is the difference
+         between this and the reading below: that one hands back what it
+         looked inside, so the record identifying the match is gone by the
+         time you have the match. */
+      if (key !== null && test.length > 1 && collection(pivot)) {
+        var deep = 'any(.. | objects; ' +
+          condition('', [{ key: key }], literal, inArray) + ')';
+        if (pivot.t === 'o') {
+          add((at === '.' ? '' : at + ' | ') + 'with_entries(select(.value | ' + deep + '))',
+          where + ', at any depth', 'keys', RANK.deep + unnamed);
+        } else {
+          add((at === '.' ? '.[]' : at + '[]') + ' | select(' + deep + ')',
+          where + ', at any depth', 'results', RANK.deep + unnamed);
+        }
+      }
       /* The same question with the key the value happened to sit under left
          open: a tag on .get is usually wanted across .post and .delete too. */
       if (test.length > (literal === null ? 1 : 0)) {
@@ -159,10 +210,6 @@ var jqsuggest = (function () {
     });
 
     /* No pivot at all: wherever it is in the document. */
-    var key = null;
-    for (var i = below.length - 1; i >= 0; i--) {
-      if (below[i].key !== undefined) { key = below[i].key; break; }
-    }
     add(key === null ? '.. | select(. == ' + literal + ')'
       : '.. | objects | select(' + condition('', [{ key: key }], literal, inArray) + ')',
     'anywhere', 'results', RANK.anywhere);
@@ -176,7 +223,37 @@ var jqsuggest = (function () {
     return out;
   }
 
-  return { suggest: suggest };
+  /* The names jq takes as an object key without quotes, which is the rule
+     pathText applies to a path segment. */
+  var identRe = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+  /* The query that turns each result of base into a record holding the lines
+     picked out of it. picks are segment lists relative to a result, so one
+     query reads the same field out of every one of them, and there has to be
+     at least one: an empty pick list is the base query itself.
+
+     A member is named after the key its line sat under, which is the name
+     someone picking .metadata.name has in mind. The path is the fallback, and
+     is what a second pick under the same key gets.
+
+     quoted writes every name as a string. jq reads a bare name as a key
+     unless it is a word the parser wants for itself -- {and: .and} does not
+     compile -- and which words those are is the engine's business rather than
+     this file's, so a caller that finds the query will not compile asks again
+     with quoted set. */
+  function project(base, picks, quoted) {
+    var used = {}, parts = [], i, path, name;
+    for (i = 0; i < picks.length; i++) {
+      path = pathText(picks[i]);
+      name = keyOf(picks[i]);
+      if (name === null || used[name]) name = path.replace(/^\./, '');
+      used[name] = true;
+      parts.push((quoted || !identRe.test(name) ? quote(name) : name) + ': ' + path);
+    }
+    return base + ' | {' + parts.join(', ') + '}';
+  }
+
+  return { suggest: suggest, project: project };
 })();
 
 /* Node loads this file directly to test it; browsers use the global above. */

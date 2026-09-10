@@ -58,9 +58,11 @@ against a build from `main`:
     done
     diff /tmp/dom-old.html /tmp/dom-new.html
 
-A static dump only covers rendering. Searching, filtering, collapsing and
-copy-path need driving, which means a browser automation tool; there is no
-such test in CI today.
+A static dump only covers rendering. Searching, filtering, collapsing,
+copy-path and picking a result's fields for the output need driving, which means
+a browser automation tool; there is no such test in CI today. What `suggest.js`
+builds is checked in `web/suggest.test.js` either way, so a driver only has to
+cover the clicking and what it puts in the box.
 
 The stylesheets carry no comments, because only the scripts are stripped: CSS
 is inlined as written, so a comment in `page.css` or `query.css` ships in every
@@ -75,8 +77,9 @@ should carry none at all, which is what `TestPageCarriesNoComments` checks.
 ## The jq subset
 
 `web/jq.js` is the query engine, `web/suggest.js` builds the queries a line of
-the document could have meant, `web/query.js` is the search box wiring that
-drives both, and `web/query.css` styles what only they put on the page. Those
+the document could have meant along with the object construction a result's
+picked lines add up to, `web/query.js` is the search box wiring that drives
+both, and `web/query.css` styles what only they put on the page. Those
 four are what `--simple` leaves out, so none of them costs
 anything in a page built with it; `web/page.js` ships either way and works
 without them, calling `jqui()` when it is there and falling back to the path

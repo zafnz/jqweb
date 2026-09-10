@@ -19,7 +19,7 @@
      tree be rendered here where the collapsing state lives. The parsed
      document is kept as well, because a query runs against it. */
   var rootValue = parseJSON(document.getElementById('data').textContent);
-  tree.innerHTML = renderTree(rootValue, typeof jqui !== 'undefined');
+  tree.innerHTML = renderTree(rootValue, typeof jqui === 'undefined' ? '' : 'filter');
   var rootNode = tree.querySelector(':scope > .node');
 
   /* The query half, or null in a page built with --simple. It reads the search
@@ -55,6 +55,11 @@
     if (cp) { copy(pathOf(cp.closest('.node')), cp); return; }
     var fq = e.target.closest('.fq');
     if (fq) { if (query) query.filter(fq.closest('.node')); return; }
+    /* Only the result view carries this one, and only a page with the engine
+       has a result view, so there is nothing to guard beyond query being
+       there at all. */
+    var ad = e.target.closest('.ad');
+    if (ad) { if (query) query.column(ad.closest('.node'), ad); return; }
     var tg = e.target.closest('.toggle');
     if (tg) { tg.closest('.node').classList.toggle('collapsed'); return; }
     var fold = e.target.closest('.fold');
@@ -166,10 +171,13 @@
     clearTimeout(timer);
     timer = setTimeout(run, 120);
   });
-  /* "/" focuses the search box, Escape clears it. */
+  /* "/" focuses the search box, Escape clears it, and Enter runs what is in
+     it. Typing runs on a pause, so Enter is only ever a way to run something
+     that was put there by something other than typing. */
   document.addEventListener('keydown', function (e) {
     if (e.key === '/' && e.target !== input) { e.preventDefault(); input.focus(); }
     if (e.key === 'Escape' && e.target === input) { input.value = ''; run(); }
+    if (e.key === 'Enter' && e.target === input) { clearTimeout(timer); run(); }
   });
 
   /* Runs whatever is in the box. Without query.js that is text to find or a

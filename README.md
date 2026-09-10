@@ -145,10 +145,10 @@ does nothing but browse, filter and look up paths.
 
 ## Filtering on a value
 
-Every line has two buttons. `&#x29C9;` puts that line's path on the clipboard.
-`&#x2261;` fills the search box with a query built from that line and drops
-down the other queries the line could have meant, each labelled with what it
-returns.
+Every line of the document has two buttons. `&#x29C9;` puts that line's path on
+the clipboard. `&#x2261;` fills the search box with a query built from that line
+and drops down the other queries the line could have meant, each labelled with
+what it returns.
 
 Which one you want is a judgement about the document, not something that can be
 read off the path. Standing on `"Page content"` in `.paths["/page/"].get.tags[0]`
@@ -173,6 +173,41 @@ into the box brings it back.
 A value the size of a whole subtree is asked about by presence instead --
 `select(.value.get? != null)`, "which paths have a get at all" -- because
 pasting the subtree into the query would give a row nobody can read.
+
+Where the pivot is a list of records, one of the readings searches each record
+whole rather than following the path the value was clicked at. Records differ
+in shape often enough that no one path finds them all: in a `kubectl get all -o
+json` listing, a Pod keeps its containers at `.spec.containers` and a Deployment
+keeps them under `.spec.template.spec`, so clicking a container port offers both
+
+```
+.items[] | select(any(.. | objects; .containerPort? == 80))                4 results
+.items[] | select(.spec.containers[0].ports[0].containerPort? == 80)       2 results
+```
+
+and the first of them finds the Deployment and the ReplicaSet as well as the two
+Pods. What it returns is the record rather than the port object, which is what
+makes the next part possible.
+
+## Picking what comes out
+
+Finding the records is half of it; the other half is saying what to show about
+each one. Every line of a result carries `&#x229E;`, which adds that line to the
+output. The path is read relative to the result it sits in, so it names the same
+field in every one of them: clicking `&#x229E;` on the `"name"` line inside
+`.metadata` above leaves
+
+```
+.items[] | select(any(.. | objects; .containerPort? == 80)) | {name: .metadata.name}
+```
+
+in the box. Clicking a second line adds a second member, named after the key it
+sat under; clicking a picked line again takes it out.
+
+Nothing runs until you press Enter. The results on screen are what the fields
+are being picked from, and running the query replaces them with what it
+returned, so the run waits until there is nothing left to pick. Enter turns the
+four records into the four names.
 
 ## Why?
 

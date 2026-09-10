@@ -169,21 +169,32 @@ var jqweb = (function () {
 
   /* ---- render ---- */
 
-  /* The buttons at the end of every line. The second one only goes into a page
-     that can act on it -- it opens a list of queries built from the line, which
-     needs the query engine -- so renderTree is told whether to emit it, and the
-     pair is worked out once per tree rather than once per line. */
+  /* The buttons at the end of every line. Which of them a line carries depends
+     on the tree it is in, and only a page with the query engine has more than
+     the first: FQ opens the list of queries built from the line, and AD adds
+     the line to the output of the query that produced it. renderTree is told
+     which tree it is building, and the pair is worked out once per tree rather
+     than once per line. */
   var CP = '<button class="cp" title="Copy path">&#x29C9;</button>';
   var FQ = '<button class="fq" title="Filter on this value">&#x2261;</button>';
+  var AD = '<button class="ad" title="Add this to the output">&#x229E;</button>';
   var buttons = CP;
+  var rootButtons = CP;
 
   /* Renders a parsed document as the markup for the whole tree. The caller
      assigns it to innerHTML in one go: for a large document that is around
      twice as fast as building the same nodes with createElement, and it keeps
-     this file free of the DOM. */
-  function renderTree(root, withFilter) {
+     this file free of the DOM.
+
+     mode says which tree this is: 'filter' for the document, 'add' for what a
+     query returned, and anything else for a tree whose lines carry nothing but
+     their path. */
+  function renderTree(root, mode) {
     var out = [];
-    buttons = withFilter ? CP + FQ : CP;
+    buttons = mode === 'filter' ? CP + FQ : mode === 'add' ? CP + AD : CP;
+    /* The top line of a result is the result, so there is no field there to
+       pick out of it. */
+    rootButtons = mode === 'add' ? CP : buttons;
     emit(out, root, null, -1, false);
     return out.join('');
   }
@@ -204,7 +215,8 @@ var jqweb = (function () {
       : idx >= 0 ? ' data-index="' + idx + '"' : '';
     /* A member's copy button sits right after its key; an array element or
        the root has no key to sit after, so its button goes at the end. */
-    var keyPart = '', endBtn = buttons;   /* unkeyed nodes get the buttons at the end of the line */
+    var keyPart = '';
+    var endBtn = key === null && idx < 0 ? rootButtons : buttons;   /* unkeyed nodes get theirs at the end of the line */
     if (key !== null) {
       keyPart = '<span class="key">' + esc(quote(key)) + '</span>' + buttons +
         '<span class="pn">: </span>';

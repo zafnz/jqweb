@@ -129,16 +129,19 @@ main { padding: 10px 14px 60px; }
 .pn { color: var(--fg); }
 .c { color: var(--muted); }
 
-.cp, .fq {
+.cp, .fq, .ad {
   background: none; border: none; border-radius: 3px; padding: 1px 4px;
   font: inherit; font-size: .92em; color: var(--icon); cursor: pointer;
 }
-.fq { margin-left: 1px; }
-.line:hover .cp, .line:hover .fq { color: var(--muted); }
-.cp:hover, .fq:hover, .cp:focus, .fq:focus {
+.fq, .ad { margin-left: 1px; }
+.line:hover .cp, .line:hover .fq, .line:hover .ad { color: var(--muted); }
+.cp:hover, .fq:hover, .ad:hover, .cp:focus, .fq:focus, .ad:focus {
   color: var(--fg); background: var(--icon-chip); outline: none;
 }
-.cp:focus-visible, .fq:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; }
+.cp:focus-visible, .fq:focus-visible, .ad:focus-visible {
+  outline: 1px solid var(--focus); outline-offset: -1px;
+}
+.line .ad.on { color: var(--fg); background: var(--icon-chip); }
 .cp.ok { color: var(--ok); }
 .cp.fail { color: var(--fail); }
 
@@ -347,17 +350,21 @@ var jqweb = (function () {
   }
   var CP = '<button class="cp" title="Copy path">&#x29C9;</button>';
   var FQ = '<button class="fq" title="Filter on this value">&#x2261;</button>';
+  var AD = '<button class="ad" title="Add this to the output">&#x229E;</button>';
   var buttons = CP;
-  function renderTree(root, withFilter) {
+  var rootButtons = CP;
+  function renderTree(root, mode) {
     var out = [];
-    buttons = withFilter ? CP + FQ : CP;
+    buttons = mode === 'filter' ? CP + FQ : mode === 'add' ? CP + AD : CP;
+    rootButtons = mode === 'add' ? CP : buttons;
     emit(out, root, null, -1, false);
     return out.join('');
   }
   function emit(out, node, key, idx, comma) {
     var attrs = key !== null ? ' data-key="' + esc(key) + '"'
       : idx >= 0 ? ' data-index="' + idx + '"' : '';
-    var keyPart = '', endBtn = buttons;
+    var keyPart = '';
+    var endBtn = key === null && idx < 0 ? rootButtons : buttons;
     if (key !== null) {
       keyPart = '<span class="key">' + esc(quote(key)) + '</span>' + buttons +
         '<span class="pn">: </span>';
@@ -2114,9 +2121,15 @@ if (typeof module === 'object' && module.exports) module.exports = jqjs;
 var jqsuggest = (function () {
   'use strict';
   var core = typeof jqweb !== 'undefined' ? jqweb : require('./core.js');
-  var pathText = core.pathText, stringify = core.stringify;
+  var pathText = core.pathText, stringify = core.stringify, quote = core.quote;
   var MAX_PIVOTS = 6;
   var MAX_LITERAL = 60;
+  function keyOf(segs) {
+    for (var i = segs.length - 1; i >= 0; i--) {
+      if (segs[i].key !== undefined) return segs[i].key;
+    }
+    return null;
+  }
   function nodeAt(doc, segs) {
     var n = doc, at, i;
     for (i = 0; i < segs.length && n; i++) {
@@ -2144,7 +2157,12 @@ var jqsuggest = (function () {
     if (n > 0 && out[out.length - 1] !== n - 1) out.push(n - 1);
     return out;
   }
-  var RANK = { pivot: 1, anyKey: 2, anywhere: 3, line: 4, unnamed: 1 };
+  function collection(n) {
+    if (n.v.length < 2) return false;
+    for (var i = 0; i < n.v.length; i++) if (n.v[i].t === 'l') return false;
+    return true;
+  }
+  var RANK = { pivot: 1, deep: 2, anyKey: 3, anywhere: 4, line: 5, unnamed: 1 };
   function suggest(doc, segs) {
     var out = [], seen = {}, value = nodeAt(doc, segs);
     if (!value) return out;
@@ -2153,6 +2171,7 @@ var jqsuggest = (function () {
     var inArray = literal !== null &&
       segs.length > 0 && segs[segs.length - 1].index !== undefined;
     var below = inArray ? segs.slice(0, -1) : segs;
+    var key = keyOf(below);
     function add(q, why, shape, rank) {
       if (!q || seen[q]) return null;
       seen[q] = true;
@@ -2178,16 +2197,23 @@ var jqsuggest = (function () {
           ' | select(' + condition('', test, literal, holds) + ')',
         where, 'results', RANK.pivot + unnamed);
       }
+      if (key !== null && test.length > 1 && collection(pivot)) {
+        var deep = 'any(.. | objects; ' +
+          condition('', [{ key: key }], literal, inArray) + ')';
+        if (pivot.t === 'o') {
+          add((at === '.' ? '' : at + ' | ') + 'with_entries(select(.value | ' + deep + '))',
+          where + ', at any depth', 'keys', RANK.deep + unnamed);
+        } else {
+          add((at === '.' ? '.[]' : at + '[]') + ' | select(' + deep + ')',
+          where + ', at any depth', 'results', RANK.deep + unnamed);
+        }
+      }
       if (test.length > (literal === null ? 1 : 0)) {
         add((at === '.' ? '.[]' : at + '[]') + ' | .[]? | select(' +
           condition('', test.slice(1), literal, holds) + ')',
         where + ', any key', 'results', RANK.anyKey + unnamed);
       }
     });
-    var key = null;
-    for (var i = below.length - 1; i >= 0; i--) {
-      if (below[i].key !== undefined) { key = below[i].key; break; }
-    }
     add(key === null ? '.. | select(. == ' + literal + ')'
       : '.. | objects | select(' + condition('', [{ key: key }], literal, inArray) + ')',
     'anywhere', 'results', RANK.anywhere);
@@ -2195,12 +2221,24 @@ var jqsuggest = (function () {
     if (line) line.plain = true;
     return out;
   }
-  return { suggest: suggest };
+  var identRe = /^[A-Za-z_][A-Za-z0-9_]*$/;
+  function project(base, picks, quoted) {
+    var used = {}, parts = [], i, path, name;
+    for (i = 0; i < picks.length; i++) {
+      path = pathText(picks[i]);
+      name = keyOf(picks[i]);
+      if (name === null || used[name]) name = path.replace(/^\./, '');
+      used[name] = true;
+      parts.push((quoted || !identRe.test(name) ? quote(name) : name) + ': ' + path);
+    }
+    return base + ' | {' + parts.join(', ') + '}';
+  }
+  return { suggest: suggest, project: project };
 })();
 if (typeof module === 'object' && module.exports) module.exports = jqsuggest;
 var jqui = function (page) {
   'use strict';
-  var renderTree = jqweb.renderTree, esc = jqweb.esc;
+  var renderTree = jqweb.renderTree, esc = jqweb.esc, pathText = jqweb.pathText;
   var tree = document.getElementById('tree');
   var results = document.getElementById('results');
   var input = document.getElementById('q');
@@ -2250,8 +2288,9 @@ var jqui = function (page) {
   var RESULT_CAP = 500;
   function showResults(out) {
     var shown = Math.min(out.length, RESULT_CAP), parts = [], i;
+    var mode = cols.length ? '' : 'add';
     for (i = 0; i < shown; i++) {
-      parts.push('<div class="result" data-n="' + i + '">' + renderTree(out[i]) + '</div>');
+      parts.push('<div class="result" data-n="' + i + '">' + renderTree(out[i], mode) + '</div>');
     }
     results.innerHTML = parts.join('');
     results.classList.toggle('one', out.length === 1);
@@ -2279,6 +2318,7 @@ var jqui = function (page) {
   var rows = [];
   var COUNT_BUDGET_MS = 300;
   function filter(node) {
+    unpick();
     var segs = page.segsOf(node);
     var deadline = Date.now() + COUNT_BUDGET_MS;
     rows = jqsuggest.suggest(page.value, segs).map(function (c) {
@@ -2343,6 +2383,7 @@ var jqui = function (page) {
     hide();
   }
   function pick(i) {
+    unpick();
     input.value = rows[i].q;
     mark(i);
     run(rows[i].q);
@@ -2358,11 +2399,16 @@ var jqui = function (page) {
   input.addEventListener('focus', show);
   input.addEventListener('input', function () {
     forget();
+    unpick();
   });
   input.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && !suggestions.hidden) {
-      hide();
-      e.stopPropagation();
+    if (e.key === 'Escape') {
+      if (!suggestions.hidden) {
+        hide();
+        e.stopPropagation();
+        return;
+      }
+      unpick();
       return;
     }
     if (suggestions.hidden || !rows.length) return;
@@ -2376,10 +2422,54 @@ var jqui = function (page) {
   document.addEventListener('mousedown', function (e) {
     if (!suggestions.contains(e.target) && e.target !== input) hide();
   });
+  var cols = [];
+  var base = '';
+  var baseStats = '';
+  function column(node, btn) {
+    var segs = page.segsOf(node), path = pathText(segs), at = held(path);
+    if (at >= 0) {
+      cols.splice(at, 1);
+      unmark(path);
+    } else {
+      if (!cols.length) { base = input.value.trim(); baseStats = stats.textContent; }
+      cols.push(segs);
+      btn.classList.add('on');
+    }
+    input.value = cols.length ? projection() : base;
+    stats.textContent = cols.length
+      ? plural(cols.length, 'column') + ', press Enter to run'
+      : baseStats;
+    forget();
+  }
+  function held(path) {
+    for (var i = 0; i < cols.length; i++) if (pathText(cols[i]) === path) return i;
+    return -1;
+  }
+  function projection() {
+    var q = jqsuggest.project(base, cols, false);
+    try {
+      jqjs.compile(q);
+    } catch (e) {
+      q = jqsuggest.project(base, cols, true);
+    }
+    return q;
+  }
+  function unmark(path) {
+    var on = results.querySelectorAll('.ad.on'), i;
+    for (i = 0; i < on.length; i++) {
+      if (pathText(page.segsOf(on[i].closest('.node'))) === path) on[i].classList.remove('on');
+    }
+  }
+  function unpick() {
+    cols = [];
+    base = '';
+    baseStats = '';
+  }
   return {
     wants: wants,
     run: run,
     filter: filter,
+    column: column,
     clearFault: clearFault,
     showDocument: showDocument
   };
@@ -2392,7 +2482,7 @@ var jqui = function (page) {
   var stats = document.getElementById('stats');
   var parseJSON = jqweb.parseJSON, renderTree = jqweb.renderTree, parsePath = jqweb.parsePath;
   var rootValue = parseJSON(document.getElementById('data').textContent);
-  tree.innerHTML = renderTree(rootValue, typeof jqui !== 'undefined');
+  tree.innerHTML = renderTree(rootValue, typeof jqui === 'undefined' ? '' : 'filter');
   var rootNode = tree.querySelector(':scope > .node');
   var query = typeof jqui === 'undefined' ? null : jqui({
     value: rootValue,
@@ -2415,6 +2505,8 @@ var jqui = function (page) {
     if (cp) { copy(pathOf(cp.closest('.node')), cp); return; }
     var fq = e.target.closest('.fq');
     if (fq) { if (query) query.filter(fq.closest('.node')); return; }
+    var ad = e.target.closest('.ad');
+    if (ad) { if (query) query.column(ad.closest('.node'), ad); return; }
     var tg = e.target.closest('.toggle');
     if (tg) { tg.closest('.node').classList.toggle('collapsed'); return; }
     var fold = e.target.closest('.fold');
@@ -2488,6 +2580,7 @@ var jqui = function (page) {
   document.addEventListener('keydown', function (e) {
     if (e.key === '/' && e.target !== input) { e.preventDefault(); input.focus(); }
     if (e.key === 'Escape' && e.target === input) { input.value = ''; run(); }
+    if (e.key === 'Enter' && e.target === input) { clearTimeout(timer); run(); }
   });
   function run() {
     var raw = input.value.trim();

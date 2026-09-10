@@ -23,8 +23,9 @@ header button {
   border: 1px solid #33373f; border-radius: 4px; padding: 3px 10px; cursor: pointer;
 }
 header button:hover { background: #2a2e35; }
+.qwrap { position: relative; flex: 1 1 220px; max-width: 420px; }
 #q {
-  font: inherit; flex: 1 1 220px; max-width: 420px; color: inherit;
+  font: inherit; width: 100%; color: inherit;
   background: #101114; border: 1px solid #33373f; border-radius: 4px;
   padding: 4px 9px; outline: none;
 }
@@ -36,6 +37,32 @@ header button:hover { background: #2a2e35; }
 }
 #stats { color: #8a9199; }
 main { padding: 10px 14px 60px; }
+
+#suggest {
+  position: absolute; z-index: 10; top: calc(100% + 4px); left: 0;
+  min-width: 100%; width: max-content; max-width: min(90vw, 760px);
+  background: #1b1e23; border: 1px solid #33373f; border-radius: 4px;
+  padding: 3px; box-shadow: 0 6px 20px rgba(0,0,0,.45);
+  max-height: 60vh; overflow-y: auto;
+}
+.sg { display: flex; align-items: stretch; border-radius: 3px; }
+.sg.on { background: #2b3038; }
+.sg:hover { background: #262a31; }
+.sgq {
+  font: inherit; color: #d4d7dd; background: none; border: none; cursor: pointer;
+  flex: 1; display: flex; gap: 18px; align-items: baseline;
+  justify-content: space-between; text-align: left; padding: 3px 6px;
+}
+.sgt { white-space: pre-wrap; word-break: break-all; }
+.sgn { color: #8a9199; white-space: nowrap; }
+.sg.on .sgn { color: #d4d7dd; }
+.sgc {
+  font: inherit; color: #8a9199; background: none; border: none;
+  cursor: pointer; padding: 3px 6px; opacity: .45;
+}
+.sg:hover .sgc, .sgc:focus { opacity: 1; }
+.sgc.ok { color: #57d364; opacity: 1; }
+.sgc.fail { color: #e5534b; opacity: 1; }
 
 .result { position: relative; padding-left: 2.6em; margin-bottom: 3px; }
 .result::before {
@@ -70,11 +97,12 @@ main { padding: 10px 14px 60px; }
 .pn { color: #d4d7dd; }
 .c { color: #8a9199; }
 
-.cp {
+.cp, .fq {
   background: none; border: none; padding: 0 5px;
   font: inherit; font-size: .92em; color: #8a9199; cursor: pointer; opacity: .35;
 }
-.line:hover .cp, .cp:focus { opacity: 1; }
+.fq { padding-left: 0; }
+.line:hover .cp, .line:hover .fq, .cp:focus, .fq:focus { opacity: 1; }
 .cp.ok { color: #57d364; opacity: 1; }
 .cp.fail { color: #e5534b; opacity: 1; }
 
@@ -92,7 +120,10 @@ main { padding: 10px 14px 60px; }
     <option value="filter">Filter</option>
     <option value="jq">jq</option>
   </select>
-  <input id="q" type="search" placeholder="Filter keys and values, or paste a path (press /)" autocomplete="off" spellcheck="false">
+  <div class="qwrap">
+    <input id="q" type="search" placeholder="Filter keys and values, or paste a path (press /)" autocomplete="off" spellcheck="false">
+    <div id="suggest" hidden></div>
+  </div>
   <span id="stats"></span>
 </header>
 <main>
@@ -199,17 +230,20 @@ var jqweb = (function () {
     }
   }
   var CP = '<button class="cp" title="Copy path">&#x29C9;</button>';
-  function renderTree(root) {
+  var FQ = '<button class="fq" title="Filter on this value">&#x2261;</button>';
+  var buttons = CP;
+  function renderTree(root, withFilter) {
     var out = [];
+    buttons = withFilter ? CP + FQ : CP;
     emit(out, root, null, -1, false);
     return out.join('');
   }
   function emit(out, node, key, idx, comma) {
     var attrs = key !== null ? ' data-key="' + esc(key) + '"'
       : idx >= 0 ? ' data-index="' + idx + '"' : '';
-    var keyPart = '', endBtn = CP;
+    var keyPart = '', endBtn = buttons;
     if (key !== null) {
-      keyPart = '<span class="key">' + esc(quote(key)) + '</span>' + CP +
+      keyPart = '<span class="key">' + esc(quote(key)) + '</span>' + buttons +
         '<span class="pn">: </span>';
       endBtn = '';
     }
@@ -240,6 +274,17 @@ var jqweb = (function () {
     out.push('</div><div class="closer"><span class="p">' + close + '</span>' + c + '</div></div>');
   }
   var pathChar = /[^.[\]"'\s]/;
+  var identRe = /^[A-Za-z_][A-Za-z0-9_]*$/;
+  function pathText(segs) {
+    var out = '', s, i;
+    for (i = 0; i < segs.length; i++) {
+      s = segs[i];
+      out += s.index !== undefined ? '[' + s.index + ']'
+        : identRe.test(s.key) ? '.' + s.key : '[' + JSON.stringify(s.key) + ']';
+    }
+    if (!out) return '.';
+    return out.charAt(0) === '[' ? '.' + out : out;
+  }
   function parsePath(str) {
     var s = str.trim();
     if (s === '.') return [];
@@ -289,6 +334,7 @@ var jqweb = (function () {
     stringify: stringify,
     renderTree: renderTree,
     parsePath: parsePath,
+    pathText: pathText,
     quote: quote,
     esc: esc
   };
@@ -301,17 +347,21 @@ if (typeof module === 'object' && module.exports) module.exports = jqweb;
   var stats = document.getElementById('stats');
   var parseJSON = jqweb.parseJSON, renderTree = jqweb.renderTree, parsePath = jqweb.parsePath;
   var rootValue = parseJSON(document.getElementById('data').textContent);
-  tree.innerHTML = renderTree(rootValue);
+  tree.innerHTML = renderTree(rootValue, typeof jqui !== 'undefined');
   var rootNode = tree.querySelector(':scope > .node');
   var query = typeof jqui === 'undefined' ? null : jqui({
     value: rootValue,
     resolve: resolvePath,
     showFound: showFound,
+    segsOf: segsOf,
+    copy: copy,
     rerun: run
   });
   document.querySelector('main').addEventListener('click', function (e) {
     var cp = e.target.closest('.cp');
-    if (cp) { copyPath(cp); return; }
+    if (cp) { copy(pathOf(cp.closest('.node')), cp); return; }
+    var fq = e.target.closest('.fq');
+    if (fq) { if (query) query.filter(fq.closest('.node')); return; }
     var tg = e.target.closest('.toggle');
     if (tg) { tg.closest('.node').classList.toggle('collapsed'); return; }
     var fold = e.target.closest('.fold');
@@ -326,27 +376,23 @@ if (typeof module === 'object' && module.exports) module.exports = jqweb;
   function each(sel, fn) {
     Array.prototype.forEach.call(document.querySelectorAll('main ' + sel), fn);
   }
-  var identRe = /^[A-Za-z_][A-Za-z0-9_]*$/;
-  function pathOf(node) {
-    var segs = [];
-    var n = node;
+  function segsOf(node) {
+    var segs = [], n = node;
     while (n) {
       if (n.dataset.index !== undefined) {
-        segs.unshift('[' + n.dataset.index + ']');
+        segs.unshift({ index: +n.dataset.index });
       } else if (n.dataset.key !== undefined) {
-        var k = n.dataset.key;
-        segs.unshift(identRe.test(k) ? '.' + k : '[' + JSON.stringify(k) + ']');
+        segs.unshift({ key: n.dataset.key });
       }
       n = n.parentElement && n.parentElement.closest('.node');
     }
-    var p = segs.join('');
-    if (!p) return '.';
-    if (p.charAt(0) === '[') p = '.' + p;
-    return p;
+    return segs;
   }
-  function copyPath(btn) {
-    var path = pathOf(btn.closest('.node'));
-    copyText(path, function (ok) { flash(btn, ok); });
+  function pathOf(node) {
+    return jqweb.pathText(segsOf(node));
+  }
+  function copy(text, btn) {
+    copyText(text, function (ok) { flash(btn, ok); });
   }
   function copyText(t, done) {
     if (navigator.clipboard && window.isSecureContext) {

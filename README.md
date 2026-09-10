@@ -113,9 +113,40 @@ Variables and `as`, `def`, `reduce`, `foreach`, assignment, `path`, string
 interpolation and format strings are not. A query using one says so by name
 instead of guessing at what it meant.
 
-The engine adds about 44KB to every page it is built into, which is why it is
+The engine adds about 51KB to every page it is built into, which is why it is
 behind a flag rather than always on. A page built without `--jq` carries none
 of it.
+
+## Filtering on a value
+
+Every line has a copy button, `&#x29C9;`, which puts that line's path on the
+clipboard. With `--jq` it gets a second one, `&#x2261;`, which fills the search
+box with a query built from that line and drops down the other queries the line
+could have meant, each labelled with what it returns.
+
+Which one you want is a judgement about the document, not something that can be
+read off the path. Standing on `"Page content"` in `.paths["/page/"].get.tags[0]`
+of an OpenAPI spec you might mean that tag, or the operations on that path
+carrying it, or every path in the document that does, so all of them are
+offered, most results first:
+
+```
+.paths | with_entries(select(.value.get.tags? | index("Page content")?))   14 keys
+.paths[] | .[]? | select(.tags? | index("Page content")?)                  14 results
+.. | objects | select(.tags? | index("Page content")?)                     14 results
+.paths["/page/"].get.tags[] | select(. == "Page content")                   1 result
+.paths["/page/"].get.tags[0]                                               1 result
+```
+
+14 against 1 tells you which reading you meant without your having to work out
+the jq. Click a row to run it, or arrow up and down through them; the list
+stays open, so trying the next one is a keystroke. The `&#x29C9;` on a row
+copies that query. Clicking elsewhere puts the list away, and clicking back
+into the box brings it back.
+
+A value the size of a whole subtree is asked about by presence instead --
+`select(.value.get? != null)`, "which paths have a get at all" -- because
+pasting the subtree into the query would give a row nobody can read.
 
 ## Why?
 

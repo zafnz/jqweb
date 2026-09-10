@@ -16,28 +16,15 @@ header button {
   border: 1px solid #33373f; border-radius: 4px; padding: 3px 10px; cursor: pointer;
 }
 header button:hover { background: #2a2e35; }
+.qwrap { position: relative; flex: 1 1 220px; max-width: 420px; }
 #q {
-  font: inherit; flex: 1 1 220px; max-width: 420px; color: inherit;
+  font: inherit; width: 100%; color: inherit;
   background: #101114; border: 1px solid #33373f; border-radius: 4px;
   padding: 4px 9px; outline: none;
 }
 #q:focus { border-color: #4a90d9; }
-#q.bad, #q.bad:focus { border-color: #e5534b; }
-#mode {
-  font: inherit; color: #d4d7dd; background: #22252b;
-  border: 1px solid #33373f; border-radius: 4px; padding: 3px 4px; cursor: pointer;
-}
 #stats { color: #8a9199; }
 main { padding: 10px 14px 60px; }
-
-.result { position: relative; padding-left: 2.6em; margin-bottom: 3px; }
-.result::before {
-  content: attr(data-n);
-  position: absolute; left: 0; width: 2em;
-  text-align: right; color: #5c636d;
-}
-#results.one .result { padding-left: 0; }
-#results.one .result::before { content: none; }
 
 .line { white-space: pre-wrap; word-break: break-word; border-radius: 3px; }
 .line:hover { background: rgba(255,255,255,.045); }
@@ -63,11 +50,12 @@ main { padding: 10px 14px 60px; }
 .pn { color: #d4d7dd; }
 .c { color: #8a9199; }
 
-.cp {
+.cp, .fq {
   background: none; border: none; padding: 0 5px;
   font: inherit; font-size: .92em; color: #8a9199; cursor: pointer; opacity: .35;
 }
-.line:hover .cp, .cp:focus { opacity: 1; }
+.fq { padding-left: 0; }
+.line:hover .cp, .line:hover .fq, .cp:focus, .fq:focus { opacity: 1; }
 .cp.ok { color: #57d364; opacity: 1; }
 .cp.fail { color: #e5534b; opacity: 1; }
 

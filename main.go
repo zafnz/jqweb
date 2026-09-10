@@ -546,7 +546,7 @@ func scriptSafe(s string) string {
 	return strings.ReplaceAll(s, "<", `\u003c`)
 }
 
-//go:embed web/page.html web/page.css web/core.js web/jq.js web/query.js web/page.js
+//go:embed web/page.html web/page.css web/query.css web/core.js web/jq.js web/suggest.js web/query.js web/page.js
 var assets embed.FS
 
 // pageTemplate returns the page shell with its stylesheet and script inlined,
@@ -565,9 +565,18 @@ var withoutJQ = sync.OnceValue(func() string { return buildTemplate(false) })
 
 func buildTemplate(jq bool) string {
 	return strings.NewReplacer(
-		"{{STYLE}}", inline("web/page.css"),
+		"{{STYLE}}", style(jq),
 		"{{SCRIPT}}", script(jq),
 	).Replace(asset("web/page.html"))
+}
+
+// style returns the page's CSS. query.css styles what only a page with the
+// query engine has, so it goes in only alongside it.
+func style(jq bool) string {
+	if !jq {
+		return inline("web/page.css")
+	}
+	return inline("web/page.css") + "\n" + inline("web/query.css")
 }
 
 // script returns the page's JavaScript: the pure core, then the query engine
@@ -579,7 +588,7 @@ func buildTemplate(jq bool) string {
 func script(jq bool) string {
 	parts := []string{"web/core.js"}
 	if jq {
-		parts = append(parts, "web/jq.js", "web/query.js")
+		parts = append(parts, "web/jq.js", "web/suggest.js", "web/query.js")
 	}
 	parts = append(parts, "web/page.js")
 	var b strings.Builder

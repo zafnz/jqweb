@@ -259,6 +259,7 @@ func TestRenderPageInlinesAssets(t *testing.T) {
 		`id="tree"`,     // the mount point the script writes into
 		`id="results"`,  // where a query's output goes
 		`id="q"`,        // the search box
+		`id="suggest"`,  // the list of queries a line could mean
 		`id="mode"`,     // what the search box means
 		`id="stats"`,
 	} {
@@ -402,7 +403,7 @@ func TestStripComments(t *testing.T) {
 }
 
 func TestStripCommentsIsIdempotent(t *testing.T) {
-	for _, name := range []string{"web/core.js", "web/jq.js", "web/query.js", "web/page.js"} {
+	for _, name := range []string{"web/core.js", "web/jq.js", "web/suggest.js", "web/query.js", "web/page.js"} {
 		once := stripComments(asset(name))
 		if twice := stripComments(once); twice != once {
 			t.Errorf("%s: stripping twice differs from stripping once", name)

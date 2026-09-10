@@ -1,0 +1,40 @@
+#q.bad, #q.bad:focus { border-color: #e5534b; }
+#mode {
+  font: inherit; color: #d4d7dd; background: #22252b;
+  border: 1px solid #33373f; border-radius: 4px; padding: 3px 4px; cursor: pointer;
+}
+
+#suggest {
+  position: absolute; z-index: 10; top: calc(100% + 4px); left: 0;
+  min-width: 100%; width: max-content; max-width: min(90vw, 760px);
+  background: #1b1e23; border: 1px solid #33373f; border-radius: 4px;
+  padding: 3px; box-shadow: 0 6px 20px rgba(0,0,0,.45);
+  max-height: 60vh; overflow-y: auto;
+}
+.sg { display: flex; align-items: stretch; border-radius: 3px; }
+.sg.on { background: #2b3038; }
+.sg:hover { background: #262a31; }
+.sgq {
+  font: inherit; color: #d4d7dd; background: none; border: none; cursor: pointer;
+  flex: 1; display: flex; gap: 18px; align-items: baseline;
+  justify-content: space-between; text-align: left; padding: 3px 6px;
+}
+.sgt { white-space: pre-wrap; word-break: break-all; }
+.sgn { color: #8a9199; white-space: nowrap; }
+.sg.on .sgn { color: #d4d7dd; }
+.sgc {
+  font: inherit; color: #8a9199; background: none; border: none;
+  cursor: pointer; padding: 3px 6px; opacity: .45;
+}
+.sg:hover .sgc, .sgc:focus { opacity: 1; }
+.sgc.ok { color: #57d364; opacity: 1; }
+.sgc.fail { color: #e5534b; opacity: 1; }
+
+.result { position: relative; padding-left: 2.6em; margin-bottom: 3px; }
+.result::before {
+  content: attr(data-n);
+  position: absolute; left: 0; width: 2em;
+  text-align: right; color: #5c636d;
+}
+#results.one .result { padding-left: 0; }
+#results.one .result::before { content: none; }

@@ -18,7 +18,10 @@
     <option value="filter">Filter</option>
     <option value="jq">jq</option>
   </select>
-  <input id="q" type="search" placeholder="Filter keys and values, or paste a path (press /)" autocomplete="off" spellcheck="false">
+  <div class="qwrap">
+    <input id="q" type="search" placeholder="Filter keys and values, or paste a path (press /)" autocomplete="off" spellcheck="false">
+    <div id="suggest" hidden></div>
+  </div>
   <span id="stats"></span>
 </header>
 <main>

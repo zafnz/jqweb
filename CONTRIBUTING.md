@@ -42,6 +42,10 @@ A static dump only covers rendering. Searching, filtering, collapsing and
 copy-path need driving, which means a browser automation tool; there is no
 such test in CI today.
 
+The stylesheets carry no comments, because only the scripts are stripped: CSS
+is inlined as written, so a comment in `page.css` or `query.css` ships in every
+page. `TestPageCarriesNoComments` fails if one does.
+
 `stripComments` gives up on any line where a `/` turns up outside a string
 without a `*` after it, and emits that line exactly as written. Regular
 expressions and division both trip it, so a comment at the end of such a line
@@ -50,12 +54,21 @@ should carry none at all, which is what `TestPageCarriesNoComments` checks.
 
 ## The jq subset
 
-`web/jq.js` is the query engine and `web/query.js` is the search box wiring
-that drives it. Both are inlined only when `--jq` is given, so neither costs
-anything in a default page; `web/page.js` ships either way and works without
-them, calling `jqui()` when it is there and falling back to the path lookup
-when it is not. Anything that reads the box as a query, or renders what one
-produced, belongs in `query.js` rather than `page.js`.
+`web/jq.js` is the query engine, `web/suggest.js` builds the queries a line of
+the document could have meant, `web/query.js` is the search box wiring that
+drives both, and `web/query.css` styles what only they put on the page. All
+four are inlined only when `--jq` is given, so none of them
+costs anything in a default page; `web/page.js` ships either way and works
+without them, calling `jqui()` when it is there and falling back to the path
+lookup when it is not. Anything that reads the box as a query, or renders what
+one produced, belongs in `query.js` rather than `page.js`.
+
+`suggest.js` is text in, text out -- segments and a parsed document give back
+query strings -- so `web/suggest.test.js` can check it without a browser. The
+test that matters most runs every query it offers for every line of a fixture
+and fails if any of them will not compile or will not run: a suggestion that
+errors is worse than no suggestion, and the shapes that cause one are easy to
+miss by hand.
 
 The engine works on the same node form `core.js` builds for rendering, so a
 result goes straight back to `renderTree` with key order and number text intact

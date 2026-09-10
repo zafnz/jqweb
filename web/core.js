@@ -169,15 +169,21 @@ var jqweb = (function () {
 
   /* ---- render ---- */
 
-  /* The copy-path button, identical on every line. */
+  /* The buttons at the end of every line. The second one only goes into a page
+     that can act on it -- it opens a list of queries built from the line, which
+     needs the query engine -- so renderTree is told whether to emit it, and the
+     pair is worked out once per tree rather than once per line. */
   var CP = '<button class="cp" title="Copy path">&#x29C9;</button>';
+  var FQ = '<button class="fq" title="Filter on this value">&#x2261;</button>';
+  var buttons = CP;
 
   /* Renders a parsed document as the markup for the whole tree. The caller
      assigns it to innerHTML in one go: for a large document that is around
      twice as fast as building the same nodes with createElement, and it keeps
      this file free of the DOM. */
-  function renderTree(root) {
+  function renderTree(root, withFilter) {
     var out = [];
+    buttons = withFilter ? CP + FQ : CP;
     emit(out, root, null, -1, false);
     return out.join('');
   }
@@ -198,9 +204,9 @@ var jqweb = (function () {
       : idx >= 0 ? ' data-index="' + idx + '"' : '';
     /* A member's copy button sits right after its key; an array element or
        the root has no key to sit after, so its button goes at the end. */
-    var keyPart = '', endBtn = CP;   /* unkeyed nodes get the button at the end of the line */
+    var keyPart = '', endBtn = buttons;   /* unkeyed nodes get the buttons at the end of the line */
     if (key !== null) {
-      keyPart = '<span class="key">' + esc(quote(key)) + '</span>' + CP +
+      keyPart = '<span class="key">' + esc(quote(key)) + '</span>' + buttons +
         '<span class="pn">: </span>';
       endBtn = '';
     }
@@ -247,6 +253,22 @@ var jqweb = (function () {
   /* What may appear unquoted in a path segment: anything that is not a
      separator, a quote or whitespace. */
   var pathChar = /[^.[\]"'\s]/;
+
+  /* A key that can be written as .name rather than ["name"]. */
+  var identRe = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+  /* Writes segments back out as a jq-style path -- the inverse of parsePath,
+     and what a copied path looks like. */
+  function pathText(segs) {
+    var out = '', s, i;
+    for (i = 0; i < segs.length; i++) {
+      s = segs[i];
+      out += s.index !== undefined ? '[' + s.index + ']'
+        : identRe.test(s.key) ? '.' + s.key : '[' + JSON.stringify(s.key) + ']';
+    }
+    if (!out) return '.';                       /* the root itself */
+    return out.charAt(0) === '[' ? '.' + out : out;   /* jq writes .[0], not [0] */
+  }
 
   /* parsePath splits a jq-style path such as .a.b[3]["x y"] into key and index
      segments. The leading dot is optional. Returns null for text that is not a
@@ -316,6 +338,7 @@ var jqweb = (function () {
     stringify: stringify,
     renderTree: renderTree,
     parsePath: parsePath,
+    pathText: pathText,
     quote: quote,
     esc: esc
   };

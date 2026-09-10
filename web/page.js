@@ -18,7 +18,7 @@
      tree be rendered here where the collapsing state lives. The parsed
      document is kept as well, because a query runs against it. */
   var rootValue = parseJSON(document.getElementById('data').textContent);
-  tree.innerHTML = renderTree(rootValue);
+  tree.innerHTML = renderTree(rootValue, typeof jqui !== 'undefined');
   var rootNode = tree.querySelector(':scope > .node');
 
   /* The query half, or null in a page built without --jq. It reads the search
@@ -28,6 +28,8 @@
     value: rootValue,
     resolve: resolvePath,
     showFound: showFound,
+    segsOf: segsOf,
+    copy: copy,
     rerun: run
   });
 
@@ -36,7 +38,9 @@
      summary, which expands the node it belongs to. */
   document.querySelector('main').addEventListener('click', function (e) {
     var cp = e.target.closest('.cp');
-    if (cp) { copyPath(cp); return; }
+    if (cp) { copy(pathOf(cp.closest('.node')), cp); return; }
+    var fq = e.target.closest('.fq');
+    if (fq) { if (query) query.filter(fq.closest('.node')); return; }
     var tg = e.target.closest('.toggle');
     if (tg) { tg.closest('.node').classList.toggle('collapsed'); return; }
     var fold = e.target.closest('.fold');
@@ -60,40 +64,35 @@
 
   /* ---- copy path ---- */
 
-  /* A key that can be written as .name rather than ["name"]. */
-  var identRe = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
-  /* Builds the jq-style path of a node by walking up its ancestors and
-     reading back the data attributes emit() wrote, prepending each segment as
-     it goes. The result is what parsePath() reads, so a copied path can be
-     pasted straight into the search box.
+  /* Where a node sits, as the segments parsePath produces, read back off the
+     data attributes emit() wrote by walking up its ancestors.
 
      The walk stops at whichever tree the node is in, so in the result view the
-     path is relative to the result it sits in rather than to the document. */
-  function pathOf(node) {
-    var segs = [];
-    var n = node;
+     segments are relative to the result the node sits in rather than to the
+     document. */
+  function segsOf(node) {
+    var segs = [], n = node;
     while (n) {
       if (n.dataset.index !== undefined) {
-        segs.unshift('[' + n.dataset.index + ']');
+        segs.unshift({ index: +n.dataset.index });
       } else if (n.dataset.key !== undefined) {
-        var k = n.dataset.key;
-        segs.unshift(identRe.test(k) ? '.' + k : '[' + JSON.stringify(k) + ']');
+        segs.unshift({ key: n.dataset.key });
       }
       /* Skip the .kids wrapper between a node and its parent node. */
       n = n.parentElement && n.parentElement.closest('.node');
     }
-    var p = segs.join('');
-    if (!p) return '.';                       /* the root itself */
-    if (p.charAt(0) === '[') p = '.' + p;     /* jq writes .[0], not [0] */
-    return p;
+    return segs;
   }
 
-  /* Copies the path of the line a copy button belongs to, and reports the
-     outcome on the button itself. */
-  function copyPath(btn) {
-    var path = pathOf(btn.closest('.node'));
-    copyText(path, function (ok) { flash(btn, ok); });
+  /* The jq-style path of a node, which is what parsePath() reads, so a copied
+     path can be pasted straight back into the search box. */
+  function pathOf(node) {
+    return jqweb.pathText(segsOf(node));
+  }
+
+  /* Copies text, reporting the outcome on the button that asked for it. */
+  function copy(text, btn) {
+    copyText(text, function (ok) { flash(btn, ok); });
   }
 
   /* Copies text, calling done(ok) when it settles. The clipboard API needs a

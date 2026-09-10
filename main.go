@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -22,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"unicode/utf8"
 )
 
@@ -53,45 +55,91 @@ self-contained interactive HTML page.
       --host <ip>      bind address for -p (default 127.0.0.1)
   -o, --output <file>  write the page to <file>; "-" writes to stdout
   -O, --open           open the page in the default browser
+  -C, --close          stop serving once the page has been fetched
+      --close-delay <d>  how long after the last fetch -C waits, such as
+                       500ms or 5s (default 1s); giving it turns on -C
       --simple         leave out the jq query engine, for a smaller page
       --theme <name>   light, dark, or auto to follow the reader's system
                        (default auto)
+
+-OC does both: open the browser and stop once it has the page.
 
 With no -p and no -o, it listens on a random available port.
 `)
 }
 
-func main() {
-	var (
-		port    int
-		output  string
-		host    string
-		open    bool
-		simple  bool
-		theme   string
-		version bool
-	)
-	flag.IntVar(&port, "p", 0, "")
-	flag.IntVar(&port, "port", 0, "")
-	flag.StringVar(&output, "o", "", "")
-	flag.StringVar(&output, "output", "", "")
-	flag.StringVar(&host, "host", "127.0.0.1", "")
-	flag.BoolVar(&open, "open", false, "")
-	flag.BoolVar(&open, "O", false, "")
-	flag.BoolVar(&simple, "simple", false, "")
-	flag.StringVar(&theme, "theme", "auto", "")
-	flag.BoolVar(&version, "version", false, "")
-	flag.BoolVar(&version, "v", false, "")
+// cliOptions is a parsed command line: the flag values, which of them were
+// given at all, and the positional arguments left over.
+type cliOptions struct {
+	port       int
+	output     string
+	host       string
+	open       bool
+	simple     bool
+	theme      string
+	version    bool
+	closeOnGet bool
+	closeDelay time.Duration
 
-	flag.Usage = usage
-	flag.CommandLine.Parse(reorderArgs(os.Args[1:]))
+	portSet bool // -p or --port was given, whatever its value
+	outSet  bool // -o or --output was given
+	args    []string
+}
+
+// parseFlags defines the command line on fs and parses args into a cliOptions.
+// The arguments are reordered first so that flags may follow the input file,
+// and the settings that depend on whether a flag was given at all, rather than
+// on its value, are resolved here.
+func parseFlags(fs *flag.FlagSet, args []string) (cliOptions, error) {
+	var o cliOptions
+	fs.IntVar(&o.port, "p", 0, "")
+	fs.IntVar(&o.port, "port", 0, "")
+	fs.StringVar(&o.output, "o", "", "")
+	fs.StringVar(&o.output, "output", "", "")
+	fs.StringVar(&o.host, "host", "127.0.0.1", "")
+	fs.BoolVar(&o.open, "open", false, "")
+	fs.BoolVar(&o.open, "O", false, "")
+	fs.BoolVar(&o.closeOnGet, "close", false, "")
+	fs.BoolVar(&o.closeOnGet, "C", false, "")
+	fs.DurationVar(&o.closeDelay, "close-delay", time.Second, "")
+	// The flag package has no notion of bundling, so the one combination worth
+	// writing as a bundle is spelled out as a flag of its own.
+	var openClose bool
+	fs.BoolVar(&openClose, "OC", false, "")
+	fs.BoolVar(&openClose, "CO", false, "")
+	fs.BoolVar(&o.simple, "simple", false, "")
+	fs.StringVar(&o.theme, "theme", "auto", "")
+	fs.BoolVar(&o.version, "version", false, "")
+	fs.BoolVar(&o.version, "v", false, "")
+
+	if err := fs.Parse(reorderArgs(args)); err != nil {
+		return o, err
+	}
 
 	set := map[string]bool{}
-	flag.Visit(func(f *flag.Flag) { set[f.Name] = true })
-	portSet := set["p"] || set["port"]
-	outSet := set["o"] || set["output"]
+	fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
+	o.portSet = set["p"] || set["port"]
+	o.outSet = set["o"] || set["output"]
+	o.open = o.open || openClose
+	// Asking for a delay is asking to close, so --close-delay does not also
+	// need -C. Without this the flag on its own would do nothing at all.
+	o.closeOnGet = o.closeOnGet || openClose || set["close-delay"]
+	o.args = fs.Args()
+	return o, nil
+}
 
-	if version {
+func main() {
+	flag.Usage = usage
+	// flag.CommandLine exits on a parse error itself, having reported it.
+	opt, err := parseFlags(flag.CommandLine, os.Args[1:])
+	if err != nil {
+		os.Exit(2)
+	}
+	port, output, host := opt.port, opt.output, opt.host
+	open, simple, theme := opt.open, opt.simple, opt.theme
+	portSet, outSet := opt.portSet, opt.outSet
+
+	if opt.version {
 		fmt.Fprintf(os.Stdout, "jqweb %s\n", releaseVersion())
 		os.Exit(0)
 	}
@@ -104,18 +152,23 @@ func main() {
 		os.Exit(2)
 	}
 
-	if flag.NArg() > 1 {
+	if opt.closeDelay < 0 {
+		fmt.Fprintf(os.Stderr, "jqweb: --close-delay cannot be negative, got %s\n", opt.closeDelay)
+		usage()
+		os.Exit(2)
+	}
+
+	if len(opt.args) > 1 {
 		fmt.Fprintln(os.Stderr, "jqweb: at most one input file")
 		usage()
 		os.Exit(2)
 	}
 	inName := "-"
-	if flag.NArg() == 1 {
-		inName = flag.Arg(0)
+	if len(opt.args) == 1 {
+		inName = opt.args[0]
 	}
 
 	var data []byte
-	var err error
 	if inName == "-" {
 		if isTTY(os.Stdin) {
 			fmt.Fprintln(os.Stderr, "jqweb: no input file and stdin is a terminal")
@@ -176,7 +229,11 @@ func main() {
 		}
 	}
 	if portSet {
-		err := serve(host, port, page, open)
+		err := serve(host, port, page, serveOptions{
+			open:       open,
+			closeOnGet: opt.closeOnGet,
+			closeDelay: opt.closeDelay,
+		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
 			os.Exit(1)
@@ -188,19 +245,22 @@ func main() {
 	}
 }
 
+// valueFlags are the flags that take a value, by the name the flag package
+// knows them by. reorderArgs needs them to keep a value with its flag; a flag
+// missing from here has its value left where it was written, which for
+// "jqweb file.json --theme light" means "light" becomes a second input file.
+var valueFlags = map[string]bool{
+	"p": true, "port": true,
+	"o": true, "output": true,
+	"theme":       true,
+	"host":        true,
+	"close-delay": true,
+}
+
 // reorderArgs moves flags ahead of positional arguments so that
 // "jqweb data.json -p 8080" works; the flag package stops parsing at the
 // first non-flag argument.
 func reorderArgs(args []string) []string {
-	needsValue := map[string]bool{
-		"-p": true, "--port": true,
-		"-o": true, "--output": true,
-		"-O": false, "--open": false,
-		"-v": false, "--version": false,
-		"--simple": false,
-		"--theme":  true,
-		"--host":   true,
-	}
 	var flags, pos []string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
@@ -210,7 +270,9 @@ func reorderArgs(args []string) []string {
 		}
 		if strings.HasPrefix(a, "-") && a != "-" {
 			flags = append(flags, a)
-			if needsValue[a] && i+1 < len(args) {
+			// "--theme=dark" carries its own value; only the separated form
+			// takes the next argument with it.
+			if !strings.Contains(a, "=") && valueFlags[flagName(a)] && i+1 < len(args) {
 				i++
 				flags = append(flags, args[i])
 			}
@@ -221,17 +283,73 @@ func reorderArgs(args []string) []string {
 	return append(flags, pos...)
 }
 
+// flagName is the name the flag package reads out of an argument: the leading
+// dashes removed, and anything from an "=" onwards dropped. One dash and two
+// mean the same thing there, so "-theme" and "--theme" are one flag and this
+// is what keeps them one entry in valueFlags.
+func flagName(a string) string {
+	name, _, _ := strings.Cut(strings.TrimLeft(a, "-"), "=")
+	return name
+}
+
 func isTTY(f *os.File) bool {
 	fi, err := f.Stat()
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }
 
-func serve(host string, port int, page []byte, open bool) (err error) {
+// serveOptions are the parts of the command line that change how the server
+// behaves rather than what it serves.
+type serveOptions struct {
+	open       bool          // open the page in the browser once listening
+	closeOnGet bool          // stop serving once the page has been fetched
+	closeDelay time.Duration // how long after the last fetch closeOnGet waits
+}
+
+func serve(host string, port int, page []byte, opt serveOptions) error {
 	ln, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stderr, "jqweb: serving on http://%s/ (Ctrl-C to stop)\n", ln.Addr())
+	stops := "Ctrl-C to stop"
+	if opt.closeOnGet {
+		stops = fmt.Sprintf("stopping %s after the page is fetched", opt.closeDelay)
+	}
+	fmt.Fprintf(os.Stderr, "jqweb: serving on http://%s/ (%s)\n", ln.Addr(), stops)
+	if opt.open {
+		if err := openBrowser(fmt.Sprintf("http://%s/", ln.Addr())); err != nil {
+			fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
+			os.Exit(1)
+		}
+	}
+	return serveOn(ln, page, opt)
+}
+
+// serveOn serves the page on ln until the process is interrupted, or, with
+// opt.closeOnGet, until opt.closeDelay has passed with no further fetch of "/".
+//
+// The delay is what makes the rule usable. Exiting on the first GET would end
+// the server before anyone had read the page whenever a prefetcher, a link
+// scanner or a proxy got there first, and would leave a reload with nothing to
+// talk to. Every GET of "/" restarts the timer, so any of those extends the
+// server's life rather than ending it, and only a run of opt.closeDelay with
+// nobody asking for the page stops it.
+func serveOn(ln net.Listener, page []byte, opt serveOptions) error {
+	srv := &http.Server{}
+
+	var mu sync.Mutex
+	var timer *time.Timer
+	fetched := func() {
+		mu.Lock()
+		defer mu.Unlock()
+		if timer == nil {
+			timer = time.AfterFunc(opt.closeDelay, func() {
+				srv.Shutdown(context.Background())
+			})
+			return
+		}
+		timer.Reset(opt.closeDelay)
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
@@ -240,14 +358,20 @@ func serve(host string, port int, page []byte, open bool) (err error) {
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(page)
-	})
-	if open {
-		if err := openBrowser(fmt.Sprintf("http://%s/", ln.Addr())); err != nil {
-			fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
-			os.Exit(1)
+		// A HEAD is a check that the page is there, not a reading of it, and
+		// http.Server has discarded the body written above.
+		if opt.closeOnGet && r.Method == http.MethodGet {
+			fetched()
 		}
+	})
+	srv.Handler = mux
+
+	// Shutdown is the only thing that stops Serve here, and it is what the
+	// caller asked for rather than a failure.
+	if err := srv.Serve(ln); !errors.Is(err, http.ErrServerClosed) {
+		return err
 	}
-	return http.Serve(ln, mux)
+	return nil
 }
 
 func openBrowser(url string) error {

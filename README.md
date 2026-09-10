@@ -37,6 +37,12 @@ default web browser
 jqweb -O < myfile.json
 ```
 
+Add -C (or --close) and jqweb stops once the browser has the page, instead of
+serving until Ctrl-C. -OC does both:
+```
+jqweb -OC myfile.json
+```
+
 
 **Output to an html file for offline viewing**
 ```bash
@@ -47,7 +53,7 @@ $ kubectl get pods -o json | jqweb -o k8s.html
 <br clear="right">
 
 ## Usage
-usage: `jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [-O|--open] [--simple] [--theme <name>] [<input-file>]`
+usage: `jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [-O|--open] [-C|--close] [--simple] [--theme <name>] [<input-file>]`
 
 Reads JSON from <input-file> ("-" or absent: stdin) and renders it as a
 self-contained interactive HTML page, served on a random port or written to file
@@ -56,10 +62,18 @@ self-contained interactive HTML page, served on a random port or written to file
       --host <ip>      bind address for -p (default 127.0.0.1)
   -o, --output <file>  write the page to <file>; "-" writes to stdout
   -O, --open           opens your default web browser with the output
+  -C, --close          stop serving once the page has been fetched
+      --close-delay <d>  how long after the last fetch -C waits, such as
+                       500ms or 5s (default 1s); giving it turns on -C
       --simple         leave out the jq query engine, for a smaller page
       --theme <name>   light, dark, or auto to follow the reader's system
 ```
 With no -p and no -o, it listens on a random available port.
+
+`-C` waits out `--close-delay` after the *last* fetch of the page rather than
+exiting on the first one. Every fetch restarts the timer, so a reload or a
+second tab keeps the server up, and a prefetcher or link scanner that gets
+there first extends the wait instead of ending it.
 
 
 ## Search

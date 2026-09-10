@@ -17,25 +17,31 @@ The macOS builds are signed and notarized.
 
 ## Example Usage
 
-**Quick view of json output. (See screenshot below, or <a href="https://zafnz.github.io/jqweb/">view here</a>)**
+**Quick view of json output. (See screenshot below, or <a href="https://zafnz.github.io/jqweb/">view here</a>)** Note: example is with
+`--jq` option enabled.
+
 ```
 $ curl -s 'https://en.wikipedia.org/api/rest_v1/?spec' | jqweb
-jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)
-
-# You can also use -O (or --open) to automatically open your 
-# default web browser
-
-$ curl -s 'https://en.wikipedia.org/api/rest_v1/?spec' | jqweb -O
 jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)
 ```
 
 <img src="demo.png" alt="jqweb rendering the Wikipedia REST API spec" width="580">
 
+You can specify `--jq` to enable a much more advanced jquery mode. 
+```
+jqweb myfile.json --jq
+```
+You can also use -O (or --open) to automatically open your 
+default web browser
+```
+jqweb -O < myfile.json
+```
+
 
 **Output to an html file for offline viewing**
 ```bash
 $ kubectl get pods -o json | jqweb -o k8s.html
-$ open k8s.html # Opens webpage in your browser
+# Saves k8s.html for offline viewing
 ```
 
 **Specify port and host**
@@ -61,14 +67,6 @@ self-contained interactive HTML page, served on a random port or written to file
 With no -p and no -o, it listens on a random available port.
 
 
-## Light and dark
-
-The page follows the reader's system by default. The button at the right of the
-toolbar cycles auto, light and dark, and remembers the choice; a page opened
-from a `file://` URL may have no storage to remember it in, in which case the
-choice lasts as long as the tab. `--theme light` or `--theme dark` sets what a
-page starts in, and the button still works afterwards.
-
 ## Search
 
 The search box filters keys and values as you type, and also accepts a jq-style
@@ -76,10 +74,6 @@ path. Paste `.list.of.things[302].item`, or any prefix of it such as
 `.list.of.things`, and the page shows that node with everything under it. The
 copy button on each line puts that line's path on the clipboard, so a copied
 path can be pasted straight back into the box.
-
-The leading dot is optional, `["quoted keys"]` and negative array indices such
-as `[-1]` both work, and text that does not resolve to a path is used as a
-filter instead.
 
 ## jq queries
 

@@ -55,3 +55,36 @@ line and would make every page faster than it is today, not just undo the
 difference. It changes how the buttons behave on touch, where there is no
 hover, so that needs an answer first.
 
+## Keep the browser drivers
+
+Every bug in the page so far has been settled by driving it headlessly, and
+none of those drivers survive: they were written into a temporary directory a
+session at a time and thrown away. The last set was fourteen of them, 194
+checks, covering the suggestion list, the search box, query errors, the fold
+button, toolbar widths, themes and contrast ratios, scrolling, the `--simple`
+page and the committed `docs/index.html`. `go test` and `node --test` cannot
+see any of it, so nothing catches a regression in the half of this project that
+only exists in a browser.
+
+The technique is written down in `CLAUDE.md`: inject a script into a rendered
+page that writes its findings into a `<pre id="report">`, load it with Chrome's
+`--headless --dump-dom`, and read the block back out. It needs no npm packages,
+which is what makes it usable here where Playwright or Puppeteer would not be.
+
+What needs deciding is where they live and how they run. Somewhere like
+`web/browser/*.js` with a small runner, so that a person can run the lot with
+one command. GitHub's ubuntu runners ship Chrome, so CI could run them too,
+which is the point of keeping them.
+
+## Split main.go
+
+721 lines in one file, in four parts that barely refer to each other: the flags
+and the flow of `main`, JSON validation and its error messages (`check` through
+`lineCol`, about 270 lines and by far the largest part), the HTTP server and
+opening a browser, and page assembly with the comment stripper.
+
+Everything is `package main`, so this is moving functions between files rather
+than designing anything: something like `check.go`, `serve.go` and `page.go`
+alongside a `main.go` that is only argument handling. `main_test.go` is 483
+lines and would divide along the same lines.
+

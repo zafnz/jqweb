@@ -4,6 +4,22 @@
 release it. This is the part that is neither: what the thing is made of, and
 the rules that are not obvious from reading one file at a time.
 
+## Which document a thing goes in
+
+`README.md` is for the people who run jqweb. It says what a flag does and what
+the page can do, and nothing about how any of it is built. Leave implementation
+out of it unless someone running the command has to know: how the `-C` timer
+decides when to exit belongs there because it changes what the user sees, and
+how `reorderArgs` places a flag's value does not.
+
+Anything a reader can already assume goes nowhere. A flag taking one dash or
+two is what both the Unix and the Go conventions lead people to expect, so it
+needs no paragraph — and it is not a feature of jqweb.
+
+`CONTRIBUTING.md` is for people working on jqweb: building, testing, releasing,
+and the reasoning behind decisions in the source. `CLAUDE.md` is this file, for
+Claude. Neither belongs in `README.md`.
+
 ## Where the work is tracked
 
 Bugs, wanted features and anything else not being worked on right now are
@@ -108,9 +124,17 @@ document use this one.
 `wiki-rest.json`. They are scratch fixtures. A wide `git add` has swept one in
 before.
 
-**`reorderArgs` in `main.go` needs to know about every value-taking flag**, or
-`jqweb file.json --theme light` puts the value in the wrong place. It also does
-not split bundled short flags, so `-OC` is read as one flag named `OC`.
+**Every value-taking flag has to be in `valueFlags` in `main.go`**, or
+`jqweb file.json --theme light` leaves `light` behind as a second input file.
+`TestValueFlagsCoversTheCommandLine` fails when a flag and the map disagree.
+The key is the name the `flag` package knows, without dashes: one dash and two
+mean the same thing there, and `flagName` strips them so `-host` and `--host`
+are one entry.
+
+**`-OC` and `-CO` are flags, not bundling.** The `flag` package has no notion
+of a bundle, so the one combination worth writing as a bundle is registered
+under those two names and sets `open` and `closeOnGet` itself. No other pair
+works: `-vO` is rejected as an unknown flag.
 
 ## Testing
 

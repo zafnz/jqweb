@@ -128,6 +128,10 @@ rather than leaving a comment in the code for a change nobody has scheduled.
 The release notes live in `.goreleaser.yaml` under `release.header`, and say
 what that release changed rather than what the tool does. Rewrite them before
 tagging and bump the `# notes-for:` marker above them to the version going out.
+The tidiest moment for that is in the pull request that makes the change worth
+releasing, rather than in one of its own afterwards: the notes have to be on
+`main` before the tag is pushed, so leaving them costs an extra round trip
+through review.
 The release workflow compares that marker with the tag and refuses to publish
 when they disagree, because nothing else can tell stale notes from fresh ones:
 the tag builds, the binaries are fine, and the release page quietly tells

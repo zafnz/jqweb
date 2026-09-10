@@ -63,6 +63,11 @@ snapshot:
 release:
   # Rewritten for each release: it is what this one changed, not what the tool
   # does. GoReleaser puts it above the commit list on the release page.
+  #
+  # Bump this marker along with the prose. Nothing else can tell whether the
+  # notes below were written for the tag being released, so the release
+  # workflow compares the two and refuses to publish when they disagree.
+  # notes-for: 0.4.1
   header: |
     A bug fix and a small addition, on top of 0.4.0.
 

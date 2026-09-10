@@ -125,6 +125,14 @@ rather than leaving a comment in the code for a change nobody has scheduled.
 
 ## Releases
 
+The release notes live in `.goreleaser.yaml` under `release.header`, and say
+what that release changed rather than what the tool does. Rewrite them before
+tagging and bump the `# notes-for:` marker above them to the version going out.
+The release workflow compares that marker with the tag and refuses to publish
+when they disagree, because nothing else can tell stale notes from fresh ones:
+the tag builds, the binaries are fine, and the release page quietly tells
+everyone upgrading that the last version's features are new again.
+
 Tagging `v*` runs GoReleaser, which builds for macOS, Linux and Windows, signs
 and notarizes the macOS binaries, and updates the Homebrew tap. Nothing else
 should need doing by hand.

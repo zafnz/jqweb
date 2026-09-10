@@ -16,6 +16,22 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The notes in .goreleaser.yaml describe one particular release, and
+      # nothing else notices when they are left describing the last one: the
+      # tag builds, the binaries are fine, and the release page tells everyone
+      # upgrading that last version's features are new again. This is the only
+      # point where the two can be compared, so it runs before anything is
+      # built or published.
+      - name: The release notes are written for this tag
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          marker=$(sed -n 's/^  # notes-for: //p' .goreleaser.yaml)
+          if [ "$marker" != "$version" ]; then
+            echo "::error file=.goreleaser.yaml::Release notes are marked for '${marker:-nothing}' but the tag is ${GITHUB_REF_NAME}. Rewrite release.header for ${version}, bump the notes-for marker, then move the tag."
+            exit 1
+          fi
+          echo "release notes are marked for ${version}"
+
       - uses: actions/setup-go@v5
         with:
           go-version: stable

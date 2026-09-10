@@ -50,12 +50,6 @@ Waiting for an idle period with no requests, rather than for the first one,
 survives all of that. Holding a connection open and exiting when it drops --
 what dev servers do -- is better still and tells you the tab actually closed.
 
-## Error message shrinks text input
-
-A long error message makes the text input shrink. Combined with the issue
-above, there should be no way the dropdown can produce an error, so instead have
-the error message appear hovering below the input. 
-
 ## One hover button instead of one per line
 
 Each line carries its own copy and filter buttons, so a document renders twice

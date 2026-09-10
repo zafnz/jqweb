@@ -1,4 +1,10 @@
 #q.bad, #q.bad:focus { border-color: var(--fail); }
+
+#fault {
+  position: absolute; z-index: 10; top: calc(100% + 4px); left: 0; width: 100%;
+  background: var(--menu-bg); border: 1px solid var(--fail); border-radius: 4px;
+  padding: 4px 8px; color: var(--fail); box-shadow: 0 6px 20px var(--menu-shadow);
+}
 #mode {
   font: inherit; color: var(--fg); background: var(--btn-bg);
   border: 1px solid var(--btn-border); border-radius: 4px; padding: 3px 4px; cursor: pointer;

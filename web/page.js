@@ -175,7 +175,7 @@
      path, as it has always been; with it, the mode decides. */
   function run() {
     var raw = input.value.trim();
-    input.classList.remove('bad');
+    if (query) query.clearFault();
     if (!raw) { reset(); return; }
     if (!query) { runPath(raw); return; }
     if (query.wants(raw)) { query.run(raw); return; }

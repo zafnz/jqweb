@@ -141,6 +141,12 @@ main { padding: 10px 14px 60px; }
 .node.hidden { display: none; }
 .node.hit > .line { background: var(--hit); }
 #q.bad, #q.bad:focus { border-color: var(--fail); }
+
+#fault {
+  position: absolute; z-index: 10; top: calc(100% + 4px); left: 0; width: 100%;
+  background: var(--menu-bg); border: 1px solid var(--fail); border-radius: 4px;
+  padding: 4px 8px; color: var(--fail); box-shadow: 0 6px 20px var(--menu-shadow);
+}
 #mode {
   font: inherit; color: var(--fg); background: var(--btn-bg);
   border: 1px solid var(--btn-border); border-radius: 4px; padding: 3px 4px; cursor: pointer;
@@ -226,6 +232,7 @@ var jqtheme = (function () {
   <div class="qwrap">
     <input id="q" type="search" placeholder="Text to find, or paste a path (press /)" autocomplete="off" spellcheck="false">
     <div id="suggest" hidden></div>
+    <div id="fault" hidden></div>
   </div>
   <span id="stats"></span>
   <button id="fold" type="button">Collapse all</button>
@@ -1732,6 +1739,7 @@ var jqui = function (page) {
   }
   function run(raw) {
     var query, out;
+    clearFault();
     showDocument();
     try {
       query = jqjs.compile(raw);
@@ -1750,7 +1758,15 @@ var jqui = function (page) {
   }
   function fault(message, pos) {
     input.classList.add('bad');
-    stats.textContent = pos === undefined ? message : message + ' (at ' + (pos + 1) + ')';
+    stats.textContent = '';
+    faultBox.textContent = pos === undefined ? message : message + ' (at ' + (pos + 1) + ')';
+    faultBox.hidden = false;
+    hide();
+  }
+  function clearFault() {
+    input.classList.remove('bad');
+    faultBox.hidden = true;
+    faultBox.textContent = '';
   }
   var RESULT_CAP = 500;
   function showResults(out) {
@@ -1780,6 +1796,7 @@ var jqui = function (page) {
     tree.hidden = false;
   }
   var suggestions = document.getElementById('suggest');
+  var faultBox = document.getElementById('fault');
   var rows = [];
   var COUNT_BUDGET_MS = 300;
   function filter(node) {
@@ -1828,7 +1845,7 @@ var jqui = function (page) {
     for (i = 0; i < kids.length; i++) kids[i].classList.toggle('on', i === at);
   }
   function show() {
-    if (rows.length) suggestions.hidden = false;
+    if (rows.length && faultBox.hidden) suggestions.hidden = false;
   }
   function hide() { suggestions.hidden = true; }
   function forget() {
@@ -1838,7 +1855,6 @@ var jqui = function (page) {
   }
   function pick(i) {
     input.value = rows[i].q;
-    input.classList.remove('bad');
     mark(i);
     run(rows[i].q);
   }
@@ -1875,6 +1891,7 @@ var jqui = function (page) {
     wants: wants,
     run: run,
     filter: filter,
+    clearFault: clearFault,
     showDocument: showDocument
   };
 };
@@ -1984,7 +2001,7 @@ var jqui = function (page) {
   });
   function run() {
     var raw = input.value.trim();
-    input.classList.remove('bad');
+    if (query) query.clearFault();
     if (!raw) { reset(); return; }
     if (!query) { runPath(raw); return; }
     if (query.wants(raw)) { query.run(raw); return; }

@@ -48,6 +48,7 @@ var jqui = function (page) {
      the view. */
   function run(raw) {
     var query, out;
+    clearFault();
     showDocument();
     try {
       query = jqjs.compile(raw);
@@ -65,10 +66,24 @@ var jqui = function (page) {
     showResults(out);
   }
 
-  /* Reports a query that would not compile or would not run. */
+  /* Reports a query that would not compile or would not run. The message goes
+     under the box: in the toolbar it was a flex item competing with the box for
+     room, so a long message made the box narrow while you were still typing in
+     it. */
   function fault(message, pos) {
     input.classList.add('bad');
-    stats.textContent = pos === undefined ? message : message + ' (at ' + (pos + 1) + ')';
+    stats.textContent = '';
+    faultBox.textContent = pos === undefined ? message : message + ' (at ' + (pos + 1) + ')';
+    faultBox.hidden = false;
+    hide();
+  }
+
+  /* Takes the message away again, which every path that reaches a result does
+     before it says anything. */
+  function clearFault() {
+    input.classList.remove('bad');
+    faultBox.hidden = true;
+    faultBox.textContent = '';
   }
 
   /* Building the markup for a query's whole output is what would stall the
@@ -129,6 +144,7 @@ var jqui = function (page) {
      attention moves elsewhere. */
 
   var suggestions = document.getElementById('suggest');
+  var faultBox = document.getElementById('fault');
   var rows = [];
 
   /* Running every candidate against a large document could take longer than
@@ -198,7 +214,7 @@ var jqui = function (page) {
   }
 
   function show() {
-    if (rows.length) suggestions.hidden = false;
+    if (rows.length && faultBox.hidden) suggestions.hidden = false;
   }
   function hide() { suggestions.hidden = true; }
 
@@ -217,7 +233,6 @@ var jqui = function (page) {
      what the mode select would have guessed. */
   function pick(i) {
     input.value = rows[i].q;
-    input.classList.remove('bad');
     mark(i);
     run(rows[i].q);
   }
@@ -273,6 +288,7 @@ var jqui = function (page) {
     wants: wants,
     run: run,
     filter: filter,
+    clearFault: clearFault,
     showDocument: showDocument
   };
 };

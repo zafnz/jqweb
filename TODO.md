@@ -35,3 +35,20 @@ offers a list where every reading returns one result. When they all return one,
 the reading a person means is almost always the line itself, but it currently
 sorts last. Rank the plain path first when nothing on the list narrows the
 document down.
+
+## The line buttons are too faint
+
+The copy and filter buttons sit at 35% opacity until the line is hovered, which
+is too little to notice in either theme and worst in light, where a grey glyph
+on near-white all but disappears. They need to read as available without
+crowding the value they sit next to.
+
+## Quit once the page has been fetched
+
+`jqweb file.json` serves until Ctrl-C, which is a nuisance for the common case
+of looking at a document once. Exit shortly after the first successful GET of
+`/` -- half a second or so, enough for the browser to have the whole response.
+`-A|--auto` for it, or make it the default and add `--no-close`; the second is
+friendlier and the bigger change to what people already expect. Either way it
+has to stay off when `-p` was given explicitly, since naming a port says the
+page is meant to be visited more than once.

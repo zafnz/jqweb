@@ -75,7 +75,7 @@ header button {
 header button:hover { background: var(--btn-hover); }
 #fold { margin-left: auto; }
 #theme { padding: 3px 9px; }
-.qwrap { position: relative; flex: 1 1 220px; max-width: 420px; }
+.qwrap { position: relative; flex: 1 1 220px; min-width: 220px; }
 #q {
   font: inherit; width: 100%; color: inherit;
   background: var(--field-bg); border: 1px solid var(--btn-border); border-radius: 4px;

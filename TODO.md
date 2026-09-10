@@ -11,10 +11,6 @@ would be wrong. Keeping the button means tracking each output back to where it
 came from, which is what jq's `path()` does and what this engine does not.
 Chaining filters falls out of the same work.
 
-## Let the search box fill the toolbar
-
-It is capped at 420px and the toolbar has room to spare.
-
 ## --cdn mode
 
 Render the page with its CSS and JavaScript referenced from

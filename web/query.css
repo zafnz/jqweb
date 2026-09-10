@@ -6,7 +6,7 @@
 
 #suggest {
   position: absolute; z-index: 10; top: calc(100% + 4px); left: 0;
-  min-width: 100%; width: max-content; max-width: min(90vw, 760px);
+  width: 100%;
   background: var(--menu-bg); border: 1px solid var(--btn-border); border-radius: 4px;
   padding: 3px; box-shadow: 0 6px 20px var(--menu-shadow);
   max-height: 60vh; overflow-y: auto;

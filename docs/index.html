@@ -82,7 +82,7 @@ header button {
 header button:hover { background: var(--btn-hover); }
 #fold { margin-left: auto; }
 #theme { padding: 3px 9px; }
-.qwrap { position: relative; flex: 1 1 220px; max-width: 420px; }
+.qwrap { position: relative; flex: 1 1 220px; min-width: 220px; }
 #q {
   font: inherit; width: 100%; color: inherit;
   background: var(--field-bg); border: 1px solid var(--btn-border); border-radius: 4px;
@@ -148,7 +148,7 @@ main { padding: 10px 14px 60px; }
 
 #suggest {
   position: absolute; z-index: 10; top: calc(100% + 4px); left: 0;
-  min-width: 100%; width: max-content; max-width: min(90vw, 760px);
+  width: 100%;
   background: var(--menu-bg); border: 1px solid var(--btn-border); border-radius: 4px;
   padding: 3px; box-shadow: 0 6px 20px var(--menu-shadow);
   max-height: 60vh; overflow-y: auto;

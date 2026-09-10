@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      notary_retry_delays:
+        description: "Seconds before each attempt. Empty uses 0 300 600 1200."
+        required: false
 
 permissions:
   contents: write
@@ -65,9 +70,11 @@ jobs:
       # nobody.
       - name: Release, waiting out Apple's notary service if it is unreachable
         env:
-          # Seconds before each attempt. Overridable so the retrying itself can
-          # be exercised without waiting out the real delays.
-          NOTARY_RETRY_DELAYS: ${{ vars.NOTARY_RETRY_DELAYS || '0 300 600 1200' }}
+          # Seconds before each attempt. The workflow_dispatch input overrides
+          # them, so the retrying itself can be exercised without waiting out
+          # the real delays, and a tag whose notarisation outlasted all four
+          # attempts can be released again by hand.
+          NOTARY_RETRY_DELAYS: ${{ inputs.notary_retry_delays || '0 300 600 1200' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
           MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}

@@ -60,13 +60,22 @@
     if (fold) { fold.closest('.node').classList.remove('collapsed'); }
   });
 
-  /* Collapse all leaves the root expanded, so the document is still readable
-     rather than a single line. */
-  document.getElementById('expand').addEventListener('click', function () {
-    each('.node.branch', function (n) { n.classList.remove('collapsed'); });
-  });
-  document.getElementById('collapse').addEventListener('click', function () {
-    each('.node.branch', function (n) { if (n !== rootNode) n.classList.add('collapsed'); });
+  /* One button for both, saying what the next click will do. Collapsing leaves
+     the root expanded, so the document is still readable rather than a single
+     line.
+
+     Folding a branch by hand does not change what the button says. It reports
+     the last thing it did rather than the state of the tree, which would mean
+     walking every node to answer a question nobody asked. */
+  var foldButton = document.getElementById('fold');
+  var folded = false;
+  foldButton.addEventListener('click', function () {
+    folded = !folded;
+    each('.node.branch', function (n) {
+      if (!folded) n.classList.remove('collapsed');
+      else if (n !== rootNode) n.classList.add('collapsed');
+    });
+    foldButton.textContent = folded ? 'Expand all' : 'Collapse all';
   });
 
   /* Runs fn over every node in either view matching sel. querySelectorAll

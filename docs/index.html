@@ -80,7 +80,8 @@ header button {
   border: 1px solid var(--btn-border); border-radius: 4px; padding: 3px 10px; cursor: pointer;
 }
 header button:hover { background: var(--btn-hover); }
-#theme { margin-left: auto; padding: 3px 9px; }
+#fold { margin-left: auto; }
+#theme { padding: 3px 9px; }
 .qwrap { position: relative; flex: 1 1 220px; max-width: 420px; }
 #q {
   font: inherit; width: 100%; color: inherit;
@@ -217,8 +218,6 @@ var jqtheme = (function () {
 <body>
 <header>
   <span class="name">jqweb &middot; wikipedia-reset-spec.json</span>
-  <button id="expand" type="button">Expand all</button>
-  <button id="collapse" type="button">Collapse all</button>
   <select id="mode" title="How to read what you type" hidden>
     <option value="auto">Auto</option>
     <option value="filter">Text</option>
@@ -229,6 +228,7 @@ var jqtheme = (function () {
     <div id="suggest" hidden></div>
   </div>
   <span id="stats"></span>
+  <button id="fold" type="button">Collapse all</button>
   <button id="theme" type="button"></button>
 </header>
 <main>
@@ -1917,11 +1917,15 @@ var jqui = function (page) {
     var fold = e.target.closest('.fold');
     if (fold) { fold.closest('.node').classList.remove('collapsed'); }
   });
-  document.getElementById('expand').addEventListener('click', function () {
-    each('.node.branch', function (n) { n.classList.remove('collapsed'); });
-  });
-  document.getElementById('collapse').addEventListener('click', function () {
-    each('.node.branch', function (n) { if (n !== rootNode) n.classList.add('collapsed'); });
+  var foldButton = document.getElementById('fold');
+  var folded = false;
+  foldButton.addEventListener('click', function () {
+    folded = !folded;
+    each('.node.branch', function (n) {
+      if (!folded) n.classList.remove('collapsed');
+      else if (n !== rootNode) n.classList.add('collapsed');
+    });
+    foldButton.textContent = folded ? 'Expand all' : 'Collapse all';
   });
   function each(sel, fn) {
     Array.prototype.forEach.call(document.querySelectorAll('main ' + sel), fn);

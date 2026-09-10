@@ -73,7 +73,8 @@ header button {
   border: 1px solid var(--btn-border); border-radius: 4px; padding: 3px 10px; cursor: pointer;
 }
 header button:hover { background: var(--btn-hover); }
-#theme { margin-left: auto; padding: 3px 9px; }
+#fold { margin-left: auto; }
+#theme { padding: 3px 9px; }
 .qwrap { position: relative; flex: 1 1 220px; max-width: 420px; }
 #q {
   font: inherit; width: 100%; color: inherit;

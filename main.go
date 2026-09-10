@@ -53,7 +53,7 @@ self-contained interactive HTML page.
       --host <ip>      bind address for -p (default 127.0.0.1)
   -o, --output <file>  write the page to <file>; "-" writes to stdout
   -O, --open           open the page in the default browser
-      --jq             answer jq queries in the search box
+      --simple         leave out the jq query engine, for a smaller page
       --theme <name>   light, dark, or auto to follow the reader's system
                        (default auto)
 
@@ -67,7 +67,7 @@ func main() {
 		output  string
 		host    string
 		open    bool
-		jq      bool
+		simple  bool
 		theme   string
 		version bool
 	)
@@ -78,7 +78,7 @@ func main() {
 	flag.StringVar(&host, "host", "127.0.0.1", "")
 	flag.BoolVar(&open, "open", false, "")
 	flag.BoolVar(&open, "O", false, "")
-	flag.BoolVar(&jq, "jq", false, "")
+	flag.BoolVar(&simple, "simple", false, "")
 	flag.StringVar(&theme, "theme", "auto", "")
 	flag.BoolVar(&version, "version", false, "")
 	flag.BoolVar(&version, "v", false, "")
@@ -148,7 +148,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	page := []byte(renderPage(data, title, options{jq: jq, theme: theme}))
+	// The page assembly asks for what to put in rather than what to leave out,
+	// so the flag is turned round here and nowhere else.
+	page := []byte(renderPage(data, title, options{jq: !simple, theme: theme}))
 
 	if outSet {
 		if output == "-" {
@@ -195,9 +197,9 @@ func reorderArgs(args []string) []string {
 		"-o": true, "--output": true,
 		"-O": false, "--open": false,
 		"-v": false, "--version": false,
-		"--jq":    false,
-		"--theme": true,
-		"--host":  true,
+		"--simple": false,
+		"--theme":  true,
+		"--host":   true,
 	}
 	var flags, pos []string
 	for i := 0; i < len(args); i++ {
@@ -539,7 +541,7 @@ func lineCol(data []byte, off int64) (int, int) {
 // options are the parts of the command line that change the page rather than
 // where it goes.
 type options struct {
-	jq    bool   // inline the query engine
+	jq    bool   // inline the query engine, which --simple turns off
 	theme string // auto, light or dark
 }
 
@@ -572,9 +574,9 @@ func scriptSafe(s string) string {
 var assets embed.FS
 
 // pageTemplate returns the page shell with its stylesheet and script inlined,
-// leaving {{TITLE}} and {{DATA}} for renderPage to fill in. The two states of
-// --jq give two different scripts, so there is a template for each, built the
-// first time it is wanted.
+// leaving {{TITLE}} and {{DATA}} for renderPage to fill in. A page with the
+// query engine and one without are two different scripts, so there is a
+// template for each, built the first time it is wanted.
 func pageTemplate(jq bool) string {
 	if jq {
 		return withJQ()
@@ -603,8 +605,8 @@ func style(jq bool) string {
 }
 
 // script returns the page's JavaScript: the pure core, then the query engine
-// and the search box wiring that drives it when --jq asked for them, then the
-// rest of the page. query.js has to precede page.js, which calls into it.
+// and the search box wiring that drives it unless --simple left them out, then
+// the rest of the page. query.js has to precede page.js, which calls into it.
 //
 // The comments in those files are written for someone reading the source, and
 // are not worth inlining into every rendered page.

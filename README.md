@@ -17,8 +17,7 @@ The macOS builds are signed and notarized.
 
 ## Example Usage
 
-**Quick view of json output. (See screenshot below, or <a href="https://zafnz.github.io/jqweb/">view here</a>)** Note: example is with
-`--jq` option enabled.
+**Quick view of json output. (See screenshot below, or <a href="https://zafnz.github.io/jqweb/">view here</a>)**
 
 ```
 $ curl -s 'https://en.wikipedia.org/api/rest_v1/?spec' | jqweb
@@ -27,10 +26,6 @@ jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)
 
 <img src="demo.png" alt="jqweb rendering the Wikipedia REST API spec" width="580">
 
-You can specify `--jq` to enable a much more advanced jquery mode. 
-```
-jqweb myfile.json --jq
-```
 You can also use -O (or --open) to automatically open your 
 default web browser
 ```
@@ -52,7 +47,7 @@ jqweb: serving on http://[::]:9000/ (Ctrl-C to stop)
 <br clear="right">
 
 ## Usage
-usage: `jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [-O|--open] [--jq] [--theme <name>] [<input-file>]`
+usage: `jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [-O|--open] [--simple] [--theme <name>] [<input-file>]`
 
 Reads JSON from <input-file> ("-" or absent: stdin) and renders it as a
 self-contained interactive HTML page, served on a random port or written to file
@@ -61,7 +56,7 @@ self-contained interactive HTML page, served on a random port or written to file
       --host <ip>      bind address for -p (default 127.0.0.1)
   -o, --output <file>  write the page to <file>; "-" writes to stdout
   -O, --open           opens your default web browser with the output
-      --jq             answer jq queries in the search box
+      --simple         leave out the jq query engine, for a smaller page
       --theme <name>   light, dark, or auto to follow the reader's system
 ```
 With no -p and no -o, it listens on a random available port.
@@ -77,7 +72,7 @@ path can be pasted straight back into the box.
 
 ## jq queries
 
-With `--jq`, the box answers jq queries as well:
+The search box answers jq queries as well as filtering text:
 
 ```
 .items[] | select(.status.phase == "Running") | .metadata.name
@@ -116,16 +111,15 @@ Variables and `as`, `def`, `reduce`, `foreach`, assignment, `path`, string
 interpolation and format strings are not. A query using one says so by name
 instead of guessing at what it meant.
 
-The engine adds about 51KB to every page it is built into, which is why it is
-behind a flag rather than always on. A page built without `--jq` carries none
-of it.
+`--simple` leaves the engine out, for a page that is about 50KB smaller and
+does nothing but browse, filter and look up paths.
 
 ## Filtering on a value
 
-Every line has a copy button, `&#x29C9;`, which puts that line's path on the
-clipboard. With `--jq` it gets a second one, `&#x2261;`, which fills the search
-box with a query built from that line and drops down the other queries the line
-could have meant, each labelled with what it returns.
+Every line has two buttons. `&#x29C9;` puts that line's path on the clipboard.
+`&#x2261;` fills the search box with a query built from that line and drops
+down the other queries the line could have meant, each labelled with what it
+returns.
 
 Which one you want is a judgement about the document, not something that can be
 read off the path. Standing on `"Page content"` in `.paths["/page/"].get.tags[0]`

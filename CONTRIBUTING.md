@@ -77,8 +77,8 @@ should carry none at all, which is what `TestPageCarriesNoComments` checks.
 `web/jq.js` is the query engine, `web/suggest.js` builds the queries a line of
 the document could have meant, `web/query.js` is the search box wiring that
 drives both, and `web/query.css` styles what only they put on the page. Those
-four are inlined only when `--jq` is given, so none of them
-costs anything in a default page; `web/page.js` ships either way and works
+four are what `--simple` leaves out, so none of them costs
+anything in a page built with it; `web/page.js` ships either way and works
 without them, calling `jqui()` when it is there and falling back to the path
 lookup when it is not. Anything that reads the box as a query, or renders what
 one produced, belongs in `query.js` rather than `page.js`.
@@ -111,12 +111,12 @@ one means adding a query for it.
 
 `docs/index.html` is a rendered page committed for GitHub Pages, and it does
 not regenerate itself. After a change to the scripts or the styling it is
-stale until someone rebuilds it. It is built with `--jq`, so that the
-page people are pointed at has the query box and the filter buttons in it. The
-file name sets the page title, so keep it:
+stale until someone rebuilds it. Build it the default way, so
+that the page people are pointed at is the one they will get. The file name
+sets the page title, so keep it:
 
     curl -s 'https://en.wikipedia.org/api/rest_v1/?spec' > wikipedia-reset-spec.json
-    go build -o jqweb . && ./jqweb --jq -o docs/index.html wikipedia-reset-spec.json
+    go build -o jqweb . && ./jqweb -o docs/index.html wikipedia-reset-spec.json
 
 ## Wanted, not written
 

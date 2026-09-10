@@ -269,31 +269,33 @@ func TestRenderPageInlinesAssets(t *testing.T) {
 	}
 }
 
-// The query engine is the largest part of the script, so it goes in only when
-// --jq asked for it.
-func TestRenderPageIncludesTheEngineOnlyWithJQ(t *testing.T) {
-	with := renderPage([]byte(`{}`), "t", options{jq: true})
-	without := renderPage([]byte(`{}`), "t", options{jq: false})
+// The query engine is the largest part of the script, and --simple is the only
+// thing that leaves it out.
+func TestRenderPageLeavesTheEngineOutOnlyForSimple(t *testing.T) {
+	full := renderPage([]byte(`{}`), "t", options{jq: true})
+	simple := renderPage([]byte(`{}`), "t", options{jq: false})
 
 	for _, want := range []string{
 		"var jqjs",          // the engine
 		"function compile(", // its entry point
 		"'sort_by/1'",       // its builtin table
-		"var jqui",          // the search box wiring that drives it
+		"var jqsuggest",     // the queries it offers for a line
+		"var jqui",          // the search box wiring that drives both
 		"function showResults(",
 	} {
-		if !strings.Contains(with, want) {
-			t.Errorf("--jq page does not contain %q", want)
+		if !strings.Contains(full, want) {
+			t.Errorf("page does not contain %q", want)
 		}
-		if strings.Contains(without, want) {
-			t.Errorf("page built without --jq contains %q", want)
+		if strings.Contains(simple, want) {
+			t.Errorf("--simple page contains %q", want)
 		}
 	}
-	if len(with) <= len(without) {
-		t.Errorf("--jq page is %d bytes, no bigger than the %d without", len(with), len(without))
+	if len(simple) >= len(full) {
+		t.Errorf("--simple page is %d bytes, no smaller than the %d without it",
+			len(simple), len(full))
 	}
 	// Both are still whole pages, not one with a hole in it.
-	for _, page := range []string{with, without} {
+	for _, page := range []string{full, simple} {
 		if i := strings.Index(page, "{{"); i >= 0 {
 			t.Errorf("page still contains a placeholder at offset %d", i)
 		}

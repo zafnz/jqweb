@@ -3,9 +3,9 @@
    search box. Everything here needs the DOM; the parsing, rendering and path
    reading it calls live in core.js.
 
-   Reading the box as a jq query lives in query.js, which is inlined only when
-   the page was built with --jq. This file is in every page either way, so it
-   works without it. */
+   Reading the box as a jq query lives in query.js, which every page has unless
+   --simple left it out. This file is in every page either way, so it works
+   without it. */
 (function () {
   'use strict';
   var tree = document.getElementById('tree');
@@ -21,7 +21,7 @@
   tree.innerHTML = renderTree(rootValue, typeof jqui !== 'undefined');
   var rootNode = tree.querySelector(':scope > .node');
 
-  /* The query half, or null in a page built without --jq. It reads the search
+  /* The query half, or null in a page built with --simple. It reads the search
      box, so it needs the document to run against and the two path helpers
      below, which walk the rendered tree rather than the value. */
   var query = typeof jqui === 'undefined' ? null : jqui({
@@ -174,7 +174,8 @@
     textFilter(raw.toLowerCase());
   }
 
-  /* The old behaviour, and still what a page built without --jq does: text
+  /* What a page built with --simple does, and what every page did before the
+     engine existed: text
      containing "." or "[" may be a path such as .a.b[3].c, so it is tried as
      one first, and a bare word is always a text filter. A path that does not
      resolve falls back to text filtering unless it was written with a leading

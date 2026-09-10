@@ -1,5 +1,5 @@
-/* The half of the page that exists only when the document was rendered with
-   --jq: reading the search box as a query, and showing what one produces.
+/* The half of the page that reads the search box as a query and shows what one
+   produces. --simple leaves it out.
 
    It is kept apart from page.js because page.js is inlined into every page
    whether or not the engine is, and none of this means anything without it.

@@ -45,3 +45,23 @@ of looking at a document once. Exit shortly after the first successful GET of
 friendlier and the bigger change to what people already expect. Either way it
 has to stay off when `-p` was given explicitly, since naming a port says the
 page is meant to be visited more than once.
+
+## Changing text in filter/search/jq box should delete dropdown
+
+At the moment the dropdown doesn't disappear until you fully erase the text
+box. but as soon as the user starts removing stuff the filter should go. 
+
+## Error message shrinks text input
+
+## One hover button instead of one per line
+
+Each line carries its own copy and filter buttons, so a document renders twice
+the buttons it used to. On large.json -- 4.8MB, 173,000 lines -- that is 57.9MB
+of markup instead of 47.2MB, and the browser takes about 700ms longer to build
+the tree: 4.3s against 5.0s. Building the string costs 14ms of that; the rest
+is the DOM.
+
+One button element moved to whichever line is hovered would cost nothing per
+line and would make every page faster than it is today, not just undo the
+difference. It changes how the buttons behave on touch, where there is no
+hover, so that needs an answer first.

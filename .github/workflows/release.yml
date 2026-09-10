@@ -49,8 +49,25 @@ jobs:
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean
+          install-only: true
+
+      # Apple's notary service is the one part of a release that is neither
+      # ours nor reliable. 0.5.0 failed on "context deadline exceeded" posting
+      # a submission and then succeeded, unchanged, on a re-run minutes later.
+      #
+      # Publishing is the last thing GoReleaser does and notarising is several
+      # steps before it, so a run that dies there has created no release, no
+      # assets and no tap commit: the next attempt starts from nothing. That is
+      # what makes retrying the whole command safe rather than only tidy.
+      #
+      # Anything that is not the notary service fails on the spot. Waiting
+      # thirty-five minutes to watch the same compile error four times helps
+      # nobody.
+      - name: Release, waiting out Apple's notary service if it is unreachable
         env:
+          # Seconds before each attempt. Overridable so the retrying itself can
+          # be exercised without waiting out the real delays.
+          NOTARY_RETRY_DELAYS: ${{ vars.NOTARY_RETRY_DELAYS || '0 300 600 1200' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
           MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
@@ -58,3 +75,22 @@ jobs:
           MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
           MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
           MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+        run: |
+          set -o pipefail
+          attempt=0
+          for delay in $NOTARY_RETRY_DELAYS; do
+            attempt=$((attempt + 1))
+            if [ "$delay" -gt 0 ]; then
+              echo "::notice::Apple's notary service did not answer. Waiting ${delay}s, then attempt ${attempt}."
+              sleep "$delay"
+            fi
+            if goreleaser release --clean 2>&1 | tee /tmp/goreleaser.log; then
+              exit 0
+            fi
+            if ! grep -qiE 'notariz|notary|appstoreconnect\.apple\.com' /tmp/goreleaser.log; then
+              echo "::error::Release failed, and not at Apple's notary service. Not retrying."
+              exit 1
+            fi
+          done
+          echo "::error::Apple's notary service did not answer across ${attempt} attempts."
+          exit 1

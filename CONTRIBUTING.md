@@ -118,10 +118,12 @@ sets the page title, so keep it:
     curl -s 'https://en.wikipedia.org/api/rest_v1/?spec' > wikipedia-reset-spec.json
     go build -o jqweb . && ./jqweb -o docs/index.html wikipedia-reset-spec.json
 
-## Wanted, not written
+## Bugs and wanted features
 
-`TODO.md` holds the things that are wanted but not being worked on. Add to it
+Both go in the issue tracker at https://github.com/zafnz/jqweb/issues. File one
 rather than leaving a comment in the code for a change nobody has scheduled.
+`TODO.md` holds the entries that were filed as issues and is not where new ones
+go.
 
 ## Releases
 
@@ -136,6 +138,15 @@ The release workflow compares that marker with the tag and refuses to publish
 when they disagree, because nothing else can tell stale notes from fresh ones:
 the tag builds, the binaries are fine, and the release page quietly tells
 everyone upgrading that the last version's features are new again.
+
+Apple's notary service is the one part of a release that is neither ours nor
+reliable, and a release that trips over it publishes nothing: notarising
+happens several steps before publishing, so the run dies with no release, no
+assets and no tap commit. The workflow retries the whole command after 5, 10
+and 20 minutes when the failure mentions the notary service, and fails on the
+spot when it does not, so a genuine build error is not repeated four times over
+half an hour. Set the `NOTARY_RETRY_DELAYS` repository variable to change the
+waits, or to shorten them while testing the retrying itself.
 
 Tagging `v*` runs GoReleaser, which builds for macOS, Linux and Windows, signs
 and notarizes the macOS binaries, and updates the Homebrew tap. Nothing else

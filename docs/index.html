@@ -131,6 +131,46 @@ main { padding: 10px 14px 60px; }
 
 .node.hidden { display: none; }
 .node.hit > .line { background: var(--hit); }
+#q.bad, #q.bad:focus { border-color: var(--fail); }
+#mode {
+  font: inherit; color: var(--fg); background: var(--btn-bg);
+  border: 1px solid var(--btn-border); border-radius: 4px; padding: 3px 4px; cursor: pointer;
+}
+
+#suggest {
+  position: absolute; z-index: 10; top: calc(100% + 4px); left: 0;
+  min-width: 100%; width: max-content; max-width: min(90vw, 760px);
+  background: var(--menu-bg); border: 1px solid var(--btn-border); border-radius: 4px;
+  padding: 3px; box-shadow: 0 6px 20px var(--menu-shadow);
+  max-height: 60vh; overflow-y: auto;
+}
+.sg { display: flex; align-items: stretch; border-radius: 3px; }
+.sg.on { background: var(--menu-on); }
+.sg:hover { background: var(--menu-hover); }
+.sgq {
+  font: inherit; color: var(--fg); background: none; border: none; cursor: pointer;
+  flex: 1; display: flex; gap: 18px; align-items: baseline;
+  justify-content: space-between; text-align: left; padding: 3px 6px;
+}
+.sgt { white-space: pre-wrap; word-break: break-all; }
+.sgn { color: var(--muted); white-space: nowrap; }
+.sg.on .sgn { color: var(--fg); }
+.sgc {
+  font: inherit; color: var(--muted); background: none; border: none;
+  cursor: pointer; padding: 3px 6px; opacity: .45;
+}
+.sg:hover .sgc, .sgc:focus { opacity: 1; }
+.sgc.ok { color: var(--ok); opacity: 1; }
+.sgc.fail { color: var(--fail); opacity: 1; }
+
+.result { position: relative; padding-left: 2.6em; margin-bottom: 3px; }
+.result::before {
+  content: attr(data-n);
+  position: absolute; left: 0; width: 2em;
+  text-align: right; color: var(--gutter);
+}
+#results.one .result { padding-left: 0; }
+#results.one .result::before { content: none; }
 </style>
 <script>
 var jqtheme = (function () {
@@ -395,6 +435,1443 @@ var jqweb = (function () {
   };
 })();
 if (typeof module === 'object' && module.exports) module.exports = jqweb;
+var jqjs = (function () {
+  'use strict';
+  var core = typeof jqweb !== 'undefined' ? jqweb : require('./core.js');
+  var leafOf = core.leafOf, stringify = core.stringify;
+  var NULL = leafOf(null), TRUE = leafOf(true), FALSE = leafOf(false);
+  var STEP_LIMIT = 5000000;
+  var steps = 0;
+  function fail(kind, msg, pos) {
+    var e = new Error(msg);
+    e.jq = kind;
+    e.pos = pos;
+    return e;
+  }
+  function parseErr(msg, pos) { return fail('parse', msg, pos); }
+  function runErr(msg) { return fail('run', msg); }
+  function arrayOf(list) { return { t: 'a', v: list }; }
+  function objectOf(keys, vals) { return { t: 'o', k: keys, v: vals }; }
+  function typeOf(n) {
+    if (n.t === 'o') return 'object';
+    if (n.t === 'a') return 'array';
+    if (n.r === null) return 'null';
+    var t = typeof n.r;
+    return t === 'boolean' ? 'boolean' : t === 'number' ? 'number' : 'string';
+  }
+  function truthy(n) { return !(n.t === 'l' && (n.r === null || n.r === false)); }
+  function members(n) {
+    var keys = [], vals = [], seen = {}, i, at;
+    for (i = 0; i < n.k.length; i++) {
+      at = seen['$' + n.k[i]];
+      if (at === undefined) {
+        seen['$' + n.k[i]] = keys.length;
+        keys.push(n.k[i]);
+        vals.push(n.v[i]);
+      } else {
+        vals[at] = n.v[i];
+      }
+    }
+    return { k: keys, v: vals };
+  }
+  function chars(s) { return Array.from(s); }
+  var RANK = { 'null': 0, boolean: 1, number: 3, string: 4, array: 5, object: 6 };
+  function rank(n) {
+    var t = typeOf(n);
+    return t === 'boolean' ? (n.r ? 2 : 1) : RANK[t];
+  }
+  function cmp(a, b) {
+    var ra = rank(a), rb = rank(b), i, c;
+    if (ra !== rb) return ra < rb ? -1 : 1;
+    if (ra <= 2) return 0;
+    if (ra === 3 || ra === 4) return a.r < b.r ? -1 : a.r > b.r ? 1 : 0;
+    if (ra === 5) {
+      for (i = 0; i < a.v.length && i < b.v.length; i++) {
+        c = cmp(a.v[i], b.v[i]);
+        if (c) return c;
+      }
+      return a.v.length === b.v.length ? 0 : a.v.length < b.v.length ? -1 : 1;
+    }
+    var ma = members(a), mb = members(b);
+    var ka = ma.k.slice().sort(), kb = mb.k.slice().sort();
+    c = cmp(arrayOf(ka.map(leafOf)), arrayOf(kb.map(leafOf)));
+    if (c) return c;
+    for (i = 0; i < ka.length; i++) {
+      c = cmp(ma.v[ma.k.indexOf(ka[i])], mb.v[mb.k.indexOf(kb[i])]);
+      if (c) return c;
+    }
+    return 0;
+  }
+  function equal(a, b) { return cmp(a, b) === 0; }
+  function field(n, key) {
+    if (n.t === 'o') {
+      var i = n.k.lastIndexOf(key);
+      return i < 0 ? NULL : n.v[i];
+    }
+    if (n.t === 'l' && n.r === null) return NULL;
+    throw runErr('cannot index ' + typeOf(n) + ' with "' + key + '"');
+  }
+  function elem(n, i) {
+    if (n.t === 'a') {
+      i = Math.floor(i);
+      if (i < 0) i += n.v.length;
+      return i < 0 || i >= n.v.length ? NULL : n.v[i];
+    }
+    if (n.t === 'l' && n.r === null) return NULL;
+    throw runErr('cannot index ' + typeOf(n) + ' with a number');
+  }
+  function lookup(n, key) {
+    var t = typeOf(key);
+    if (t === 'string') return field(n, key.r);
+    if (t === 'number') return elem(n, key.r);
+    if (t === 'null' && n.t === 'l' && n.r === null) return NULL;
+    throw runErr('cannot index ' + typeOf(n) + ' with ' + t);
+  }
+  function slice(n, from, to) {
+    if (n.t === 'l' && n.r === null) return NULL;
+    var isStr = n.t === 'l' && typeof n.r === 'string';
+    if (n.t !== 'a' && !isStr) throw runErr('cannot slice ' + typeOf(n));
+    var cs = isStr ? chars(n.r) : n.v;
+    var lo = bound(from, 0, cs.length), hi = bound(to, cs.length, cs.length);
+    if (hi < lo) hi = lo;
+    return isStr ? leafOf(cs.slice(lo, hi).join('')) : arrayOf(cs.slice(lo, hi));
+  }
+  function bound(v, dflt, len) {
+    if (v === null) return dflt;
+    if (typeOf(v) !== 'number') throw runErr('a slice bound must be a number');
+    var i = Math.floor(v.r);
+    if (i < 0) i += len;
+    return i < 0 ? 0 : i > len ? len : i;
+  }
+  function iterate(n) {
+    if (n.t === 'a') return n.v;
+    if (n.t === 'o') return members(n).v;
+    throw runErr('cannot iterate over ' + typeOf(n));
+  }
+  function descend(n, out) {
+    out.push(n);
+    if (n.t === 'a' || n.t === 'o') {
+      var v = n.t === 'o' ? members(n).v : n.v;
+      for (var i = 0; i < v.length; i++) descend(v[i], out);
+    }
+  }
+  function add2(a, b) {
+    var ta = typeOf(a), tb = typeOf(b);
+    if (ta === 'null') return b;
+    if (tb === 'null') return a;
+    if (ta === 'number' && tb === 'number') return leafOf(a.r + b.r);
+    if (ta === 'string' && tb === 'string') return leafOf(a.r + b.r);
+    if (ta === 'array' && tb === 'array') return arrayOf(a.v.concat(b.v));
+    if (ta === 'object' && tb === 'object') return merge(a, b, false);
+    throw runErr(ta + ' and ' + tb + ' cannot be added');
+  }
+  function sub2(a, b) {
+    var ta = typeOf(a), tb = typeOf(b);
+    if (ta === 'number' && tb === 'number') return leafOf(a.r - b.r);
+    if (ta === 'array' && tb === 'array') {
+      return arrayOf(a.v.filter(function (n) {
+        for (var i = 0; i < b.v.length; i++) if (equal(b.v[i], n)) return false;
+        return true;
+      }));
+    }
+    throw runErr(ta + ' and ' + tb + ' cannot be subtracted');
+  }
+  function mul2(a, b) {
+    var ta = typeOf(a), tb = typeOf(b);
+    if (ta === 'number' && tb === 'number') return leafOf(a.r * b.r);
+    if (ta === 'string' && tb === 'number') return repeat(a.r, b.r);
+    if (ta === 'number' && tb === 'string') return repeat(b.r, a.r);
+    if (ta === 'object' && tb === 'object') return merge(a, b, true);
+    throw runErr(ta + ' and ' + tb + ' cannot be multiplied');
+  }
+  function div2(a, b) {
+    var ta = typeOf(a), tb = typeOf(b);
+    if (ta === 'number' && tb === 'number') {
+      if (b.r === 0) throw runErr('cannot divide by zero');
+      return leafOf(a.r / b.r);
+    }
+    if (ta === 'string' && tb === 'string') return arrayOf(a.r.split(b.r).map(leafOf));
+    throw runErr(ta + ' and ' + tb + ' cannot be divided');
+  }
+  function mod2(a, b) {
+    if (typeOf(a) !== 'number' || typeOf(b) !== 'number') {
+      throw runErr(typeOf(a) + ' and ' + typeOf(b) + ' cannot be divided');
+    }
+    var d = Math.trunc(b.r);
+    if (d === 0) throw runErr('cannot divide by zero');
+    return leafOf(Math.trunc(a.r) % d);
+  }
+  function repeat(s, n) {
+    if (n < 0) return NULL;
+    var out = '', i;
+    for (i = Math.floor(n); i > 0; i--) out += s;
+    return leafOf(out);
+  }
+  function merge(a, b, deep) {
+    var ma = members(a), mb = members(b);
+    var keys = ma.k.slice(), vals = ma.v.slice(), i, at;
+    for (i = 0; i < mb.k.length; i++) {
+      at = keys.indexOf(mb.k[i]);
+      if (at < 0) {
+        keys.push(mb.k[i]);
+        vals.push(mb.v[i]);
+      } else {
+        vals[at] = deep && vals[at].t === 'o' && mb.v[i].t === 'o'
+          ? merge(vals[at], mb.v[i], true) : mb.v[i];
+      }
+    }
+    return objectOf(keys, vals);
+  }
+  var IDENT_HEAD = /[A-Za-z_]/;
+  var IDENT_TAIL = /[A-Za-z0-9_]/;
+  var DIGIT = /[0-9]/;
+  var OPS = ['?//', '==', '!=', '<=', '>=', '//', '|=', '+=', '-=', '*=', '/=',
+    '%=', '..', '|', ',', '(', ')', '[', ']', '{', '}', ':', ';', '+', '-',
+    '*', '%', '/', '<', '>', '=', '?', '.'];
+  var ESCAPES = {
+    '"': '"', '\\': '\\', '/': '/', b: '\b', f: '\f',
+    n: '\n', r: '\r', t: '\t'
+  };
+  function lex(src) {
+    var toks = [], i = 0, c, p, j, buf, d, e, hex, name;
+    while (i < src.length) {
+      c = src.charAt(i);
+      if (c === ' ' || c === '\t' || c === '\n' || c === '\r') { i++; continue; }
+      if (c === '#') {
+        while (i < src.length && src.charAt(i) !== '\n') i++;
+        continue;
+      }
+      p = i;
+      if (c === '"') {
+        j = i + 1;
+        buf = '';
+        for (;;) {
+          if (j >= src.length) throw parseErr('unterminated string', p);
+          d = src.charAt(j);
+          if (d === '"') { j++; break; }
+          if (d !== '\\') { buf += d; j++; continue; }
+          e = src.charAt(j + 1);
+          if (e === '(') throw parseErr('string interpolation is not supported', j);
+          if (ESCAPES[e] !== undefined) { buf += ESCAPES[e]; j += 2; continue; }
+          if (e === 'u') {
+            hex = src.substr(j + 2, 4);
+            if (!/^[0-9a-fA-F]{4}$/.test(hex)) throw parseErr('bad \\u escape', j);
+            buf += String.fromCharCode(parseInt(hex, 16));
+            j += 6;
+            continue;
+          }
+          throw parseErr('bad escape "\\' + e + '"', j);
+        }
+        toks.push({ k: 'str', v: buf, p: p });
+        i = j;
+        continue;
+      }
+      if (DIGIT.test(c)) {
+        j = i;
+        while (j < src.length && DIGIT.test(src.charAt(j))) j++;
+        if (src.charAt(j) === '.') {
+          j++;
+          while (j < src.length && DIGIT.test(src.charAt(j))) j++;
+        }
+        if (src.charAt(j) === 'e' || src.charAt(j) === 'E') {
+          j++;
+          if (src.charAt(j) === '+' || src.charAt(j) === '-') j++;
+          while (j < src.length && DIGIT.test(src.charAt(j))) j++;
+        }
+        toks.push({ k: 'num', v: +src.slice(i, j), p: p });
+        i = j;
+        continue;
+      }
+      if (c === '.' && IDENT_HEAD.test(src.charAt(i + 1))) {
+        j = i + 1;
+        while (j < src.length && IDENT_TAIL.test(src.charAt(j))) j++;
+        toks.push({ k: 'field', v: src.slice(i + 1, j), p: p });
+        i = j;
+        continue;
+      }
+      if (IDENT_HEAD.test(c)) {
+        j = i;
+        while (j < src.length && IDENT_TAIL.test(src.charAt(j))) j++;
+        name = src.slice(i, j);
+        toks.push(name === 'and' || name === 'or'
+          ? { k: 'op', v: name, p: p } : { k: 'ident', v: name, p: p });
+        i = j;
+        continue;
+      }
+      if (c === '$' || c === '@') {
+        j = i + 1;
+        while (j < src.length && IDENT_TAIL.test(src.charAt(j))) j++;
+        toks.push({ k: c === '$' ? 'var' : 'format', v: src.slice(i, j), p: p });
+        i = j;
+        continue;
+      }
+      for (j = 0; j < OPS.length; j++) {
+        if (src.substr(i, OPS[j].length) === OPS[j]) break;
+      }
+      if (j === OPS.length) throw parseErr('unexpected "' + c + '"', p);
+      toks.push({ k: 'op', v: OPS[j], p: p });
+      i += OPS[j].length;
+    }
+    toks.push({ k: 'eof', v: '', p: src.length });
+    return toks;
+  }
+  var BINOPS = [
+    { ops: ['|'], right: true },
+    { ops: [','] },
+    { ops: ['//'] },
+    { ops: ['or'] },
+    { ops: ['and'] },
+    { ops: ['==', '!=', '<', '<=', '>', '>='] },
+    { ops: ['+', '-'] },
+    { ops: ['*', '/', '%'] }
+  ];
+  var OBJ_VALUE_LEVEL = 2;
+  var MISSING = {
+    '=': 'assignment is not supported',
+    '|=': 'assignment is not supported',
+    '+=': 'assignment is not supported',
+    '-=': 'assignment is not supported',
+    '*=': 'assignment is not supported',
+    '/=': 'assignment is not supported',
+    '%=': 'assignment is not supported',
+    '?//': 'destructuring is not supported',
+    'as': 'variables are not supported',
+    'def': 'function definitions are not supported',
+    'reduce': 'reduce is not supported',
+    'foreach': 'foreach is not supported',
+    'try': 'try/catch is not supported, but a trailing "?" is',
+    'catch': 'try/catch is not supported, but a trailing "?" is',
+    'label': 'labels are not supported',
+    'import': 'imports are not supported',
+    'include': 'imports are not supported'
+  };
+  function orList(ns) {
+    var sorted = ns.slice().sort(function (a, b) { return a - b; });
+    if (sorted.length < 2) return String(sorted[0]);
+    return sorted.slice(0, -1).join(', ') + ' or ' + sorted[sorted.length - 1];
+  }
+  var arityCache = null;
+  function arities() {
+    if (!arityCache) {
+      arityCache = {};
+      for (var key in builtins) {
+        var cut = key.lastIndexOf('/');
+        var name = key.slice(0, cut);
+        if (!arityCache[name]) arityCache[name] = [];
+        arityCache[name].push(+key.slice(cut + 1));
+      }
+    }
+    return arityCache;
+  }
+  function parse(src) {
+    var toks = lex(src), at = 0;
+    function peek() { return toks[at]; }
+    function isOp(v) { return toks[at].k === 'op' && toks[at].v === v; }
+    function isWord(v) { return toks[at].k === 'ident' && toks[at].v === v; }
+    function eat(v) { return isOp(v) ? (at++, true) : false; }
+    function want(v) {
+      if (!eat(v)) reject(peek(), 'expected "' + v + '"');
+    }
+    function wantWord(v) {
+      if (!isWord(v)) reject(peek(), 'expected "' + v + '"');
+      at++;
+    }
+    function reject(t, fallback) {
+      if (t.k === 'var') throw parseErr('variables are not supported', t.p);
+      if (t.k === 'format') throw parseErr('format strings are not supported', t.p);
+      if ((t.k === 'op' || t.k === 'ident') && MISSING[t.v]) {
+        throw parseErr(MISSING[t.v], t.p);
+      }
+      if (fallback) throw parseErr(fallback, t.p);
+      if (t.k === 'eof') throw parseErr('query ends early', t.p);
+      throw parseErr('unexpected "' + t.v + '"', t.p);
+    }
+    function expr(level) {
+      if (level === undefined) level = 0;
+      if (level >= BINOPS.length) return unary();
+      var lhs = expr(level + 1), lv = BINOPS[level], t;
+      for (;;) {
+        t = peek();
+        if (t.k !== 'op' || lv.ops.indexOf(t.v) < 0) return lhs;
+        at++;
+        lhs = { op: t.v, l: lhs, r: lv.right ? expr(level) : expr(level + 1), p: t.p };
+        if (lv.right) return lhs;
+      }
+    }
+    function unary() {
+      if (isOp('-')) {
+        var p = peek().p;
+        at++;
+        return { op: 'neg', e: unary(), p: p };
+      }
+      return postfix(primary());
+    }
+    function postfix(src) {
+      var t, next;
+      for (;;) {
+        t = peek();
+        next = toks[at + 1];
+        if (t.k === 'field') {
+          at++;
+          src = { op: 'field', src: src, name: t.v, p: t.p };
+        } else if (t.k === 'op' && t.v === '.' && next.k === 'str') {
+          at += 2;
+          src = { op: 'field', src: src, name: next.v, p: t.p };
+        } else if (t.k === 'op' && t.v === '.' && next.k === 'op' && next.v === '[') {
+          at++;
+        } else if (t.k === 'op' && t.v === '[') {
+          src = brackets(src);
+        } else if (t.k === 'op' && t.v === '?') {
+          at++;
+          src = { op: 'opt', e: src, p: t.p };
+        } else {
+          return src;
+        }
+      }
+    }
+    function brackets(src) {
+      var p = peek().p, first, to;
+      at++;
+      if (eat(']')) return { op: 'iterate', src: src, p: p };
+      if (eat(':')) {
+        to = expr();
+        want(']');
+        return { op: 'slice', src: src, from: null, to: to, p: p };
+      }
+      first = expr();
+      if (eat(':')) {
+        to = isOp(']') ? null : expr();
+        want(']');
+        return { op: 'slice', src: src, from: first, to: to, p: p };
+      }
+      want(']');
+      return { op: 'index', src: src, e: first, p: p };
+    }
+    function primary() {
+      var t = peek(), e, args, key;
+      if (t.k === 'num' || t.k === 'str') {
+        at++;
+        return { op: 'lit', n: leafOf(t.v), p: t.p };
+      }
+      if (t.k === 'field') return { op: '.', p: t.p };
+      if (t.k === 'op' && t.v === '.') {
+        var after = toks[at + 1];
+        if (!(after.k === 'str' || (after.k === 'op' && after.v === '['))) at++;
+        return { op: '.', p: t.p };
+      }
+      if (t.k === 'op' && t.v === '..') { at++; return { op: 'recurse', p: t.p }; }
+      if (t.k === 'op' && t.v === '(') {
+        at++;
+        e = expr();
+        want(')');
+        return e;
+      }
+      if (t.k === 'op' && t.v === '[') {
+        at++;
+        if (eat(']')) return { op: 'array', e: null, p: t.p };
+        e = expr();
+        want(']');
+        return { op: 'array', e: e, p: t.p };
+      }
+      if (t.k === 'op' && t.v === '{') { at++; return object(t.p); }
+      if (t.k === 'ident' && !MISSING[t.v]) {
+        if (t.v === 'if') return conditional();
+        if (t.v === 'true' || t.v === 'false' || t.v === 'null') {
+          at++;
+          return { op: 'lit', n: t.v === 'null' ? NULL : t.v === 'true' ? TRUE : FALSE, p: t.p };
+        }
+        at++;
+        args = [];
+        if (eat('(')) {
+          for (;;) {
+            args.push(expr());
+            if (!eat(';')) break;
+          }
+          want(')');
+        }
+        key = t.v + '/' + args.length;
+        if (!builtins[key]) {
+          var counts = arities()[t.v];
+          if (!counts) throw parseErr(t.v + ' is not a supported filter', t.p);
+          throw parseErr(t.v + ' takes ' + orList(counts) +
+            (counts.length === 1 && counts[0] === 1 ? ' argument, not ' : ' arguments, not ') +
+            args.length, t.p);
+        }
+        return { op: 'call', key: key, args: args, p: t.p };
+      }
+      return reject(t);
+    }
+    function conditional() {
+      var p = peek().p, cond, yes, no;
+      at++;
+      cond = expr();
+      wantWord('then');
+      yes = expr();
+      if (isWord('elif')) return { op: 'if', c: cond, t: yes, f: conditional(), p: p };
+      if (isWord('else')) { at++; no = expr(); } else { no = { op: '.', p: p }; }
+      wantWord('end');
+      return { op: 'if', c: cond, t: yes, f: no, p: p };
+    }
+    function object(p) {
+      var entries = [], t, key, val;
+      if (eat('}')) return { op: 'object', entries: entries, p: p };
+      for (;;) {
+        t = peek();
+        if (t.k === 'ident' || t.k === 'str') {
+          at++;
+          key = { op: 'lit', n: leafOf(t.v), p: t.p };
+        } else if (t.k === 'op' && t.v === '(') {
+          at++;
+          key = expr();
+          want(')');
+        } else {
+          return reject(t);
+        }
+        if (eat(':')) {
+          val = expr(OBJ_VALUE_LEVEL);
+        } else if (t.k === 'ident' || t.k === 'str') {
+          val = { op: 'field', src: { op: '.', p: t.p }, name: t.v, p: t.p };
+        } else {
+          throw parseErr('expected ":"', peek().p);
+        }
+        entries.push({ k: key, v: val });
+        if (!eat(',')) break;
+      }
+      want('}');
+      return { op: 'object', entries: entries, p: p };
+    }
+    if (peek().k === 'eof') throw parseErr('empty query', 0);
+    var ast = expr();
+    if (peek().k !== 'eof') reject(peek());
+    return ast;
+  }
+  function pathSegs(a) {
+    var base, v;
+    if (a.op === '.') return [];
+    if (a.op === 'field') {
+      base = pathSegs(a.src);
+      return base && base.concat([{ key: a.name }]);
+    }
+    if (a.op === 'index') {
+      v = constant(a.e);
+      base = v && pathSegs(a.src);
+      if (!base) return null;
+      if (typeof v.r === 'string') return base.concat([{ key: v.r }]);
+      if (typeof v.r === 'number' && v.r % 1 === 0) return base.concat([{ index: v.r }]);
+    }
+    return null;
+  }
+  function constant(a) {
+    if (a.op === 'lit') return a.n;
+    if (a.op === 'neg' && a.e.op === 'lit' && typeof a.e.n.r === 'number') {
+      return leafOf(-a.e.n.r);
+    }
+    return null;
+  }
+  function tick() {
+    if (++steps > STEP_LIMIT) throw runErr('query produced too much work');
+  }
+  function push(out, list) {
+    for (var i = 0; i < list.length; i++) out.push(list[i]);
+  }
+  var COMPARE = {
+    '==': function (c) { return c === 0; },
+    '!=': function (c) { return c !== 0; },
+    '<': function (c) { return c < 0; },
+    '<=': function (c) { return c <= 0; },
+    '>': function (c) { return c > 0; },
+    '>=': function (c) { return c >= 0; }
+  };
+  var ARITH = { '+': add2, '-': sub2, '*': mul2, '/': div2, '%': mod2 };
+  function ev(a, x) {
+    tick();
+    var out, vals, i, j, k, from, to, test;
+    switch (a.op) {
+      case '.':
+        return [x];
+      case 'lit':
+        return [a.n];
+      case 'recurse':
+        out = [];
+        descend(x, out);
+        return out;
+      case '|':
+        out = [];
+        vals = ev(a.l, x);
+        for (i = 0; i < vals.length; i++) push(out, ev(a.r, vals[i]));
+        return out;
+      case ',':
+        return ev(a.l, x).concat(ev(a.r, x));
+      case '//':
+        return alternative(a, x);
+      case 'and':
+      case 'or':
+        return logical(a, x);
+      case '==': case '!=': case '<': case '<=': case '>': case '>=':
+        test = COMPARE[a.op];
+        return pair(a, x, function (l, r) { return test(cmp(l, r)) ? TRUE : FALSE; });
+      case '+': case '-': case '*': case '/': case '%':
+        return pair(a, x, ARITH[a.op]);
+      case 'neg':
+        out = [];
+        vals = ev(a.e, x);
+        for (i = 0; i < vals.length; i++) {
+          out.push(leafOf(-num(vals[i], 'negation')));
+        }
+        return out;
+      case 'opt':
+        try {
+          return ev(a.e, x);
+        } catch (e) {
+          if (e.jq === 'run') return [];
+          throw e;
+        }
+      case 'field':
+        out = [];
+        vals = ev(a.src, x);
+        for (i = 0; i < vals.length; i++) out.push(field(vals[i], a.name));
+        return out;
+      case 'index':
+        out = [];
+        vals = ev(a.src, x);
+        to = ev(a.e, x);
+        for (i = 0; i < vals.length; i++) {
+          for (j = 0; j < to.length; j++) out.push(lookup(vals[i], to[j]));
+        }
+        return out;
+      case 'slice':
+        out = [];
+        vals = ev(a.src, x);
+        from = a.from ? ev(a.from, x) : [null];
+        to = a.to ? ev(a.to, x) : [null];
+        for (i = 0; i < vals.length; i++) {
+          for (j = 0; j < from.length; j++) {
+            for (k = 0; k < to.length; k++) out.push(slice(vals[i], from[j], to[k]));
+          }
+        }
+        return out;
+      case 'iterate':
+        out = [];
+        vals = ev(a.src, x);
+        for (i = 0; i < vals.length; i++) push(out, iterate(vals[i]));
+        return out;
+      case 'array':
+        return [arrayOf(a.e ? ev(a.e, x) : [])];
+      case 'object':
+        out = [];
+        buildObject(a.entries, 0, [], [], x, out);
+        return out;
+      case 'if':
+        out = [];
+        vals = ev(a.c, x);
+        for (i = 0; i < vals.length; i++) push(out, ev(truthy(vals[i]) ? a.t : a.f, x));
+        return out;
+      case 'call':
+        return builtins[a.key](x, a.args);
+    }
+    throw runErr('cannot evaluate ' + a.op);
+  }
+  function pair(a, x, f) {
+    var l = ev(a.l, x), r = ev(a.r, x), out = [], i, j;
+    for (i = 0; i < r.length; i++) {
+      for (j = 0; j < l.length; j++) out.push(f(l[j], r[i]));
+    }
+    return out;
+  }
+  function alternative(a, x) {
+    var out = [], vals, i;
+    try {
+      vals = ev(a.l, x);
+      for (i = 0; i < vals.length; i++) if (truthy(vals[i])) out.push(vals[i]);
+    } catch (e) {
+      if (e.jq !== 'run') throw e;
+    }
+    return out.length ? out : ev(a.r, x);
+  }
+  function logical(a, x) {
+    var vals = ev(a.l, x), decided = a.op === 'or', out = [], rest, i, j;
+    for (i = 0; i < vals.length; i++) {
+      if (truthy(vals[i]) === decided) {
+        out.push(decided ? TRUE : FALSE);
+        continue;
+      }
+      rest = ev(a.r, x);
+      for (j = 0; j < rest.length; j++) out.push(truthy(rest[j]) ? TRUE : FALSE);
+    }
+    return out;
+  }
+  function buildObject(entries, i, keys, vals, x, out) {
+    if (i === entries.length) {
+      out.push(distinct(objectOf(keys.slice(), vals.slice())));
+      return;
+    }
+    var ks = ev(entries[i].k, x), vs, j, m;
+    for (j = 0; j < ks.length; j++) {
+      if (typeOf(ks[j]) !== 'string') {
+        throw runErr('an object key must be a string, not ' + typeOf(ks[j]));
+      }
+      vs = ev(entries[i].v, x);
+      for (m = 0; m < vs.length; m++) {
+        keys.push(ks[j].r);
+        vals.push(vs[m]);
+        buildObject(entries, i + 1, keys, vals, x, out);
+        keys.pop();
+        vals.pop();
+      }
+    }
+  }
+  function wantType(n, t, name) {
+    if (typeOf(n) !== t) throw runErr(name + ' needs ' + t + ', not ' + typeOf(n));
+    return n;
+  }
+  function num(n, name) {
+    if (typeOf(n) !== 'number') throw runErr(name + ' needs a number, not ' + typeOf(n));
+    return n.r;
+  }
+  function overArg(arg, x, f) {
+    var vals = ev(arg, x), out = [], i;
+    for (i = 0; i < vals.length; i++) out.push(f(vals[i]));
+    return out;
+  }
+  function distinct(n) {
+    var m = members(n);
+    return objectOf(m.k, m.v);
+  }
+  function keysOf(n, sorted) {
+    var out = [], i;
+    if (n.t === 'a') {
+      for (i = 0; i < n.v.length; i++) out.push(leafOf(i));
+      return arrayOf(out);
+    }
+    if (n.t === 'o') {
+      var k = members(n).k.slice();
+      if (sorted) k.sort();
+      return arrayOf(k.map(leafOf));
+    }
+    throw runErr(typeOf(n) + ' has no keys');
+  }
+  function hasKey(container, key) {
+    if (container.t === 'o') {
+      return typeOf(key) === 'string' && members(container).k.indexOf(key.r) >= 0;
+    }
+    if (container.t === 'a') {
+      var i = num(key, 'has');
+      return i >= 0 && i < container.v.length;
+    }
+    throw runErr('cannot check whether ' + typeOf(container) + ' has a key');
+  }
+  function keyed(list, arg) {
+    var pairs = list.map(function (n) { return { n: n, k: arrayOf(ev(arg, n)) }; });
+    pairs.sort(function (p, q) { return cmp(p.k, q.k); });
+    return pairs;
+  }
+  function runsOf(pairs) {
+    var out = [], i;
+    for (i = 0; i < pairs.length; i++) {
+      if (i && cmp(pairs[i - 1].k, pairs[i].k) === 0) out[out.length - 1].push(pairs[i].n);
+      else out.push([pairs[i].n]);
+    }
+    return out;
+  }
+  function flattenInto(list, depth, out) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].t === 'a' && depth > 0) flattenInto(list[i].v, depth - 1, out);
+      else out.push(list[i]);
+    }
+  }
+  function rangeOf(froms, tos, bys) {
+    var out = [], i, j, k, from, to, by, v;
+    for (i = 0; i < froms.length; i++) {
+      for (j = 0; j < tos.length; j++) {
+        for (k = 0; k < bys.length; k++) {
+          from = num(froms[i], 'range');
+          to = num(tos[j], 'range');
+          by = num(bys[k], 'range');
+          if (by === 0) continue;
+          for (v = from; by > 0 ? v < to : v > to; v += by) {
+            tick();
+            out.push(leafOf(v));
+          }
+        }
+      }
+    }
+    return out;
+  }
+  var RE_FLAGS = 'gimsuy';
+  function regex(pattern, flags) {
+    var i;
+    for (i = 0; i < flags.length; i++) {
+      if (RE_FLAGS.indexOf(flags.charAt(i)) < 0) {
+        throw runErr('unsupported regex flag "' + flags.charAt(i) + '"');
+      }
+    }
+    try {
+      return new RegExp(pattern, flags);
+    } catch (e) {
+      throw runErr('bad regular expression: ' + e.message);
+    }
+  }
+  function containsIn(a, b) {
+    var ta = typeOf(a), tb = typeOf(b), i, j, ok, mb;
+    if (ta === 'object' && tb === 'object') {
+      mb = members(b);
+      for (i = 0; i < mb.k.length; i++) {
+        if (!containsIn(field(a, mb.k[i]), mb.v[i])) return false;
+      }
+      return true;
+    }
+    if (ta === 'array' && tb === 'array') {
+      for (i = 0; i < b.v.length; i++) {
+        ok = false;
+        for (j = 0; j < a.v.length && !ok; j++) ok = containsIn(a.v[j], b.v[i]);
+        if (!ok) return false;
+      }
+      return true;
+    }
+    if (ta === 'string' && tb === 'string') return a.r.indexOf(b.r) >= 0;
+    if (ta !== tb) throw runErr(ta + ' and ' + tb + ' cannot be checked for containment');
+    return equal(a, b);
+  }
+  function indicesOf(x, want) {
+    var tx = typeOf(x), tw = typeOf(want), out = [], cs, ws, i, j;
+    if (tx === 'null') return NULL;
+    if (tx === 'string') {
+      if (tw !== 'string') throw runErr('cannot look for ' + tw + ' in a string');
+      ws = chars(want.r);
+      cs = chars(x.r);
+      for (i = 0; ws.length && i + ws.length <= cs.length; i++) {
+        for (j = 0; j < ws.length && cs[i + j] === ws[j]; j++) {  }
+        if (j === ws.length) out.push(leafOf(i));
+      }
+      return arrayOf(out);
+    }
+    if (tx !== 'array') throw runErr('cannot look inside ' + tx);
+    if (tw === 'array') {
+      for (i = 0; want.v.length && i + want.v.length <= x.v.length; i++) {
+        for (j = 0; j < want.v.length && equal(x.v[i + j], want.v[j]); j++) {  }
+        if (j === want.v.length) out.push(leafOf(i));
+      }
+      return arrayOf(out);
+    }
+    for (i = 0; i < x.v.length; i++) if (equal(x.v[i], want)) out.push(leafOf(i));
+    return arrayOf(out);
+  }
+  function endIndex(found, last) {
+    if (found.t !== 'a' || !found.v.length) return NULL;
+    return last ? found.v[found.v.length - 1] : found.v[0];
+  }
+  var ENTRY_KEYS = ['name', 'Name', 'key', 'Key'];
+  var ENTRY_VALUES = ['value', 'Value'];
+  function entryKey(e) {
+    var at, i;
+    for (i = 0; i < ENTRY_KEYS.length; i++) {
+      at = e.k.lastIndexOf(ENTRY_KEYS[i]);
+      if (at >= 0 && truthy(e.v[at])) return e.v[at];
+    }
+    return NULL;
+  }
+  function entryValue(e) {
+    var at, i;
+    for (i = 0; i < ENTRY_VALUES.length; i++) {
+      at = e.k.lastIndexOf(ENTRY_VALUES[i]);
+      if (at >= 0) return e.v[at];
+    }
+    return NULL;
+  }
+  function typeFilter(t) {
+    return function (x) { return typeOf(x) === t ? [x] : []; };
+  }
+  function mathFilter(f) {
+    return function (x) { return [leafOf(f(num(x, 'a number filter')))]; };
+  }
+  var builtins = {
+    'empty/0': function () { return []; },
+    'not/0': function (x) { return [truthy(x) ? FALSE : TRUE]; },
+    'type/0': function (x) { return [leafOf(typeOf(x))]; },
+    'select/1': function (x, args) {
+      var vals = ev(args[0], x), out = [], i;
+      for (i = 0; i < vals.length; i++) if (truthy(vals[i])) out.push(x);
+      return out;
+    },
+    'recurse/0': function (x) {
+      var out = [];
+      descend(x, out);
+      return out;
+    },
+    'recurse/1': function (x, args) {
+      var out = [], stack = [x], next, i;
+      while (stack.length) {
+        tick();
+        next = stack.pop();
+        out.push(next);
+        next = ev(args[0], next);
+        for (i = next.length - 1; i >= 0; i--) stack.push(next[i]);
+      }
+      return out;
+    },
+    'map/1': function (x, args) {
+      var vals = iterate(x), out = [], i;
+      for (i = 0; i < vals.length; i++) push(out, ev(args[0], vals[i]));
+      return [arrayOf(out)];
+    },
+    'map_values/1': function (x, args) {
+      var keys = [], vals = [], r, i, m;
+      if (x.t === 'a') {
+        for (i = 0; i < x.v.length; i++) {
+          r = ev(args[0], x.v[i]);
+          if (r.length) vals.push(r[0]);
+        }
+        return [arrayOf(vals)];
+      }
+      m = members(wantType(x, 'object', 'map_values'));
+      for (i = 0; i < m.k.length; i++) {
+        r = ev(args[0], m.v[i]);
+        if (r.length) {
+          keys.push(m.k[i]);
+          vals.push(r[0]);
+        }
+      }
+      return [objectOf(keys, vals)];
+    },
+    'length/0': function (x) {
+      var t = typeOf(x);
+      if (t === 'null') return [leafOf(0)];
+      if (t === 'boolean') throw runErr('boolean has no length');
+      if (t === 'number') return [leafOf(Math.abs(x.r))];
+      if (t === 'string') return [leafOf(chars(x.r).length)];
+      return [leafOf(t === 'object' ? members(x).k.length : x.v.length)];
+    },
+    'keys/0': function (x) { return [keysOf(x, true)]; },
+    'keys_unsorted/0': function (x) { return [keysOf(x, false)]; },
+    'has/1': function (x, args) {
+      return overArg(args[0], x, function (k) { return hasKey(x, k) ? TRUE : FALSE; });
+    },
+    'in/1': function (x, args) {
+      return overArg(args[0], x, function (c) { return hasKey(c, x) ? TRUE : FALSE; });
+    },
+    'indices/1': function (x, args) {
+      return overArg(args[0], x, function (w) { return indicesOf(x, w); });
+    },
+    'index/1': function (x, args) {
+      return overArg(args[0], x, function (w) { return endIndex(indicesOf(x, w), false); });
+    },
+    'rindex/1': function (x, args) {
+      return overArg(args[0], x, function (w) { return endIndex(indicesOf(x, w), true); });
+    },
+    'contains/1': function (x, args) {
+      return overArg(args[0], x, function (b) { return containsIn(x, b) ? TRUE : FALSE; });
+    },
+    'inside/1': function (x, args) {
+      return overArg(args[0], x, function (b) { return containsIn(b, x) ? TRUE : FALSE; });
+    },
+    'to_entries/0': function (x) {
+      var m = members(wantType(x, 'object', 'to_entries')), out = [], i;
+      for (i = 0; i < m.k.length; i++) {
+        out.push(objectOf(['key', 'value'], [leafOf(m.k[i]), m.v[i]]));
+      }
+      return [arrayOf(out)];
+    },
+    'from_entries/0': function (x) {
+      var list = wantType(x, 'array', 'from_entries').v;
+      var keys = [], vals = [], e, k, i;
+      for (i = 0; i < list.length; i++) {
+        e = list[i];
+        k = e.t === 'o' ? entryKey(e) : e;
+        vals.push(e.t === 'o' ? entryValue(e) : NULL);
+        keys.push(typeOf(k) === 'string' ? k.r : stringify(k));
+      }
+      return [distinct(objectOf(keys, vals))];
+    },
+    'with_entries/1': function (x, args) {
+      var entries = builtins['to_entries/0'](x)[0], out = [], i;
+      for (i = 0; i < entries.v.length; i++) push(out, ev(args[0], entries.v[i]));
+      return builtins['from_entries/0'](arrayOf(out));
+    },
+    'add/0': function (x) {
+      var vals = iterate(x), acc = NULL, i;
+      for (i = 0; i < vals.length; i++) acc = add2(acc, vals[i]);
+      return [acc];
+    },
+    'any/0': function (x) {
+      var vals = iterate(x), i;
+      for (i = 0; i < vals.length; i++) if (truthy(vals[i])) return [TRUE];
+      return [FALSE];
+    },
+    'all/0': function (x) {
+      var vals = iterate(x), i;
+      for (i = 0; i < vals.length; i++) if (!truthy(vals[i])) return [FALSE];
+      return [TRUE];
+    },
+    'any/1': function (x, args) {
+      var vals = iterate(x), r, i, j;
+      for (i = 0; i < vals.length; i++) {
+        r = ev(args[0], vals[i]);
+        for (j = 0; j < r.length; j++) if (truthy(r[j])) return [TRUE];
+      }
+      return [FALSE];
+    },
+    'all/1': function (x, args) {
+      var vals = iterate(x), r, i, j;
+      for (i = 0; i < vals.length; i++) {
+        r = ev(args[0], vals[i]);
+        for (j = 0; j < r.length; j++) if (!truthy(r[j])) return [FALSE];
+      }
+      return [TRUE];
+    },
+    'min/0': function (x) { return [pick(wantType(x, 'array', 'min').v, null, -1)]; },
+    'max/0': function (x) { return [pick(wantType(x, 'array', 'max').v, null, 1)]; },
+    'min_by/1': function (x, args) { return [pick(wantType(x, 'array', 'min_by').v, args[0], -1)]; },
+    'max_by/1': function (x, args) { return [pick(wantType(x, 'array', 'max_by').v, args[0], 1)]; },
+    'sort/0': function (x) {
+      return [arrayOf(wantType(x, 'array', 'sort').v.slice().sort(cmp))];
+    },
+    'sort_by/1': function (x, args) {
+      var pairs = keyed(wantType(x, 'array', 'sort_by').v, args[0]);
+      return [arrayOf(pairs.map(function (p) { return p.n; }))];
+    },
+    'group_by/1': function (x, args) {
+      var runs = runsOf(keyed(wantType(x, 'array', 'group_by').v, args[0]));
+      return [arrayOf(runs.map(arrayOf))];
+    },
+    'unique/0': function (x) {
+      var sorted = wantType(x, 'array', 'unique').v.slice().sort(cmp), out = [], i;
+      for (i = 0; i < sorted.length; i++) {
+        if (!i || cmp(sorted[i - 1], sorted[i]) !== 0) out.push(sorted[i]);
+      }
+      return [arrayOf(out)];
+    },
+    'unique_by/1': function (x, args) {
+      var runs = runsOf(keyed(wantType(x, 'array', 'unique_by').v, args[0]));
+      return [arrayOf(runs.map(function (r) { return r[0]; }))];
+    },
+    'reverse/0': function (x) {
+      if (typeOf(x) === 'string') return [leafOf(chars(x.r).reverse().join(''))];
+      if (typeOf(x) === 'null') return [arrayOf([])];
+      return [arrayOf(wantType(x, 'array', 'reverse').v.slice().reverse())];
+    },
+    'flatten/0': function (x) {
+      var out = [];
+      flattenInto(wantType(x, 'array', 'flatten').v, Infinity, out);
+      return [arrayOf(out)];
+    },
+    'flatten/1': function (x, args) {
+      return overArg(args[0], x, function (d) {
+        var depth = num(d, 'flatten'), out = [];
+        if (depth < 0) throw runErr('flatten needs a depth of 0 or more');
+        flattenInto(wantType(x, 'array', 'flatten').v, depth, out);
+        return arrayOf(out);
+      });
+    },
+    'first/0': function (x) { return [elem(wantType(x, 'array', 'first'), 0)]; },
+    'last/0': function (x) { return [elem(wantType(x, 'array', 'last'), -1)]; },
+    'first/1': function (x, args) {
+      var vals = ev(args[0], x);
+      return vals.length ? [vals[0]] : [];
+    },
+    'last/1': function (x, args) {
+      var vals = ev(args[0], x);
+      return vals.length ? [vals[vals.length - 1]] : [];
+    },
+    'limit/2': function (x, args) {
+      var out = [], counts = ev(args[0], x), vals, n, i;
+      for (i = 0; i < counts.length; i++) {
+        n = Math.floor(num(counts[i], 'limit'));
+        if (n <= 0) continue;
+        vals = ev(args[1], x);
+        push(out, vals.slice(0, n));
+      }
+      return out;
+    },
+    'range/1': function (x, args) { return rangeOf([leafOf(0)], ev(args[0], x), [leafOf(1)]); },
+    'range/2': function (x, args) { return rangeOf(ev(args[0], x), ev(args[1], x), [leafOf(1)]); },
+    'range/3': function (x, args) { return rangeOf(ev(args[0], x), ev(args[1], x), ev(args[2], x)); },
+    'join/1': function (x, args) {
+      var list = wantType(x, 'array', 'join').v;
+      return overArg(args[0], x, function (sep) {
+        var parts = [], t, i;
+        for (i = 0; i < list.length; i++) {
+          t = typeOf(list[i]);
+          if (t === 'null') parts.push('');
+          else if (t === 'string') parts.push(list[i].r);
+          else if (t === 'number' || t === 'boolean') parts.push(stringify(list[i]));
+          else throw runErr('cannot join ' + t + ' elements');
+        }
+        return leafOf(parts.join(typeOf(sep) === 'string' ? sep.r : stringify(sep)));
+      });
+    },
+    'split/1': function (x, args) {
+      var s = wantType(x, 'string', 'split').r;
+      return overArg(args[0], x, function (sep) {
+        return arrayOf(s.split(wantType(sep, 'string', 'split').r).map(leafOf));
+      });
+    },
+    'test/1': function (x, args) { return match(x, args[0], null); },
+    'test/2': function (x, args) { return match(x, args[0], args[1]); },
+    'startswith/1': function (x, args) {
+      var s = wantType(x, 'string', 'startswith').r;
+      return overArg(args[0], x, function (p) {
+        return s.lastIndexOf(wantType(p, 'string', 'startswith').r, 0) === 0 ? TRUE : FALSE;
+      });
+    },
+    'endswith/1': function (x, args) {
+      var s = wantType(x, 'string', 'endswith').r;
+      return overArg(args[0], x, function (p) {
+        var t = wantType(p, 'string', 'endswith').r;
+        return s.length >= t.length && s.indexOf(t, s.length - t.length) >= 0 ? TRUE : FALSE;
+      });
+    },
+    'ltrimstr/1': function (x, args) {
+      return overArg(args[0], x, function (p) {
+        if (typeOf(x) !== 'string' || typeOf(p) !== 'string') return x;
+        return x.r.lastIndexOf(p.r, 0) === 0 ? leafOf(x.r.slice(p.r.length)) : x;
+      });
+    },
+    'rtrimstr/1': function (x, args) {
+      return overArg(args[0], x, function (p) {
+        if (typeOf(x) !== 'string' || typeOf(p) !== 'string') return x;
+        var at = x.r.length - p.r.length;
+        return at >= 0 && x.r.indexOf(p.r, at) === at ? leafOf(x.r.slice(0, at)) : x;
+      });
+    },
+    'ascii_downcase/0': function (x) {
+      return [leafOf(wantType(x, 'string', 'ascii_downcase').r.replace(/[A-Z]/g, lower))];
+    },
+    'ascii_upcase/0': function (x) {
+      return [leafOf(wantType(x, 'string', 'ascii_upcase').r.replace(/[a-z]/g, upper))];
+    },
+    'tostring/0': function (x) {
+      return [typeOf(x) === 'string' ? x : leafOf(stringify(x))];
+    },
+    'tonumber/0': function (x) {
+      if (typeOf(x) === 'number') return [x];
+      var n = +wantType(x, 'string', 'tonumber').r;
+      if (x.r.trim() === '' || isNaN(n)) throw runErr('cannot parse "' + x.r + '" as a number');
+      return [leafOf(n)];
+    },
+    'tojson/0': function (x) { return [leafOf(stringify(x))]; },
+    'fromjson/0': function (x) {
+      var s = wantType(x, 'string', 'fromjson').r;
+      try {
+        JSON.parse(s);
+      } catch (e) {
+        throw runErr('cannot parse "' + s + '" as JSON');
+      }
+      return [core.parseJSON(s)];
+    },
+    'floor/0': mathFilter(Math.floor),
+    'ceil/0': mathFilter(Math.ceil),
+    'round/0': mathFilter(Math.round),
+    'fabs/0': mathFilter(Math.abs),
+    'sqrt/0': mathFilter(Math.sqrt),
+    'arrays/0': typeFilter('array'),
+    'objects/0': typeFilter('object'),
+    'booleans/0': typeFilter('boolean'),
+    'numbers/0': typeFilter('number'),
+    'strings/0': typeFilter('string'),
+    'nulls/0': typeFilter('null'),
+    'iterables/0': function (x) { return x.t === 'a' || x.t === 'o' ? [x] : []; },
+    'scalars/0': function (x) { return x.t === 'l' ? [x] : []; },
+    'values/0': function (x) { return x.t === 'l' && x.r === null ? [] : [x]; }
+  };
+  function lower(c) { return c.toLowerCase(); }
+  function upper(c) { return c.toUpperCase(); }
+  function pick(list, arg, want) {
+    var best = null, bestKey = null, key, c, i;
+    for (i = 0; i < list.length; i++) {
+      key = arg ? arrayOf(ev(arg, list[i])) : list[i];
+      if (best === null) {
+        best = list[i];
+        bestKey = key;
+        continue;
+      }
+      c = cmp(key, bestKey);
+      if (want > 0 ? c >= 0 : c < 0) {
+        best = list[i];
+        bestKey = key;
+      }
+    }
+    return best === null ? NULL : best;
+  }
+  function match(x, patArg, flagArg) {
+    var s = wantType(x, 'string', 'test').r;
+    var pats = ev(patArg, x), flags = flagArg ? ev(flagArg, x) : [leafOf('')];
+    var out = [], i, j;
+    for (i = 0; i < flags.length; i++) {
+      for (j = 0; j < pats.length; j++) {
+        out.push(regex(wantType(pats[j], 'string', 'test').r,
+          wantType(flags[i], 'string', 'test').r).test(s) ? TRUE : FALSE);
+      }
+    }
+    return out;
+  }
+  function compile(src) {
+    var ast = parse(src);
+    return {
+      path: pathSegs(ast),
+      run: function (input) {
+        steps = 0;
+        return ev(ast, input);
+      }
+    };
+  }
+  return { compile: compile };
+})();
+if (typeof module === 'object' && module.exports) module.exports = jqjs;
+var jqsuggest = (function () {
+  'use strict';
+  var core = typeof jqweb !== 'undefined' ? jqweb : require('./core.js');
+  var pathText = core.pathText, stringify = core.stringify;
+  var MAX_PIVOTS = 6;
+  var MAX_LITERAL = 60;
+  function nodeAt(doc, segs) {
+    var n = doc, at, i;
+    for (i = 0; i < segs.length && n; i++) {
+      if (segs[i].index !== undefined) {
+        n = n.t === 'a' ? n.v[segs[i].index] : null;
+      } else {
+        at = n.t === 'o' ? n.k.lastIndexOf(segs[i].key) : -1;
+        n = at < 0 ? null : n.v[at];
+      }
+    }
+    return n || null;
+  }
+  function suffix(segs) {
+    return segs.length ? pathText(segs).replace(/^\.\[/, '[') : '';
+  }
+  function condition(subject, test, literal, inArray) {
+    var path = subject + suffix(test) + (test.length ? '?' : '');
+    if (literal === null) return path + ' != null';
+    if (!inArray) return (path || '.') + ' == ' + literal;
+    return path ? path + ' | index(' + literal + ')?' : 'index(' + literal + ')?';
+  }
+  function depths(n) {
+    var out = [], d;
+    for (d = 0; d < n && d < MAX_PIVOTS; d++) out.push(d);
+    if (n > 0 && out[out.length - 1] !== n - 1) out.push(n - 1);
+    return out;
+  }
+  var RANK = { pivot: 1, anyKey: 2, anywhere: 3, line: 4, unnamed: 1 };
+  function suggest(doc, segs) {
+    var out = [], seen = {}, value = nodeAt(doc, segs);
+    if (!value) return out;
+    var literal = stringify(value);
+    if (literal.length > MAX_LITERAL) literal = null;
+    var inArray = literal !== null &&
+      segs.length > 0 && segs[segs.length - 1].index !== undefined;
+    var below = inArray ? segs.slice(0, -1) : segs;
+    function add(q, why, shape, rank) {
+      if (q && !seen[q]) {
+        seen[q] = true;
+        out.push({ q: q, why: why, shape: shape, rank: rank });
+      }
+    }
+    depths(segs.length).forEach(function (d) {
+      var pivot = nodeAt(doc, segs.slice(0, d));
+      if (!pivot || pivot.t === 'l') return;
+      var at = pathText(segs.slice(0, d));
+      var test = below.slice(d + 1);
+      if (literal === null && !test.length) return;
+      var where = at === '.' ? 'across the document' : 'in ' + at;
+      var holds = inArray && d < below.length;
+      var unnamed = at === '.' ? RANK.unnamed : 0;
+      if (pivot.t === 'o') {
+        add((at === '.' ? '' : at + ' | ') +
+          'with_entries(select(' + condition('.value', test, literal, holds) + '))',
+        where, 'keys', RANK.pivot + unnamed);
+      } else {
+        add((at === '.' ? '.[]' : at + '[]') +
+          ' | select(' + condition('', test, literal, holds) + ')',
+        where, 'results', RANK.pivot + unnamed);
+      }
+      if (test.length > (literal === null ? 1 : 0)) {
+        add((at === '.' ? '.[]' : at + '[]') + ' | .[]? | select(' +
+          condition('', test.slice(1), literal, holds) + ')',
+        where + ', any key', 'results', RANK.anyKey + unnamed);
+      }
+    });
+    var key = null;
+    for (var i = below.length - 1; i >= 0; i--) {
+      if (below[i].key !== undefined) { key = below[i].key; break; }
+    }
+    add(key === null ? '.. | select(. == ' + literal + ')'
+      : '.. | objects | select(' + condition('', [{ key: key }], literal, inArray) + ')',
+    'anywhere', 'results', RANK.anywhere);
+    add(pathText(segs), 'this line', 'results', RANK.line);
+    return out;
+  }
+  return { suggest: suggest };
+})();
+if (typeof module === 'object' && module.exports) module.exports = jqsuggest;
+var jqui = function (page) {
+  'use strict';
+  var renderTree = jqweb.renderTree, esc = jqweb.esc;
+  var tree = document.getElementById('tree');
+  var results = document.getElementById('results');
+  var input = document.getElementById('q');
+  var mode = document.getElementById('mode');
+  var stats = document.getElementById('stats');
+  mode.hidden = false;
+  input.placeholder = 'Filter, a path, or a jq query such as .items[] | select(.n > 3)';
+  mode.addEventListener('change', function () { input.focus(); page.rerun(); });
+  var QUERY_START = '.[($|';
+  var CALL = /^[a-z_][a-z0-9_]*\s*\(/;
+  function wants(raw) {
+    if (mode.value === 'jq') return true;
+    if (mode.value !== 'auto') return false;
+    return QUERY_START.indexOf(raw.charAt(0)) >= 0 || CALL.test(raw);
+  }
+  function run(raw) {
+    var query, out;
+    showDocument();
+    try {
+      query = jqjs.compile(raw);
+    } catch (e) {
+      fault(e.message, e.pos);
+      return;
+    }
+    if (query.path) { page.showFound(page.resolve(query.path), query.path.length); return; }
+    try {
+      out = query.run(page.value);
+    } catch (e) {
+      fault(e.message);
+      return;
+    }
+    showResults(out);
+  }
+  function fault(message, pos) {
+    input.classList.add('bad');
+    stats.textContent = pos === undefined ? message : message + ' (at ' + (pos + 1) + ')';
+  }
+  var RESULT_CAP = 500;
+  function showResults(out) {
+    var shown = Math.min(out.length, RESULT_CAP), parts = [], i;
+    for (i = 0; i < shown; i++) {
+      parts.push('<div class="result" data-n="' + i + '">' + renderTree(out[i]) + '</div>');
+    }
+    results.innerHTML = parts.join('');
+    results.classList.toggle('one', out.length === 1);
+    results.hidden = false;
+    tree.hidden = true;
+    stats.textContent = shown < out.length
+      ? 'first ' + shown + ' of ' + plural(out.length, 'result')
+      : describe(out);
+  }
+  function describe(out) {
+    if (out.length !== 1) return plural(out.length, 'result');
+    if (out[0].t === 'o') return '1 result, ' + plural(out[0].k.length, 'key');
+    if (out[0].t === 'a') return '1 result, ' + plural(out[0].v.length, 'item');
+    return '1 result';
+  }
+  function plural(n, noun) { return n + ' ' + noun + (n === 1 ? '' : 's'); }
+  function showDocument() {
+    if (results.hidden) return;
+    results.hidden = true;
+    results.innerHTML = '';
+    tree.hidden = false;
+  }
+  var suggestions = document.getElementById('suggest');
+  var rows = [];
+  var COUNT_BUDGET_MS = 300;
+  function filter(node) {
+    var segs = page.segsOf(node);
+    var deadline = Date.now() + COUNT_BUDGET_MS;
+    rows = jqsuggest.suggest(page.value, segs).map(function (c) {
+      c.count = Date.now() > deadline ? null : count(c);
+      return c;
+    }).filter(function (c) {
+      return c.count !== 0;
+    });
+    rows.sort(function (a, b) {
+      var an = a.count === null ? -1 : a.count, bn = b.count === null ? -1 : b.count;
+      return an === bn ? a.rank - b.rank : bn - an;
+    });
+    draw();
+    if (rows.length) pick(0);
+    show();
+  }
+  function count(c) {
+    var out;
+    try {
+      out = jqjs.compile(c.q).run(page.value);
+    } catch (e) {
+      if (e.jq) return 0;
+      throw e;
+    }
+    if (c.shape !== 'keys') return out.length;
+    return out.length && out[0].t === 'o' ? out[0].k.length : 0;
+  }
+  function label(c) {
+    return c.count === null ? '' : plural(c.count, c.shape === 'keys' ? 'key' : 'result');
+  }
+  function draw() {
+    var parts = [], i;
+    for (i = 0; i < rows.length; i++) {
+      parts.push('<div class="sg"><button class="sgq" type="button">' +
+        '<span class="sgt">' + esc(rows[i].q) + '</span>' +
+        '<span class="sgn">' + esc(label(rows[i])) + '</span></button>' +
+        '<button class="sgc" type="button" title="Copy this query">&#x29C9;</button></div>');
+    }
+    suggestions.innerHTML = parts.join('');
+    mark();
+  }
+  function mark() {
+    var kids = suggestions.children, i;
+    for (i = 0; i < kids.length; i++) {
+      kids[i].classList.toggle('on', rows[i].q === input.value.trim());
+    }
+  }
+  function show() {
+    if (rows.length) suggestions.hidden = false;
+  }
+  function hide() { suggestions.hidden = true; }
+  function pick(i) {
+    input.value = rows[i].q;
+    input.classList.remove('bad');
+    mark();
+    run(rows[i].q);
+  }
+  suggestions.addEventListener('click', function (e) {
+    var row = e.target.closest('.sg');
+    if (!row) return;
+    var i = Array.prototype.indexOf.call(suggestions.children, row);
+    if (e.target.closest('.sgc')) { page.copy(rows[i].q, e.target.closest('.sgc')); return; }
+    pick(i);
+    input.focus();
+  });
+  input.addEventListener('focus', show);
+  input.addEventListener('input', function () {
+    if (input.value.trim()) {
+      mark();
+      return;
+    }
+    rows = [];
+    suggestions.innerHTML = '';
+    hide();
+  });
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !suggestions.hidden) {
+      hide();
+      e.stopPropagation();
+      return;
+    }
+    if (suggestions.hidden || !rows.length) return;
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    var at = -1, i;
+    for (i = 0; i < rows.length; i++) if (rows[i].q === input.value.trim()) at = i;
+    at = e.key === 'ArrowDown' ? Math.min(at + 1, rows.length - 1) : Math.max(at - 1, 0);
+    pick(at);
+  });
+  document.addEventListener('mousedown', function (e) {
+    if (!suggestions.contains(e.target) && e.target !== input) hide();
+  });
+  return {
+    wants: wants,
+    run: run,
+    filter: filter,
+    showDocument: showDocument
+  };
+};
 (function () {
   'use strict';
   var tree = document.getElementById('tree');

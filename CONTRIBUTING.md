@@ -103,11 +103,12 @@ one means adding a query for it.
 
 `docs/index.html` is a rendered page committed for GitHub Pages, and it does
 not regenerate itself. After a change to the scripts or the styling it is
-stale until someone rebuilds it. It is built without `--jq`, matching the
-default. The file name sets the page title, so keep it:
+stale until someone rebuilds it. It is built with `--jq`, so that the
+page people are pointed at has the query box and the filter buttons in it. The
+file name sets the page title, so keep it:
 
     curl -s 'https://en.wikipedia.org/api/rest_v1/?spec' > wikipedia-reset-spec.json
-    go build -o jqweb . && ./jqweb -o docs/index.html wikipedia-reset-spec.json
+    go build -o jqweb . && ./jqweb --jq -o docs/index.html wikipedia-reset-spec.json
 
 ## Wanted, not written
 

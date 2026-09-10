@@ -112,11 +112,16 @@ one means adding a query for it.
 `docs/index.html` is a rendered page committed for GitHub Pages, and it does
 not regenerate itself. After a change to the scripts or the styling it is
 stale until someone rebuilds it. Build it the default way, so
-that the page people are pointed at is the one they will get. The file name
-sets the page title, so keep it:
+that the page people are pointed at is the one they will get. The input file
+name sets the page title, so build from `docs/k8s.json` where it sits:
 
-    curl -s 'https://en.wikipedia.org/api/rest_v1/?spec' > wikipedia-reset-spec.json
-    go build -o jqweb . && ./jqweb -o docs/index.html wikipedia-reset-spec.json
+    go build -o jqweb . && ./jqweb -o docs/index.html docs/k8s.json
+
+`docs/k8s.json` is the document that page shows: a `kubectl get all -o json`
+listing, generated rather than taken from a real cluster. GitHub Pages serves
+it at https://zafnz.github.io/jqweb/k8s.json, which is what the `curl` in
+`README.md` fetches, so changing the file changes both the example page and
+the first command a reader runs.
 
 ## Bugs and wanted features
 

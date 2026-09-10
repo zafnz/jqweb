@@ -25,7 +25,7 @@ The macOS builds are signed and notarized.
 **Quick view of json output. (See screenshot below, or <a href="https://zafnz.github.io/jqweb/">view here</a>)**
 
 ```
-$ curl -s 'https://en.wikipedia.org/api/rest_v1/?spec' | jqweb
+$ curl -s https://zafnz.github.io/jqweb/k8s.json | jqweb
 jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)
 ```
 

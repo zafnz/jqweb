@@ -1,3 +1,8 @@
+![Release](https://github.com/zafnz/jqweb/workflows/release/badge.svg)
+![GitHub Release](https://img.shields.io/github/v/release/zafnz/jqweb)
+![GitHub Issues](https://img.shields.io/github/issues/zafnz/jqweb)
+![GitHub License](https://img.shields.io/github/license/zafnz/jqweb)
+
 # jqweb
 Renders json like jq, but as a webpage
 

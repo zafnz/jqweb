@@ -1822,22 +1822,24 @@ var jqui = function (page) {
         '<button class="sgc" type="button" title="Copy this query">&#x29C9;</button></div>');
     }
     suggestions.innerHTML = parts.join('');
-    mark();
   }
-  function mark() {
+  function mark(at) {
     var kids = suggestions.children, i;
-    for (i = 0; i < kids.length; i++) {
-      kids[i].classList.toggle('on', rows[i].q === input.value.trim());
-    }
+    for (i = 0; i < kids.length; i++) kids[i].classList.toggle('on', i === at);
   }
   function show() {
     if (rows.length) suggestions.hidden = false;
   }
   function hide() { suggestions.hidden = true; }
+  function forget() {
+    rows = [];
+    suggestions.innerHTML = '';
+    hide();
+  }
   function pick(i) {
     input.value = rows[i].q;
     input.classList.remove('bad');
-    mark();
+    mark(i);
     run(rows[i].q);
   }
   suggestions.addEventListener('click', function (e) {
@@ -1850,13 +1852,7 @@ var jqui = function (page) {
   });
   input.addEventListener('focus', show);
   input.addEventListener('input', function () {
-    if (input.value.trim()) {
-      mark();
-      return;
-    }
-    rows = [];
-    suggestions.innerHTML = '';
-    hide();
+    forget();
   });
   input.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !suggestions.hidden) {

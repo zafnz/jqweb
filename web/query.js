@@ -187,22 +187,27 @@ var jqui = function (page) {
         '<button class="sgc" type="button" title="Copy this query">&#x29C9;</button></div>');
     }
     suggestions.innerHTML = parts.join('');
-    mark();
   }
 
-  /* Highlights whichever row the box currently holds, so the two never
-     disagree about what is running. */
-  function mark() {
+  /* Highlights the row the box is holding. Nothing else can put text there
+     that matches a row -- typing drops the list -- so it is the row that was
+     picked rather than whatever happens to match. */
+  function mark(at) {
     var kids = suggestions.children, i;
-    for (i = 0; i < kids.length; i++) {
-      kids[i].classList.toggle('on', rows[i].q === input.value.trim());
-    }
+    for (i = 0; i < kids.length; i++) kids[i].classList.toggle('on', i === at);
   }
 
   function show() {
     if (rows.length) suggestions.hidden = false;
   }
   function hide() { suggestions.hidden = true; }
+
+  /* Put the list away and drop what was in it. */
+  function forget() {
+    rows = [];
+    suggestions.innerHTML = '';
+    hide();
+  }
 
   /* Picking a row leaves the list open: trying the next one is the whole
      reason there is a list.
@@ -213,7 +218,7 @@ var jqui = function (page) {
   function pick(i) {
     input.value = rows[i].q;
     input.classList.remove('bad');
-    mark();
+    mark(i);
     run(rows[i].q);
   }
 
@@ -228,17 +233,16 @@ var jqui = function (page) {
 
   input.addEventListener('focus', show);
 
-  /* Emptying the box is done with the list, which was about a query that is no
-     longer there, so the rows go too and focusing the empty box brings nothing
-     back. Escape only puts the list away, which is why that one keeps them. */
+  /* Typing anything is done with the list. It offered readings of one line of
+     the document, and the moment the text stops being one of them it is
+     answering a question that is no longer being asked -- so the rows go, and
+     focusing the box brings nothing back.
+
+     Only a person typing gets here: filling the box from a row sets the value
+     directly, which fires nothing. Escape is the one way to put the list away
+     and still get it back. */
   input.addEventListener('input', function () {
-    if (input.value.trim()) {
-      mark();
-      return;
-    }
-    rows = [];
-    suggestions.innerHTML = '';
-    hide();
+    forget();
   });
 
   /* Up and down step through the readings, running each, which is the quick

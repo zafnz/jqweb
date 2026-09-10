@@ -50,11 +50,6 @@ Waiting for an idle period with no requests, rather than for the first one,
 survives all of that. Holding a connection open and exiting when it drops --
 what dev servers do -- is better still and tells you the tab actually closed.
 
-## Changing text in filter/search/jq box should delete dropdown
-
-At the moment the dropdown doesn't disappear until you fully erase the text
-box. but as soon as the user starts removing stuff the filter should go. 
-
 ## Error message shrinks text input
 
 A long error message makes the text input shrink. Combined with the issue

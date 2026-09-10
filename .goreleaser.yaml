@@ -102,13 +102,33 @@ release:
     page that browses, filters and looks up paths and nothing else; that one is
     about 5KB larger than 0.3.0, which is the second colour palette.
 
+    Against that, the comments in the page scripts are no longer served to
+    every reader of a page. They were written for someone reading `web/*.js`
+    and were being inlined along with the code; stripping them takes about 10KB
+    off a page before any of the above is added.
+
+    ## Truncated input
+
+    JSON that ends inside an unclosed container reports that it was truncated,
+    rather than an end-of-input error, whichever version of Go built the
+    binary. Go 1.27 changed what the decoder returns there, which had made the
+    message worse in a binary built with it.
+
 changelog:
-  sort: asc
+  # No sort: git order, so the list reads as the work happened rather than
+  # alphabetically by whatever word a subject starts with.
+  sort:
+  # The commit list sits under the notes above, so it wants to be readable
+  # rather than complete: a full SHA on every line is 40 characters of nothing
+  # anyone reads, and a merge commit says only that a branch arrived.
+  abbrev: -1
   filters:
     exclude:
       - "^docs:"
       - "^test:"
       - "^chore:"
+      - "^Merge pull request"
+      - "^Merge branch"
 
 homebrew_casks:
   - name: jqweb

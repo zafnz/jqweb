@@ -41,3 +41,4 @@ k8s.html
 jqweb
 # GoReleaser
 dist/
+.claude/worktrees

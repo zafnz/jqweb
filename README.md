@@ -93,12 +93,26 @@ how to run a bare-word one such as `keys`.
 
 This is a subset of jq, not all of it. Paths, `[]`, slices, `|`, `,`, `//`,
 `?`, comparisons, arithmetic, `if/then/elif/else/end`, array and object
-construction, and about 60 builtins are there: `select`, `map`, `map_values`,
-`keys`, `length`, `type`, `has`, `to_entries`, `from_entries`, `with_entries`,
-`add`, `any`, `all`, `sort_by`, `group_by`, `unique_by`, `min_by`, `max_by`,
-`flatten`, `range`, `limit`, `first`, `last`, `join`, `split`, `test`,
-`startswith`, `contains`, `index`, `rindex`, `indices`, `tostring`, `tonumber`,
-`tojson`, `recurse` and the type filters.
+construction, and around 100 builtins:
+
+- **picking things out** — `select`, `map`, `map_values`, `keys`, `length`,
+  `type`, `has`, `in`, `contains`, `inside`, `any`, `all`, `first`, `last`,
+  `limit`, `range`, `recurse`, `walk`, `paths`, `getpath`, `isempty`,
+  `while`, `until`
+- **rearranging** — `to_entries`, `from_entries`, `with_entries`, `add`,
+  `sort`, `sort_by`, `group_by`, `unique`, `unique_by`, `min_by`, `max_by`,
+  `flatten`, `reverse`, `join`, `split`
+- **text** — `test`, `match`, `capture`, `scan`, `splits`, `sub`, `gsub`,
+  `startswith`, `endswith`, `ltrimstr`, `rtrimstr`, `ascii_downcase`,
+  `ascii_upcase`, `explode`, `implode`, `index`, `rindex`, `indices`
+- **converting** — `tostring`, `tonumber`, `tojson`, `fromjson`, and the
+  format strings `@text`, `@json`, `@csv`, `@tsv`, `@uri`, `@html`, `@sh`,
+  `@base64`, `@base64d`
+- **dates** — `now`, `todate`, `fromdate`, `gmtime`, `mktime`, `strftime`
+- **numbers** — `floor`, `ceil`, `round`, `fabs`, `sqrt`, `pow`, `log`,
+  `log2`, `log10`, `exp`, `exp2`, `exp10`, `trunc`
+- the type filters — `arrays`, `objects`, `strings`, `numbers`, `booleans`,
+  `nulls`, `iterables`, `scalars`, `values`
 
 Two things differ from jq on purpose. Regular expressions are JavaScript's
 rather than Oniguruma's, which part ways in the corners. `index` and `indices`
@@ -107,11 +121,12 @@ count characters, so in jq `.[index("x"):]` cuts in the wrong place as soon as
 the text before the match is not all ASCII. Pure ASCII behaves identically
 either way.
 
-Variables and `as`, `def`, `reduce`, `foreach`, assignment, `path`, string
-interpolation and format strings are not. A query using one says so by name
-instead of guessing at what it meant.
+Variables and `as`, `def`, `reduce`, `foreach`, `try`/`catch` and string
+interpolation are not there. Neither is anything that edits a document --
+assignment, `del`, `setpath` -- since the page is for reading one. A query
+using any of them says so by name instead of guessing at what it meant.
 
-`--simple` leaves the engine out, for a page that is about 50KB smaller and
+`--simple` leaves the engine out, for a page that is about 70KB smaller and
 does nothing but browse, filter and look up paths.
 
 ## Filtering on a value

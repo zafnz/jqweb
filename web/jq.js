@@ -589,6 +589,18 @@ var jqjs = (function () {
         return { op: 'array', e: e, p: t.p };
       }
       if (t.k === 'op' && t.v === '{') { at++; return object(t.p); }
+      /* "@base64" and the rest are filters whose names begin with an @. The
+         "@base64 \"text\"" form, which formats an interpolated string, needs
+         interpolation and so is not here. */
+      if (t.k === 'format') {
+        if (!builtins[t.v + '/0']) throw parseErr(t.v + ' is not a supported format', t.p);
+        if (toks[at + 1].k === 'str') {
+          throw parseErr(t.v + ' applied to a string needs interpolation, ' +
+            'which is not supported', t.p);
+        }
+        at++;
+        return { op: 'call', key: t.v + '/0', args: [], p: t.p };
+      }
       if (t.k === 'ident' && !MISSING[t.v]) {
         if (t.v === 'if') return conditional();
         if (t.v === 'true' || t.v === 'false' || t.v === 'null') {
@@ -988,7 +1000,8 @@ var jqjs = (function () {
   function regex(pattern, flags) {
     var i;
     for (i = 0; i < flags.length; i++) {
-      if (RE_FLAGS.indexOf(flags.charAt(i)) < 0) {
+      /* "d" and the second "g" are added by the matcher, not by the query. */
+      if (RE_FLAGS.indexOf(flags.charAt(i)) < 0 && flags.charAt(i) !== 'd') {
         throw runErr('unsupported regex flag "' + flags.charAt(i) + '"');
       }
     }
@@ -997,6 +1010,241 @@ var jqjs = (function () {
     } catch (e) {
       throw runErr('bad regular expression: ' + e.message);
     }
+  }
+
+  /* ---- regular expressions ----
+
+     jq counts characters and JavaScript indexes strings by 16-bit unit, so
+     every offset a match reports has to be converted. This maps each unit
+     index to the character index at or before it; a surrogate pair takes two
+     units and counts once. */
+  function charOffsets(s) {
+    var map = new Array(s.length + 1), at = 0, i = 0, c;
+    while (i < s.length) {
+      map[i] = at;
+      c = s.charCodeAt(i);
+      if (c >= 0xD800 && c < 0xDC00 && i + 1 < s.length) {
+        map[i + 1] = at;
+        i += 2;
+      } else {
+        i += 1;
+      }
+      at++;
+    }
+    map[s.length] = at;
+    return map;
+  }
+
+  /* The name of each capture group by its number, or null for an unnamed one.
+     JavaScript reports named groups in a bag with no numbering, and jq lists
+     every capture in order with its name attached, so the pattern is read for
+     the order. Escapes and character classes are skipped, as are the "(?"
+     forms that do not capture. */
+  function groupNames(pattern) {
+    var names = [null], inClass = false, i = 0, c, m;
+    while (i < pattern.length) {
+      c = pattern.charAt(i);
+      if (c === '\\') { i += 2; continue; }
+      if (inClass) {
+        if (c === ']') inClass = false;
+        i++;
+        continue;
+      }
+      if (c === '[') { inClass = true; i++; continue; }
+      if (c !== '(') { i++; continue; }
+      if (pattern.charAt(i + 1) !== '?') { names.push(null); i++; continue; }
+      m = /^\(\?<([A-Za-z_$][A-Za-z0-9_$]*)>/.exec(pattern.slice(i));
+      if (m) {
+        names.push(m[1]);
+        i += m[0].length;
+      } else {
+        i += 2;
+      }
+    }
+    return names;
+  }
+
+  /* Every match of a pattern in a string, as the objects jq's match produces:
+     {offset, length, string, captures: [{offset, length, string, name}]}. */
+  function matchesOf(x, pattern, flags, global) {
+    var s = wantType(x, 'string', 'match').r;
+    var re = regex(pattern, flags.replace(/g/g, '') + 'gd');
+    var names = groupNames(pattern), off = charOffsets(s), out = [], m, i, at;
+    while ((m = re.exec(s)) !== null) {
+      var caps = [];
+      for (i = 1; i < m.length; i++) {
+        at = m.indices[i];
+        caps.push(objectOf(['offset', 'length', 'string', 'name'],
+          at ? [leafOf(off[at[0]]), leafOf(off[at[1]] - off[at[0]]),
+            leafOf(m[i]), names[i] === undefined || names[i] === null ? NULL : leafOf(names[i])]
+            : [leafOf(-1), leafOf(0), NULL,
+              names[i] === undefined || names[i] === null ? NULL : leafOf(names[i])]));
+      }
+      out.push(objectOf(['offset', 'length', 'string', 'captures'],
+        [leafOf(off[m.index]), leafOf(off[m.index + m[0].length] - off[m.index]),
+          leafOf(m[0]), arrayOf(caps)]));
+      if (!global) break;
+      /* An empty match would otherwise be found at the same place for ever. */
+      if (m[0] === '') re.lastIndex++;
+      tick();
+    }
+    return out;
+  }
+
+  /* The named captures of one match as an object, which is what capture gives
+     back and what the replacement in sub and gsub is run against. */
+  function captureObject(match) {
+    var caps = field(match, 'captures').v, keys = [], vals = [], name, i;
+    for (i = 0; i < caps.length; i++) {
+      name = field(caps[i], 'name');
+      if (typeOf(name) === 'string') {
+        keys.push(name.r);
+        vals.push(field(caps[i], 'string'));
+      }
+    }
+    return distinct(objectOf(keys, vals));
+  }
+
+  /* The pieces of a string either side of every match. */
+  function splitOn(x, pattern, flags) {
+    var s = wantType(x, 'string', 'splits').r;
+    var cs = chars(s), ms = matchesOf(x, pattern, flags, true), out = [], at = 0, i, m;
+    for (i = 0; i < ms.length; i++) {
+      m = ms[i];
+      out.push(leafOf(cs.slice(at, field(m, 'offset').r).join('')));
+      at = field(m, 'offset').r + field(m, 'length').r;
+    }
+    out.push(leafOf(cs.slice(at).join('')));
+    return out;
+  }
+
+  /* Replaces matches, running the replacement as a filter over each match's
+     named captures -- gsub("(?<c>l)"; "[" + .c + "]") is jq's own example. A
+     replacement that yields several values yields several whole strings, so
+     the results are built across the matches rather than one at a time. */
+  function substitute(x, pattern, replacement, flags, global) {
+    var s = wantType(x, 'string', 'sub').r;
+    var cs = chars(s), ms = matchesOf(x, pattern, flags, global), out = [];
+    build(0, 0, '');
+    return out;
+
+    function build(i, at, acc) {
+      tick();
+      if (i === ms.length) {
+        out.push(leafOf(acc + cs.slice(at).join('')));
+        return;
+      }
+      var m = ms[i], start = field(m, 'offset').r, len = field(m, 'length').r;
+      var before = acc + cs.slice(at, start).join('');
+      var reps = ev(replacement, captureObject(m)), j;
+      for (j = 0; j < reps.length; j++) {
+        build(i + 1, start + len, before + wantType(reps[j], 'string', 'sub').r);
+      }
+    }
+  }
+
+  /* ---- format strings ----
+
+     @base64 and the rest, which jq writes as a filter named with an @. */
+  var FORMATS = {
+    '@text': function (x) { return typeOf(x) === 'string' ? x.r : stringify(x); },
+    '@json': function (x) { return stringify(x); },
+    '@uri': function (x) {
+      return asText(x).replace(/[^A-Za-z0-9\-_.~]/g, function (c) {
+        return Array.prototype.map.call(utf8(c), function (b) {
+          return '%' + (b < 16 ? '0' : '') + b.toString(16).toUpperCase();
+        }).join('');
+      });
+    },
+    '@html': function (x) {
+      return asText(x).replace(/[&<>'"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c];
+      });
+    },
+    '@base64': function (x) { return base64(asText(x)); },
+    '@base64d': function (x) { return unbase64(asText(x)); },
+    '@csv': function (x) { return row(x, ',', true); },
+    '@tsv': function (x) { return row(x, '\t', false); },
+    '@sh': function (x) {
+      var vals = x.t === 'a' ? x.v : [x];
+      return vals.map(function (v) {
+        if (typeOf(v) === 'string') return "'" + v.r.replace(/'/g, "'\\''") + "'";
+        if (v.t === 'a' || v.t === 'o') throw runErr('cannot quote ' + typeOf(v) + ' for a shell');
+        return stringify(v);
+      }).join(' ');
+    }
+  };
+
+  function asText(x) { return typeOf(x) === 'string' ? x.r : stringify(x); }
+
+  /* One row of @csv or @tsv. Both take an array; csv quotes strings and
+     doubles the quotes inside them, tsv escapes the characters that would end
+     a field or a line. */
+  function row(x, sep, quoted) {
+    return wantType(x, 'array', 'a format string').v.map(function (v) {
+      var t = typeOf(v);
+      if (t === 'null') return '';
+      if (t === 'number' || t === 'boolean') return stringify(v);
+      if (t !== 'string') throw runErr(t + ' cannot go in a row');
+      if (quoted) return '"' + v.r.replace(/"/g, '""') + '"';
+      return v.r.replace(/\\/g, '\\\\').replace(/\t/g, '\\t')
+        .replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+    }).join(sep);
+  }
+
+  /* UTF-8 bytes of a string, which @uri percent-encodes and @base64 packs. */
+  function utf8(s) {
+    var out = [], i, c;
+    for (i = 0; i < s.length; i++) {
+      c = s.codePointAt(i);
+      if (c > 0xFFFF) i++;
+      if (c < 0x80) out.push(c);
+      else if (c < 0x800) out.push(0xC0 | (c >> 6), 0x80 | (c & 63));
+      else if (c < 0x10000) out.push(0xE0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+      else out.push(0xF0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+    }
+    return out;
+  }
+
+  var B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+  function base64(s) {
+    var b = utf8(s), out = '', i, n;
+    for (i = 0; i < b.length; i += 3) {
+      n = (b[i] << 16) | ((b[i + 1] || 0) << 8) | (b[i + 2] || 0);
+      out += B64.charAt(n >> 18) + B64.charAt((n >> 12) & 63) +
+        (i + 1 < b.length ? B64.charAt((n >> 6) & 63) : '=') +
+        (i + 2 < b.length ? B64.charAt(n & 63) : '=');
+    }
+    return out;
+  }
+
+  function unbase64(s) {
+    var clean = s.replace(/[^A-Za-z0-9+/]/g, ''), bytes = [], i, n, have;
+    for (i = 0; i < clean.length; i += 4) {
+      have = Math.min(4, clean.length - i);
+      n = 0;
+      for (var j = 0; j < 4; j++) n = (n << 6) | (j < have ? B64.indexOf(clean.charAt(i + j)) : 0);
+      bytes.push((n >> 16) & 255);
+      if (have > 2) bytes.push((n >> 8) & 255);
+      if (have > 3) bytes.push(n & 255);
+    }
+    return fromUTF8(bytes);
+  }
+
+  /* Bytes back to a string. Anything that is not valid UTF-8 comes through as
+     the replacement character, which is what jq does with it. */
+  function fromUTF8(b) {
+    var out = '', i = 0, c, n, cp;
+    while (i < b.length) {
+      c = b[i];
+      n = c < 0x80 ? 0 : c < 0xE0 ? 1 : c < 0xF0 ? 2 : 3;
+      cp = n === 0 ? c : c & (0x3F >> n);
+      for (var j = 1; j <= n; j++) cp = (cp << 6) | (b[i + j] & 63);
+      out += i + n < b.length || n === 0 ? String.fromCodePoint(cp) : '\uFFFD';
+      i += n + 1;
+    }
+    return out;
   }
 
   /* jq's containment: a string contains a substring, an array contains
@@ -1090,6 +1338,92 @@ var jqjs = (function () {
       if (at >= 0) return e.v[at];
     }
     return NULL;
+  }
+
+  /* Every path to a value inside a node, deepest last, as jq's paths gives
+     them: arrays of keys and indices, and never the empty path for the root. */
+  function pathsOf(n, at, out, keep) {
+    var i, m, here;
+    if (n.t === 'a') {
+      for (i = 0; i < n.v.length; i++) {
+        here = at.concat([leafOf(i)]);
+        if (keep(n.v[i])) out.push(arrayOf(here));
+        pathsOf(n.v[i], here, out, keep);
+      }
+    } else if (n.t === 'o') {
+      m = members(n);
+      for (i = 0; i < m.k.length; i++) {
+        here = at.concat([leafOf(m.k[i])]);
+        if (keep(m.v[i])) out.push(arrayOf(here));
+        pathsOf(m.v[i], here, out, keep);
+      }
+    }
+  }
+
+  /* Follows a path of keys and indices, giving null where it leads nowhere. */
+  function atPath(n, path) {
+    var i;
+    for (i = 0; i < path.length && n; i++) {
+      if (n.t === 'l' && n.r === null) return NULL;
+      n = lookup(n, path[i]);
+    }
+    return n || NULL;
+  }
+
+  /* The broken-out time jq's gmtime returns: year, month from zero, day,
+     hour, minute, second, weekday, and day of the year from zero. */
+  function broken(secs) {
+    var d = new Date(secs * 1000);
+    var start = Date.UTC(d.getUTCFullYear(), 0, 1);
+    return arrayOf([leafOf(d.getUTCFullYear()), leafOf(d.getUTCMonth()), leafOf(d.getUTCDate()),
+      leafOf(d.getUTCHours()), leafOf(d.getUTCMinutes()),
+      leafOf(d.getUTCSeconds() + (secs - Math.floor(secs))),
+      leafOf(d.getUTCDay()), leafOf(Math.floor((Date.UTC(d.getUTCFullYear(),
+        d.getUTCMonth(), d.getUTCDate()) - start) / 86400000))]);
+  }
+
+  /* Seconds from a broken-out time, or from a number left as it is. */
+  function seconds(x, name) {
+    if (typeOf(x) === 'number') return x.r;
+    var v = wantType(x, 'array', name).v;
+    if (v.length < 6) throw runErr(name + ' needs a broken-out time of at least six parts');
+    return Date.UTC(num(v[0], name), num(v[1], name), num(v[2], name),
+      num(v[3], name), num(v[4], name), Math.floor(num(v[5], name))) / 1000 +
+      (num(v[5], name) % 1);
+  }
+
+  var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+
+  function pad(n, w) {
+    var s = String(Math.floor(Math.abs(n)));
+    while (s.length < w) s = '0' + s;
+    return (n < 0 ? '-' : '') + s;
+  }
+
+  /* The strftime specifiers people actually type. An unknown one is left as
+     written rather than guessed at. */
+  function strftime(secs, fmt) {
+    var t = broken(secs).v.map(function (n) { return n.r; });
+    var map = {
+      Y: pad(t[0], 4), m: pad(t[1] + 1, 2), d: pad(t[2], 2), e: String(t[2]),
+      H: pad(t[3], 2), M: pad(t[4], 2), S: pad(t[5], 2), j: pad(t[7] + 1, 3),
+      a: DAYS[t[6]].slice(0, 3), A: DAYS[t[6]], b: MONTHS[t[1]].slice(0, 3),
+      B: MONTHS[t[1]], y: pad(t[0] % 100, 2), Z: 'UTC', z: '+0000',
+      T: pad(t[3], 2) + ':' + pad(t[4], 2) + ':' + pad(t[5], 2),
+      D: pad(t[1] + 1, 2) + '/' + pad(t[2], 2) + '/' + pad(t[0] % 100, 2),
+      F: pad(t[0], 4) + '-' + pad(t[1] + 1, 2) + '-' + pad(t[2], 2),
+      u: String(t[6] === 0 ? 7 : t[6]), w: String(t[6]), s: String(Math.floor(secs)),
+      n: '\n', t: '\t', '%': '%'
+    };
+    return fmt.replace(/%(.)/g, function (whole, c) {
+      return map[c] === undefined ? whole : map[c];
+    });
+  }
+
+  function mathOf(f, name) {
+    return function (x) { return [leafOf(f(num(x, name)))]; };
   }
 
   /* select(type == "...") under the shorter name jq gives it. */
@@ -1247,6 +1581,27 @@ var jqjs = (function () {
       var vals = iterate(x), r, i, j;
       for (i = 0; i < vals.length; i++) {
         r = ev(args[0], vals[i]);
+        for (j = 0; j < r.length; j++) if (!truthy(r[j])) return [FALSE];
+      }
+      return [TRUE];
+    },
+
+    /* The two-argument forms take a stream rather than the input's own
+       members, which is what lets a test reach anywhere in a subtree:
+       any(.. | objects; .containerPort? == 80). An empty stream is vacuously
+       all and not any, as in jq. */
+    'any/2': function (x, args) {
+      var vals = ev(args[0], x), r, i, j;
+      for (i = 0; i < vals.length; i++) {
+        r = ev(args[1], vals[i]);
+        for (j = 0; j < r.length; j++) if (truthy(r[j])) return [TRUE];
+      }
+      return [FALSE];
+    },
+    'all/2': function (x, args) {
+      var vals = ev(args[0], x), r, i, j;
+      for (i = 0; i < vals.length; i++) {
+        r = ev(args[1], vals[i]);
         for (j = 0; j < r.length; j++) if (!truthy(r[j])) return [FALSE];
       }
       return [TRUE];
@@ -1418,8 +1773,216 @@ var jqjs = (function () {
     'nulls/0': typeFilter('null'),
     'iterables/0': function (x) { return x.t === 'a' || x.t === 'o' ? [x] : []; },
     'scalars/0': function (x) { return x.t === 'l' ? [x] : []; },
-    'values/0': function (x) { return x.t === 'l' && x.r === null ? [] : [x]; }
+    'values/0': function (x) { return x.t === 'l' && x.r === null ? [] : [x]; },
+
+    'match/1': function (x, a) { return withRe(x, a, 1, matchOne); },
+    'match/2': function (x, a) { return withRe(x, a, 2, matchOne); },
+    'capture/1': function (x, a) { return withRe(x, a, 1, captureOne); },
+    'capture/2': function (x, a) { return withRe(x, a, 2, captureOne); },
+    'scan/1': function (x, a) { return withRe(x, a, 1, scanOne); },
+    'scan/2': function (x, a) { return withRe(x, a, 2, scanOne); },
+    'splits/1': function (x, a) { return withRe(x, a, 1, splitOn); },
+    'splits/2': function (x, a) { return withRe(x, a, 2, splitOn); },
+    'split/2': function (x, a) { return [arrayOf(withRe(x, a, 2, splitOn))]; },
+    'test/1': function (x, a) { return withRe(x, a, 1, testOne); },
+    'test/2': function (x, a) { return withRe(x, a, 2, testOne); },
+    'sub/2': function (x, a) { return substitute(x, one(a[0], x, 'sub'), a[1], '', false); },
+    'sub/3': function (x, a) {
+      return substitute(x, one(a[0], x, 'sub'), a[1], one(a[2], x, 'sub'), false);
+    },
+    'gsub/2': function (x, a) { return substitute(x, one(a[0], x, 'gsub'), a[1], '', true); },
+    'gsub/3': function (x, a) {
+      return substitute(x, one(a[0], x, 'gsub'), a[1], one(a[2], x, 'gsub'), true);
+    },
+
+    'paths/0': function (x) {
+      var out = [];
+      pathsOf(x, [], out, function () { return true; });
+      return out;
+    },
+    'paths/1': function (x, a) {
+      var out = [], kept = [];
+      pathsOf(x, [], out, function () { return true; });
+      for (var i = 0; i < out.length; i++) {
+        var v = atPath(x, out[i].v), r = ev(a[0], v), j;
+        for (j = 0; j < r.length; j++) {
+          if (truthy(r[j])) { kept.push(out[i]); break; }
+        }
+      }
+      return kept;
+    },
+    'getpath/1': function (x, a) {
+      return overArg(a[0], x, function (p) {
+        return atPath(x, wantType(p, 'array', 'getpath').v);
+      });
+    },
+
+    'walk/1': function (x, a) {
+      return [step(x)];
+
+      function step(n) {
+        tick();
+        var m, i, vals;
+        if (n.t === 'a') {
+          n = arrayOf(n.v.map(step));
+        } else if (n.t === 'o') {
+          m = members(n);
+          vals = [];
+          for (i = 0; i < m.v.length; i++) vals.push(step(m.v[i]));
+          n = objectOf(m.k, vals);
+        }
+        var r = ev(a[0], n);
+        return r.length ? r[0] : NULL;
+      }
+    },
+
+    'while/2': function (x, a) {
+      var out = [], at = x, r;
+      for (;;) {
+        tick();
+        r = ev(a[0], at);
+        if (!r.length || !truthy(r[0])) return out;
+        out.push(at);
+        r = ev(a[1], at);
+        if (!r.length) return out;
+        at = r[0];
+      }
+    },
+    'until/2': function (x, a) {
+      var at = x, r;
+      for (;;) {
+        tick();
+        r = ev(a[0], at);
+        if (r.length && truthy(r[0])) return [at];
+        r = ev(a[1], at);
+        if (!r.length) return [at];
+        at = r[0];
+      }
+    },
+    'isempty/1': function (x, a) { return [ev(a[0], x).length ? FALSE : TRUE]; },
+    'error/0': function (x) {
+      throw runErr(typeOf(x) === 'string' ? x.r : stringify(x));
+    },
+    'error/1': function (x, a) {
+      var m = ev(a[0], x);
+      throw runErr(!m.length ? 'error' : typeOf(m[0]) === 'string' ? m[0].r : stringify(m[0]));
+    },
+    'recurse/2': function (x, a) {
+      var out = [], stack = [x], next, keep, i, j;
+      while (stack.length) {
+        tick();
+        next = stack.pop();
+        out.push(next);
+        keep = [];
+        next = ev(a[0], next);
+        for (i = 0; i < next.length; i++) {
+          var c = ev(a[1], next[i]);
+          for (j = 0; j < c.length; j++) {
+            if (truthy(c[j])) { keep.push(next[i]); break; }
+          }
+        }
+        for (i = keep.length - 1; i >= 0; i--) stack.push(keep[i]);
+      }
+      return out;
+    },
+
+    'explode/0': function (x) {
+      return [arrayOf(chars(wantType(x, 'string', 'explode').r)
+        .map(function (c) { return leafOf(c.codePointAt(0)); }))];
+    },
+    'implode/0': function (x) {
+      return [leafOf(wantType(x, 'array', 'implode').v
+        .map(function (n) { return String.fromCodePoint(num(n, 'implode')); }).join(''))];
+    },
+
+    'now/0': function () { return [leafOf(Date.now() / 1000)]; },
+    'gmtime/0': function (x) { return [broken(num(x, 'gmtime'))]; },
+    'mktime/0': function (x) { return [leafOf(seconds(x, 'mktime'))]; },
+    'todate/0': function (x) { return [leafOf(strftime(num(x, 'todate'), '%Y-%m-%dT%H:%M:%SZ'))]; },
+    'todateiso8601/0': function (x) {
+      return [leafOf(strftime(num(x, 'todateiso8601'), '%Y-%m-%dT%H:%M:%SZ'))];
+    },
+    'fromdate/0': function (x) { return [leafOf(parseDate(x, 'fromdate'))]; },
+    'fromdateiso8601/0': function (x) { return [leafOf(parseDate(x, 'fromdateiso8601'))]; },
+    'strftime/1': function (x, a) {
+      var secs = seconds(x, 'strftime');
+      return overArg(a[0], x, function (f) {
+        return leafOf(strftime(secs, wantType(f, 'string', 'strftime').r));
+      });
+    },
+    'pow/2': function (x, a) {
+      var b = ev(a[0], x), e = ev(a[1], x), out = [], i, j;
+      for (i = 0; i < b.length; i++) {
+        for (j = 0; j < e.length; j++) {
+          out.push(leafOf(Math.pow(num(b[i], 'pow'), num(e[j], 'pow'))));
+        }
+      }
+      return out;
+    },
+    'log/0': mathOf(Math.log, 'log'),
+    'log2/0': mathOf(Math.log2, 'log2'),
+    'log10/0': mathOf(Math.log10, 'log10'),
+    'exp/0': mathOf(Math.exp, 'exp'),
+    'exp2/0': mathOf(function (n) { return Math.pow(2, n); }, 'exp2'),
+    'exp10/0': mathOf(function (n) { return Math.pow(10, n); }, 'exp10'),
+    'trunc/0': mathOf(Math.trunc, 'trunc')
   };
+
+  /* The format strings go in under their own names, since @base64 is a filter
+     like any other once the parser has read the "@". */
+  (function () {
+    Object.keys(FORMATS).forEach(function (name) {
+      builtins[name + '/0'] = function (x) { return [leafOf(FORMATS[name](x))]; };
+    });
+  })();
+
+  /* A regex builtin's pattern and flags come from its arguments, and jq runs
+     the whole thing once per combination of them. */
+  function withRe(x, args, arity, run) {
+    var pats = ev(args[0], x), flags = arity > 1 ? ev(args[1], x) : [leafOf('')];
+    var out = [], i, j;
+    for (i = 0; i < flags.length; i++) {
+      for (j = 0; j < pats.length; j++) {
+        push(out, run(x, wantType(pats[j], 'string', 'a regex').r,
+          typeOf(flags[i]) === 'string' ? flags[i].r : ''));
+      }
+    }
+    return out;
+  }
+
+  /* The single value an argument stands for, where a stream would make no
+     sense -- the pattern of a substitution, whose replacement is already run
+     once per match. */
+  function one(arg, x, name) {
+    var vals = ev(arg, x);
+    if (!vals.length) throw runErr(name + ' needs a pattern');
+    return wantType(vals[0], 'string', name).r;
+  }
+
+  function matchOne(x, pattern, flags) {
+    return matchesOf(x, pattern, flags, flags.indexOf('g') >= 0);
+  }
+  function testOne(x, pattern, flags) {
+    return [matchesOf(x, pattern, flags, false).length ? TRUE : FALSE];
+  }
+  function captureOne(x, pattern, flags) {
+    return matchOne(x, pattern, flags).map(captureObject);
+  }
+  /* scan gives the matched text, or the captures when the pattern has any. */
+  function scanOne(x, pattern, flags) {
+    return matchesOf(x, pattern, flags.replace(/g/g, '') + 'g', true).map(function (m) {
+      var caps = field(m, 'captures').v;
+      return caps.length
+        ? arrayOf(caps.map(function (c) { return field(c, 'string'); }))
+        : field(m, 'string');
+    });
+  }
+
+  function parseDate(x, name) {
+    var s = wantType(x, 'string', name).r, at = Date.parse(s);
+    if (isNaN(at)) throw runErr('cannot read "' + s + '" as a date');
+    return at / 1000;
+  }
 
   function lower(c) { return c.toLowerCase(); }
   function upper(c) { return c.toUpperCase(); }

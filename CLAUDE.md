@@ -134,7 +134,7 @@ line buttons were invisible in light mode at 1.6:1.
 ## Working habits that have paid off
 
 Measure before claiming. Page sizes, contrast ratios, load times and result
-counts have all been surprising — the query engine costs 52KB, and the 700ms it
+counts have all been surprising — the query engine costs 70KB, and the 700ms it
 adds on a 4.8MB document is the second button on each of 173,000 lines rather
 than the script.
 

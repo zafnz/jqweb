@@ -39,11 +39,6 @@ $ kubectl get pods -o json | jqweb -o k8s.html
 # Saves k8s.html for offline viewing
 ```
 
-**Specify port and host**
-```bash
-$ jqweb --host 0.0.0.0 --port 9000 < input.json
-jqweb: serving on http://[::]:9000/ (Ctrl-C to stop)
-```
 <br clear="right">
 
 ## Usage

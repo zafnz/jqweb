@@ -53,6 +53,10 @@ box. but as soon as the user starts removing stuff the filter should go.
 
 ## Error message shrinks text input
 
+A long error message makes the text input shrink. Combined with the issue
+above, there should be no way the dropdown can produce an error, so instead have
+the error message appear hovering below the input. 
+
 ## One hover button instead of one per line
 
 Each line carries its own copy and filter buttons, so a document renders twice
@@ -65,3 +69,4 @@ One button element moved to whichever line is hovered would cost nothing per
 line and would make every page faster than it is today, not just undo the
 difference. It changes how the buttons behave on touch, where there is no
 hover, so that needs an answer first.
+

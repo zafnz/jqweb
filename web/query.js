@@ -223,7 +223,19 @@ var jqui = function (page) {
   });
 
   input.addEventListener('focus', show);
-  input.addEventListener('input', mark);
+
+  /* Emptying the box is done with the list, which was about a query that is no
+     longer there, so the rows go too and focusing the empty box brings nothing
+     back. Escape only puts the list away, which is why that one keeps them. */
+  input.addEventListener('input', function () {
+    if (input.value.trim()) {
+      mark();
+      return;
+    }
+    rows = [];
+    suggestions.innerHTML = '';
+    hide();
+  });
 
   /* Up and down step through the readings, running each, which is the quick
      way to find out which one you meant. Escape puts the list away without

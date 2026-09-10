@@ -311,7 +311,7 @@ func moreValues(dec *json.Decoder) bool {
 }
 
 func describeErr(data []byte, err error) error {
-	if err == io.EOF || err == io.ErrUnexpectedEOF {
+	if isTruncated(err) {
 		if len(bytes.TrimSpace(data)) == 0 {
 			return fmt.Errorf("empty input")
 		}
@@ -343,6 +343,21 @@ func describeErr(data []byte, err error) error {
 		return fmt.Errorf("%v (line %d, column %d)", err, line, col)
 	}
 	return err
+}
+
+// isTruncated reports whether err means the input ran out mid-document.
+//
+// Which error that is depends on the Go version: through Go 1.26 the decoder
+// returned io.EOF, but Go 1.27 reports More() as true inside an unclosed
+// container, so the decoder reads on and returns a syntax error instead. The
+// message is the only thing distinguishing it from a real syntax error, since
+// its offset is the end of the input either way.
+func isTruncated(err error) bool {
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	var se *json.SyntaxError
+	return errors.As(err, &se) && se.Error() == "unexpected end of JSON input"
 }
 
 // exactErr re-parses data in one pass to obtain a syntax error whose Offset
@@ -525,7 +540,7 @@ func scriptSafe(s string) string {
 	return strings.ReplaceAll(s, "<", `\u003c`)
 }
 
-//go:embed web/page.html web/page.css web/page.js
+//go:embed web/page.html web/page.css web/core.js web/page.js
 var assets embed.FS
 
 // pageTemplate is the page shell with its stylesheet and script inlined,
@@ -535,8 +550,94 @@ var pageTemplate = buildTemplate()
 func buildTemplate() string {
 	return strings.NewReplacer(
 		"{{STYLE}}", inline("web/page.css"),
-		"{{SCRIPT}}", inline("web/page.js"),
+		"{{SCRIPT}}", script(),
 	).Replace(asset("web/page.html"))
+}
+
+// script returns the page's JavaScript: the pure core, then the DOM wiring
+// that drives it. The comments in those files are written for someone reading
+// the source, and are not worth inlining into every rendered page.
+func script() string {
+	return stripComments(inline("web/core.js")) + "\n" + stripComments(inline("web/page.js"))
+}
+
+// stripComments removes /* ... */ comments, and the lines left empty by
+// removing them, from JavaScript source.
+//
+// It is deliberately not a tokenizer. It tracks string and template literals,
+// so a "/*" inside one survives, and it gives up on any line where a "/" turns
+// up outside a string without a "*" after it, since that could open a regular
+// expression whose contents are not code. Such a line is emitted exactly as
+// written: missing a comment costs a few bytes, mangling a regular expression
+// costs a broken page.
+func stripComments(src string) string {
+	var out []string
+	inComment := false
+	for _, line := range strings.Split(src, "\n") {
+		kept, stillInComment, ok := stripLine(line, inComment)
+		if !ok {
+			out = append(out, line) // ambiguous, so leave it as written
+			inComment = false
+			continue
+		}
+		inComment = stillInComment
+		if kept = strings.TrimRight(kept, " \t"); kept != "" {
+			out = append(out, kept)
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+// stripLine removes the comments from one line, given whether the previous
+// line ended inside one. It reports whether the line ends inside a comment,
+// and whether it could be read at all; a false ok means the caller must keep
+// the line as it is.
+func stripLine(line string, inComment bool) (kept string, stillInComment, ok bool) {
+	var b strings.Builder
+	for i := 0; i < len(line); {
+		if inComment {
+			j := strings.Index(line[i:], "*/")
+			if j < 0 {
+				return b.String(), true, true // comment runs past this line
+			}
+			i += j + 2
+			inComment = false
+			continue
+		}
+		switch c := line[i]; {
+		case c == '/' && i+1 < len(line) && line[i+1] == '*':
+			inComment = true
+			i += 2
+		case c == '/':
+			return "", false, false // a regular expression, or division
+		case c == '\'' || c == '"' || c == '`':
+			end, closed := endOfString(line, i)
+			if !closed {
+				return "", false, false // a template literal spanning lines
+			}
+			b.WriteString(line[i : end+1])
+			i = end + 1
+		default:
+			b.WriteByte(c)
+			i++
+		}
+	}
+	return b.String(), inComment, true
+}
+
+// endOfString returns the index of the quote closing the literal that opens at
+// line[i], or closed == false when the line ends first.
+func endOfString(line string, i int) (end int, closed bool) {
+	q := line[i]
+	for j := i + 1; j < len(line); j++ {
+		switch line[j] {
+		case '\\':
+			j++ // an escaped character cannot close the literal
+		case q:
+			return j, true
+		}
+	}
+	return 0, false
 }
 
 // asset returns the contents of an embedded file.

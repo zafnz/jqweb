@@ -20,6 +20,15 @@ jobs:
         with:
           go-version: stable
 
+      # The page scripts are embedded in the binary, so a JavaScript
+      # regression ships in a release too. GoReleaser runs the Go tests
+      # itself, from its before hooks.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - run: node --test
+
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser

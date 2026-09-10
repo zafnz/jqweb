@@ -68,6 +68,10 @@ header {
   padding: 8px 14px; background: var(--head-bg); border-bottom: 1px solid var(--head-border);
 }
 header .name { color: var(--muted); margin-right: 4px; }
+header .name a { color: var(--fg); text-decoration: none; }
+header .name a svg { fill: currentColor; vertical-align: text-bottom; margin-right: 4px; }
+header .name a:hover span { text-decoration: underline; }
+header .name a:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
 header button {
   font: inherit; color: var(--fg); background: var(--btn-bg);
   border: 1px solid var(--btn-border); border-radius: 4px; padding: 3px 10px; cursor: pointer;

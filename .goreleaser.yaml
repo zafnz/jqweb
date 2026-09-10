@@ -60,6 +60,48 @@ checksum:
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
+release:
+  header: |
+    ## jq queries
+
+    The search box answers jq queries as well as finding text: paths,
+    iteration, slices, pipes, `//`, `?`, comparisons, arithmetic,
+    if/then/elif/else/end, array and object construction, and about 60 builtins
+    including `select`, `map`, `keys`, `to_entries`, `sort_by`, `group_by`,
+    `unique_by`, `flatten`, `range`, `join`, `test` and `index`. Variables,
+    `def`, `reduce`, assignment, string interpolation and format strings are
+    not there, and a query using one says so by name rather than guessing at
+    what it meant.
+
+    A query whose output is not part of the document replaces the tree with its
+    results. One that only walks down, such as `.a.b[3]`, highlights that node,
+    the way a pasted path always has.
+
+    ## Filtering on a value
+
+    Every line has a second button. It fills the search box with a query built
+    from that line and offers the other queries the line could have meant, each
+    labelled with what it returns -- 14 results against 1 says which reading
+    was meant without anyone having to work out the jq.
+
+    ## Light and dark
+
+    The page follows the reader's system. The button at the right of the
+    toolbar cycles auto, light and dark and remembers the choice; `--theme
+    light` or `--theme dark` sets what a page starts in.
+
+    ## Toolbar
+
+    Expand all and Collapse all are one button, moved to the right, and the
+    search box fills the room they left.
+
+    ## Page size
+
+    The query engine is inlined into every page, which makes one about 57KB
+    larger than 0.3.0 whatever the document. `--simple` leaves it out, for a
+    page that browses, filters and looks up paths and nothing else; that one is
+    about 5KB larger than 0.3.0, which is the second colour palette.
+
 changelog:
   sort: asc
   filters:

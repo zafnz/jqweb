@@ -274,7 +274,13 @@ func TestRenderPageIncludesTheEngineOnlyWithJQ(t *testing.T) {
 	with := renderPage([]byte(`{}`), "t", true)
 	without := renderPage([]byte(`{}`), "t", false)
 
-	for _, want := range []string{"var jqjs", "function compile(src)", "'sort_by/1'"} {
+	for _, want := range []string{
+		"var jqjs",          // the engine
+		"function compile(", // its entry point
+		"'sort_by/1'",       // its builtin table
+		"var jqui",          // the search box wiring that drives it
+		"function showResults(",
+	} {
 		if !strings.Contains(with, want) {
 			t.Errorf("--jq page does not contain %q", want)
 		}
@@ -396,7 +402,7 @@ func TestStripComments(t *testing.T) {
 }
 
 func TestStripCommentsIsIdempotent(t *testing.T) {
-	for _, name := range []string{"web/core.js", "web/jq.js", "web/page.js"} {
+	for _, name := range []string{"web/core.js", "web/jq.js", "web/query.js", "web/page.js"} {
 		once := stripComments(asset(name))
 		if twice := stripComments(once); twice != once {
 			t.Errorf("%s: stripping twice differs from stripping once", name)

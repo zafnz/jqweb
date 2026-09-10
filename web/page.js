@@ -1,18 +1,17 @@
 /* The interactive half of the page: builds the tree from the embedded
    document, then wires up expanding and collapsing, copying a path, and the
    search box. Everything here needs the DOM; the parsing, rendering and path
-   reading it calls live in core.js. */
+   reading it calls live in core.js.
+
+   Reading the box as a jq query lives in query.js, which is inlined only when
+   the page was built with --jq. This file is in every page either way, so it
+   works without it. */
 (function () {
   'use strict';
   var tree = document.getElementById('tree');
-  var results = document.getElementById('results');
   var input = document.getElementById('q');
-  var mode = document.getElementById('mode');
   var stats = document.getElementById('stats');
   var parseJSON = jqweb.parseJSON, renderTree = jqweb.renderTree, parsePath = jqweb.parsePath;
-
-  /* The query engine is only inlined when the page was built with --jq. */
-  var jq = typeof jqjs !== 'undefined' ? jqjs : null;
 
   /* Build the whole tree in one write. The document is served inside the page
      as JSON rather than as markup, which keeps the file smaller and lets the
@@ -22,10 +21,15 @@
   tree.innerHTML = renderTree(rootValue);
   var rootNode = tree.querySelector(':scope > .node');
 
-  if (jq) {
-    mode.hidden = false;
-    input.placeholder = 'Filter, a path, or a jq query such as .items[] | select(.n > 3)';
-  }
+  /* The query half, or null in a page built without --jq. It reads the search
+     box, so it needs the document to run against and the two path helpers
+     below, which walk the rendered tree rather than the value. */
+  var query = typeof jqui === 'undefined' ? null : jqui({
+    value: rootValue,
+    resolve: resolvePath,
+    showFound: showFound,
+    rerun: run
+  });
 
   /* One delegated listener for every line in either view, however many there
      are: a click either hits a copy button, a toggle, or the collapsed
@@ -146,51 +150,16 @@
     if (e.key === 'Escape' && e.target === input) { input.value = ''; run(); }
   });
 
-  mode.addEventListener('change', function () { input.focus(); run(); });
-
-  /* Runs whatever is in the box. Without the query engine that is the text
-     filter or a path, as it has always been; with it, the mode decides. */
+  /* Runs whatever is in the box. Without query.js that is the text filter or a
+     path, as it has always been; with it, the mode decides. */
   function run() {
     var raw = input.value.trim();
     input.classList.remove('bad');
     if (!raw) { reset(); return; }
-    if (!jq) { runPath(raw); return; }
-    if (queryMode(raw) === 'jq') { runQuery(raw); return; }
-    showDocument();
+    if (!query) { runPath(raw); return; }
+    if (query.wants(raw)) { query.run(raw); return; }
+    query.showDocument();
     textFilter(raw.toLowerCase());
-  }
-
-  /* The characters a path or a jq expression can start with. In auto mode
-     they are what tells a query from a filter, so that typing a word still
-     filters; a bare-word query such as "keys" needs the mode set to jq. */
-  var QUERY_START = '.[($|';
-
-  function queryMode(raw) {
-    return mode.value !== 'auto' ? mode.value
-      : QUERY_START.indexOf(raw.charAt(0)) >= 0 ? 'jq' : 'filter';
-  }
-
-  /* Compiles and runs the box as a jq query. One that only walks down the
-     document is shown in place, as a pasted path always has been; anything
-     else produces values that are not in the document, so its output replaces
-     the view. */
-  function runQuery(raw) {
-    var query, out;
-    showDocument();
-    try {
-      query = jq.compile(raw);
-    } catch (e) {
-      fault(e.message, e.pos);
-      return;
-    }
-    if (query.path) { showFound(resolvePath(query.path), query.path.length); return; }
-    try {
-      out = query.run(rootValue);
-    } catch (e) {
-      fault(e.message);
-      return;
-    }
-    showResults(out);
   }
 
   /* The old behaviour, and still what a page built without --jq does: text
@@ -224,47 +193,10 @@
     stats.textContent = found.depth ? 'no path past ' + pathOf(found.node) : 'no such path';
   }
 
-  /* Reports a query that would not compile or would not run. */
-  function fault(message, pos) {
-    input.classList.add('bad');
-    stats.textContent = pos === undefined ? message : message + ' (at ' + (pos + 1) + ')';
-  }
-
-  /* Building the markup for a query's whole output is what would stall the
-     page, so only this many are rendered; the count still reports them all. */
-  var RESULT_CAP = 500;
-
-  /* Shows a query's outputs in place of the document. Each carries its
-     position, which the stylesheet puts in the gutter, because a query
-     produces a list of values rather than one document; a single value is left
-     unnumbered. The document tree is hidden rather than thrown away, so it
-     comes back with its collapsed state intact and without being rendered
-     again. */
-  function showResults(out) {
-    var shown = Math.min(out.length, RESULT_CAP), parts = [], i;
-    for (i = 0; i < shown; i++) {
-      parts.push('<div class="result" data-n="' + i + '">' + renderTree(out[i]) + '</div>');
-    }
-    results.innerHTML = parts.join('');
-    results.classList.toggle('one', out.length === 1);
-    results.hidden = false;
-    tree.hidden = true;
-    stats.textContent = shown < out.length
-      ? 'first ' + shown + ' of ' + out.length + ' results'
-      : out.length === 1 ? '1 result' : out.length + ' results';
-  }
-
-  function showDocument() {
-    if (results.hidden) return;
-    results.hidden = true;
-    results.innerHTML = '';
-    tree.hidden = false;
-  }
-
   /* Clears any filtering and shows the whole document again. Collapsed state
      is left alone: it is the reader's, not the search's. */
   function reset() {
-    showDocument();
+    if (query) query.showDocument();
     each('.node', function (n) { n.classList.remove('hidden', 'hit'); });
     stats.textContent = '';
   }

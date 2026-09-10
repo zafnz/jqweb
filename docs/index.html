@@ -297,19 +297,18 @@ if (typeof module === 'object' && module.exports) module.exports = jqweb;
 (function () {
   'use strict';
   var tree = document.getElementById('tree');
-  var results = document.getElementById('results');
   var input = document.getElementById('q');
-  var mode = document.getElementById('mode');
   var stats = document.getElementById('stats');
   var parseJSON = jqweb.parseJSON, renderTree = jqweb.renderTree, parsePath = jqweb.parsePath;
-  var jq = typeof jqjs !== 'undefined' ? jqjs : null;
   var rootValue = parseJSON(document.getElementById('data').textContent);
   tree.innerHTML = renderTree(rootValue);
   var rootNode = tree.querySelector(':scope > .node');
-  if (jq) {
-    mode.hidden = false;
-    input.placeholder = 'Filter, a path, or a jq query such as .items[] | select(.n > 3)';
-  }
+  var query = typeof jqui === 'undefined' ? null : jqui({
+    value: rootValue,
+    resolve: resolvePath,
+    showFound: showFound,
+    rerun: run
+  });
   document.querySelector('main').addEventListener('click', function (e) {
     var cp = e.target.closest('.cp');
     if (cp) { copyPath(cp); return; }
@@ -387,38 +386,14 @@ if (typeof module === 'object' && module.exports) module.exports = jqweb;
     if (e.key === '/' && e.target !== input) { e.preventDefault(); input.focus(); }
     if (e.key === 'Escape' && e.target === input) { input.value = ''; run(); }
   });
-  mode.addEventListener('change', function () { input.focus(); run(); });
   function run() {
     var raw = input.value.trim();
     input.classList.remove('bad');
     if (!raw) { reset(); return; }
-    if (!jq) { runPath(raw); return; }
-    if (queryMode(raw) === 'jq') { runQuery(raw); return; }
-    showDocument();
+    if (!query) { runPath(raw); return; }
+    if (query.wants(raw)) { query.run(raw); return; }
+    query.showDocument();
     textFilter(raw.toLowerCase());
-  }
-  var QUERY_START = '.[($|';
-  function queryMode(raw) {
-    return mode.value !== 'auto' ? mode.value
-      : QUERY_START.indexOf(raw.charAt(0)) >= 0 ? 'jq' : 'filter';
-  }
-  function runQuery(raw) {
-    var query, out;
-    showDocument();
-    try {
-      query = jq.compile(raw);
-    } catch (e) {
-      fault(e.message, e.pos);
-      return;
-    }
-    if (query.path) { showFound(resolvePath(query.path), query.path.length); return; }
-    try {
-      out = query.run(rootValue);
-    } catch (e) {
-      fault(e.message);
-      return;
-    }
-    showResults(out);
   }
   function runPath(raw) {
     if (/[.[]/.test(raw)) {
@@ -442,32 +417,8 @@ if (typeof module === 'object' && module.exports) module.exports = jqweb;
     showPath(found.node, found.depth > 0);
     stats.textContent = found.depth ? 'no path past ' + pathOf(found.node) : 'no such path';
   }
-  function fault(message, pos) {
-    input.classList.add('bad');
-    stats.textContent = pos === undefined ? message : message + ' (at ' + (pos + 1) + ')';
-  }
-  var RESULT_CAP = 500;
-  function showResults(out) {
-    var shown = Math.min(out.length, RESULT_CAP), parts = [], i;
-    for (i = 0; i < shown; i++) {
-      parts.push('<div class="result" data-n="' + i + '">' + renderTree(out[i]) + '</div>');
-    }
-    results.innerHTML = parts.join('');
-    results.classList.toggle('one', out.length === 1);
-    results.hidden = false;
-    tree.hidden = true;
-    stats.textContent = shown < out.length
-      ? 'first ' + shown + ' of ' + out.length + ' results'
-      : out.length === 1 ? '1 result' : out.length + ' results';
-  }
-  function showDocument() {
-    if (results.hidden) return;
-    results.hidden = true;
-    results.innerHTML = '';
-    tree.hidden = false;
-  }
   function reset() {
-    showDocument();
+    if (query) query.showDocument();
     each('.node', function (n) { n.classList.remove('hidden', 'hit'); });
     stats.textContent = '';
   }

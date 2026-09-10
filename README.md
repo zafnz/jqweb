@@ -113,8 +113,9 @@ Variables and `as`, `def`, `reduce`, `foreach`, assignment, `path`, string
 interpolation and format strings are not. A query using one says so by name
 instead of guessing at what it meant.
 
-The engine adds about 40KB to every page it is built into, which is why it is
-behind a flag rather than always on.
+The engine adds about 44KB to every page it is built into, which is why it is
+behind a flag rather than always on. A page built without `--jq` carries none
+of it.
 
 ## Why?
 

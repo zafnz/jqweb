@@ -546,7 +546,7 @@ func scriptSafe(s string) string {
 	return strings.ReplaceAll(s, "<", `\u003c`)
 }
 
-//go:embed web/page.html web/page.css web/core.js web/jq.js web/page.js
+//go:embed web/page.html web/page.css web/core.js web/jq.js web/query.js web/page.js
 var assets embed.FS
 
 // pageTemplate returns the page shell with its stylesheet and script inlined,
@@ -570,14 +570,16 @@ func buildTemplate(jq bool) string {
 	).Replace(asset("web/page.html"))
 }
 
-// script returns the page's JavaScript: the pure core, the query engine when
-// it was asked for, then the DOM wiring that drives them. The comments in
-// those files are written for someone reading the source, and are not worth
-// inlining into every rendered page.
+// script returns the page's JavaScript: the pure core, then the query engine
+// and the search box wiring that drives it when --jq asked for them, then the
+// rest of the page. query.js has to precede page.js, which calls into it.
+//
+// The comments in those files are written for someone reading the source, and
+// are not worth inlining into every rendered page.
 func script(jq bool) string {
 	parts := []string{"web/core.js"}
 	if jq {
-		parts = append(parts, "web/jq.js")
+		parts = append(parts, "web/jq.js", "web/query.js")
 	}
 	parts = append(parts, "web/page.js")
 	var b strings.Builder

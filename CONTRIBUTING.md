@@ -50,10 +50,16 @@ should carry none at all, which is what `TestPageCarriesNoComments` checks.
 
 ## The jq subset
 
-`web/jq.js` is the query engine, inlined only when `--jq` is given. It works on
-the same node form `core.js` builds for rendering, so a result goes straight
-back to `renderTree` with key order and number text intact and the document is
-parsed once; scalars come from the `r` field on a leaf.
+`web/jq.js` is the query engine and `web/query.js` is the search box wiring
+that drives it. Both are inlined only when `--jq` is given, so neither costs
+anything in a default page; `web/page.js` ships either way and works without
+them, calling `jqui()` when it is there and falling back to the path lookup
+when it is not. Anything that reads the box as a query, or renders what one
+produced, belongs in `query.js` rather than `page.js`.
+
+The engine works on the same node form `core.js` builds for rendering, so a
+result goes straight back to `renderTree` with key order and number text intact
+and the document is parsed once; scalars come from the `r` field on a leaf.
 
 Its answers are checked against jq itself rather than against what anyone
 believed jq does. `web/testdata/jq-corpus.json` holds a fixture document, a

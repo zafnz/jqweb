@@ -8,6 +8,7 @@
    without it. */
 (function () {
   'use strict';
+  var header = document.querySelector('header');
   var tree = document.getElementById('tree');
   var input = document.getElementById('q');
   var stats = document.getElementById('stats');
@@ -265,7 +266,28 @@
     Array.prototype.forEach.call(target.querySelectorAll('.node'), function (d) {
       d.classList.remove('hidden');
     });
-    target.scrollIntoView({ block: 'center' });
+    reveal(target);
+  }
+
+  /* Scrolls a revealed node into view.
+
+     Centring is right for a line, and wrong for anything taller than the
+     window: the middle of a whole document is halfway down it, so typing "."
+     -- which resolves to the root -- used to throw the reader into the middle
+     of the file. A node that does not fit is put under the header by its top
+     instead, and one already on screen is left where it is, so that typing a
+     path one character at a time does not drag the page around. */
+  var GAP = 4;   /* a little air between the header and what it scrolled to */
+
+  function reveal(target) {
+    var below = header.getBoundingClientRect().bottom;
+    var box = target.getBoundingClientRect();
+    if (box.top >= below && box.top <= window.innerHeight) return;
+    if (box.height > window.innerHeight - below) {
+      window.scrollBy(0, box.top - below - GAP);
+    } else {
+      target.scrollIntoView({ block: 'center' });
+    }
   }
 
   /* ---- text filter ---- */

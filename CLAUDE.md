@@ -4,6 +4,17 @@
 release it. This is the part that is neither: what the thing is made of, and
 the rules that are not obvious from reading one file at a time.
 
+## Where the work is tracked
+
+Bugs, wanted features and anything else not being worked on right now are
+GitHub issues on `zafnz/jqweb`. `gh issue list` for what is open, `gh issue
+create` to file one. `TODO.md` holds the entries that were filed as issues and
+is not where new ones go.
+
+When someone asks for something to be added to the TODO without saying where,
+ask whether they want an issue filed or just a note kept for the rest of the
+session.
+
 ## What it is
 
 A Go binary that turns a JSON document into one self-contained HTML page, and
@@ -63,7 +74,7 @@ short-circuits as a result, so no builtin may produce an endless stream.
 
 **Offline, always.** A rendered page is one file that has to work with no
 network: no CDN, no web fonts, no remote images. The GitHub mark in the toolbar
-is inline SVG for this reason. (`--cdn` in `TODO.md` would change this on
+is inline SVG for this reason. (The `--cdn` issue would change this on
 purpose, for people who want the opposite.)
 
 **No dependencies, either side.** `go.mod` requires nothing, there is no

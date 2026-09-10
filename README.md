@@ -46,7 +46,7 @@ jqweb: serving on http://[::]:9000/ (Ctrl-C to stop)
 <br clear="right">
 
 ## Usage
-usage: `jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [-O|--open] [--jq] [<input-file>]`
+usage: `jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [-O|--open] [--jq] [--theme <name>] [<input-file>]`
 
 Reads JSON from <input-file> ("-" or absent: stdin) and renders it as a
 self-contained interactive HTML page, served on a random port or written to file
@@ -56,9 +56,18 @@ self-contained interactive HTML page, served on a random port or written to file
   -o, --output <file>  write the page to <file>; "-" writes to stdout
   -O, --open           opens your default web browser with the output
       --jq             answer jq queries in the search box
+      --theme <name>   light, dark, or auto to follow the reader's system
 ```
 With no -p and no -o, it listens on a random available port.
 
+
+## Light and dark
+
+The page follows the reader's system by default. The button at the right of the
+toolbar cycles auto, light and dark, and remembers the choice; a page opened
+from a `file://` URL may have no storage to remember it in, in which case the
+choice lasts as long as the tab. `--theme light` or `--theme dark` sets what a
+page starts in, and the button still works afterwards.
 
 ## Search
 

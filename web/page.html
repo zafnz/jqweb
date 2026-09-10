@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-pref="{{PREF}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,6 +7,9 @@
 <style>
 {{STYLE}}
 </style>
+<script>
+{{HEAD}}
+</script>
 </head>
 <body>
 <header>
@@ -23,6 +26,7 @@
     <div id="suggest" hidden></div>
   </div>
   <span id="stats"></span>
+  <button id="theme" type="button"></button>
 </header>
 <main>
   <div id="tree"></div>

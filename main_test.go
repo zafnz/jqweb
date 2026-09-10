@@ -243,14 +243,14 @@ func dataBlock(t *testing.T, page string) string {
 }
 
 func TestRenderPageSubstitutesEveryPlaceholder(t *testing.T) {
-	page := renderPage([]byte(`{"a":1}`), "doc.json", false)
+	page := renderPage([]byte(`{"a":1}`), "doc.json", options{jq: false})
 	if i := strings.Index(page, "{{"); i >= 0 {
 		t.Errorf("page still contains a placeholder at offset %d: %.20q", i, page[i:])
 	}
 }
 
 func TestRenderPageInlinesAssets(t *testing.T) {
-	page := renderPage([]byte(`{}`), "t", false)
+	page := renderPage([]byte(`{}`), "t", options{jq: false})
 	for _, want := range []string{
 		"<style>",       // the shell
 		"color-scheme",  // from page.css
@@ -272,8 +272,8 @@ func TestRenderPageInlinesAssets(t *testing.T) {
 // The query engine is the largest part of the script, so it goes in only when
 // --jq asked for it.
 func TestRenderPageIncludesTheEngineOnlyWithJQ(t *testing.T) {
-	with := renderPage([]byte(`{}`), "t", true)
-	without := renderPage([]byte(`{}`), "t", false)
+	with := renderPage([]byte(`{}`), "t", options{jq: true})
+	without := renderPage([]byte(`{}`), "t", options{jq: false})
 
 	for _, want := range []string{
 		"var jqjs",          // the engine
@@ -309,7 +309,7 @@ func TestRenderPageRoundTripsTheDocument(t *testing.T) {
 		`{"big":123456789012345678901234567890}`,
 	}
 	for _, doc := range docs {
-		block := dataBlock(t, renderPage([]byte(doc), "t", false))
+		block := dataBlock(t, renderPage([]byte(doc), "t", options{jq: false}))
 		var got, want any
 		if err := json.Unmarshal([]byte(block), &got); err != nil {
 			t.Errorf("data block for %s does not parse: %v", doc, err)
@@ -328,7 +328,7 @@ func TestRenderPageRoundTripsTheDocument(t *testing.T) {
 // holding the document.
 func TestRenderPageDataCannotEscapeItsElement(t *testing.T) {
 	doc := `{"payload":"</script><script>alert(1)</script>"}`
-	page := renderPage([]byte(doc), "t", false)
+	page := renderPage([]byte(doc), "t", options{jq: false})
 	block := dataBlock(t, page)
 	if strings.Contains(block, "</script") {
 		t.Errorf("data block contains a literal </script: %s", block)
@@ -348,24 +348,43 @@ func TestRenderPageDataCannotEscapeItsElement(t *testing.T) {
 // Substitution is a single pass, so placeholder text inside the document or
 // the title is data, not a placeholder to expand.
 func TestRenderPageDoesNotRescanSubstitutions(t *testing.T) {
-	page := renderPage([]byte(`{"a":"{{TITLE}}"}`), "t", false)
+	page := renderPage([]byte(`{"a":"{{TITLE}}"}`), "t", options{jq: false})
 	if !strings.Contains(dataBlock(t, page), `{{TITLE}}`) {
 		t.Error("a document containing {{TITLE}} had it substituted away")
 	}
 
-	page = renderPage([]byte(`{"a":1}`), "{{DATA}}", false)
+	page = renderPage([]byte(`{"a":1}`), "{{DATA}}", options{jq: false})
 	if strings.Count(page, `{{DATA}}`) != 2 { // the <title> and the header
 		t.Error("a title containing {{DATA}} had it substituted away")
 	}
 }
 
 func TestRenderPageEscapesTitle(t *testing.T) {
-	page := renderPage([]byte(`{}`), `<img src=x onerror="alert(1)">`, false)
+	page := renderPage([]byte(`{}`), `<img src=x onerror="alert(1)">`, options{jq: false})
 	if strings.Contains(page, "<img src=x") {
 		t.Error("page contains an unescaped title")
 	}
 	if !strings.Contains(page, "&lt;img src=x") {
 		t.Error("page does not contain the escaped title")
+	}
+}
+
+func TestRenderPageStartsInTheThemeAskedFor(t *testing.T) {
+	for _, want := range []string{"auto", "light", "dark"} {
+		page := renderPage([]byte(`{}`), "t", options{theme: want})
+		if got := `<html lang="en" data-pref="` + want + `">`; !strings.Contains(page, got) {
+			t.Errorf("page for --theme %s does not carry %q", want, got)
+		}
+	}
+	// The palette itself is settled before the body is parsed, so that a page
+	// never shows one theme and then swaps to the other.
+	page := renderPage([]byte(`{}`), "t", options{theme: "auto"})
+	head := page[:strings.Index(page, "</head>")]
+	if !strings.Contains(head, "prefers-color-scheme") {
+		t.Error("the theme is not settled in the head")
+	}
+	if !strings.Contains(page, `--theme="light"`) && !strings.Contains(page, `[data-theme="light"]`) {
+		t.Error("the page has no light palette")
 	}
 }
 
@@ -403,7 +422,7 @@ func TestStripComments(t *testing.T) {
 }
 
 func TestStripCommentsIsIdempotent(t *testing.T) {
-	for _, name := range []string{"web/core.js", "web/jq.js", "web/suggest.js", "web/query.js", "web/page.js"} {
+	for _, name := range []string{"web/theme.js", "web/core.js", "web/jq.js", "web/suggest.js", "web/query.js", "web/page.js"} {
 		once := stripComments(asset(name))
 		if twice := stripComments(once); twice != once {
 			t.Errorf("%s: stripping twice differs from stripping once", name)
@@ -418,7 +437,7 @@ func TestStripCommentsIsIdempotent(t *testing.T) {
 // so this covers it too.
 func TestPageCarriesNoComments(t *testing.T) {
 	for _, jq := range []bool{false, true} {
-		page := renderPage([]byte(`{"a":1}`), "t", jq)
+		page := renderPage([]byte(`{"a":1}`), "t", options{jq: jq})
 		if i := strings.Index(page, "/*"); i >= 0 {
 			line := 1 + strings.Count(page[:i], "\n")
 			t.Errorf("page with jq=%v carries a comment at line %d: %.70q", jq, line, page[i:])
@@ -428,7 +447,7 @@ func TestPageCarriesNoComments(t *testing.T) {
 
 // The comments go, the code stays.
 func TestPageShipsWithoutComments(t *testing.T) {
-	page := renderPage([]byte(`{"a":1}`), "t", false)
+	page := renderPage([]byte(`{"a":1}`), "t", options{jq: false})
 	for _, gone := range []string{
 		"Pure helpers shared by the page", // core.js file comment
 		"recursive-descent scanner",       // inside parseJSON

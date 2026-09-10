@@ -33,6 +33,19 @@
     rerun: run
   });
 
+  /* The toolbar's theme button reports what is in force and cycles when
+     clicked; the palette itself was settled by theme.js before the body was
+     parsed. */
+  var GLYPH = { auto: '\u25D0', light: '\u2600', dark: '\u263E' };
+  var themeButton = document.getElementById('theme');
+  themeButton.addEventListener('click', function () { showTheme(jqtheme.cycle()); });
+  showTheme(jqtheme.current());
+
+  function showTheme(pref) {
+    themeButton.textContent = GLYPH[pref];
+    themeButton.title = 'Theme: ' + pref;
+  }
+
   /* One delegated listener for every line in either view, however many there
      are: a click either hits a copy button, a toggle, or the collapsed
      summary, which expands the node it belongs to. */

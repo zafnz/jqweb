@@ -17,6 +17,18 @@ the `go.mod` floor and the current release. The two have disagreed before:
 Go 1.27 changed `json.Decoder.More()` at the end of a truncated document,
 which changed the error message a user sees.
 
+## Colours
+
+Every colour is a custom property on `:root` in `web/page.css`, defined twice:
+once for dark and once under `:root[data-theme="light"]`. Adding a colour means
+adding it to both, and using a literal anywhere means one theme gets it wrong.
+
+`web/theme.js` runs in the head, before the body is parsed, so a page never
+paints in one theme and swaps to the other. It reads `data-pref` -- which
+`--theme` sets -- then the stored choice if there is one, resolves `auto`
+against `prefers-color-scheme`, and writes `data-theme`, which is what the
+stylesheet selects on.
+
 ## Testing changes to the page
 
 The Go tests assert what page assembly must preserve — that every placeholder
@@ -56,7 +68,7 @@ should carry none at all, which is what `TestPageCarriesNoComments` checks.
 
 `web/jq.js` is the query engine, `web/suggest.js` builds the queries a line of
 the document could have meant, `web/query.js` is the search box wiring that
-drives both, and `web/query.css` styles what only they put on the page. All
+drives both, and `web/query.css` styles what only they put on the page. Those
 four are inlined only when `--jq` is given, so none of them
 costs anything in a default page; `web/page.js` ships either way and works
 without them, calling `jqui()` when it is there and falling back to the path

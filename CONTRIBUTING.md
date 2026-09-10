@@ -23,6 +23,14 @@ Every colour is a custom property on `:root` in `web/page.css`, defined twice:
 once for dark and once under `:root[data-theme="light"]`. Adding a colour means
 adding it to both, and using a literal anywhere means one theme gets it wrong.
 
+The buttons on each line go through three steps, because at rest they have to
+be findable without competing with the value beside them. `--icon` is the
+resting colour, about 3:1 against the background; hovering the line brings them
+to `--muted`; hovering one puts it on `--icon-chip` in `--fg`, which is also
+what makes the click target visible. Dimming a grey with `opacity` instead gave
+1.6:1 in light, which is no button at all, so it is worth checking the ratio
+rather than the look on one screen.
+
 `web/theme.js` runs in the head, before the body is parsed, so a page never
 paints in one theme and swaps to the other. It reads `data-pref` -- which
 `--theme` sets -- then the stored choice if there is one, resolves `auto`

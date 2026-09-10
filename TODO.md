@@ -36,13 +36,6 @@ the reading a person means is almost always the line itself, but it currently
 sorts last. Rank the plain path first when nothing on the list narrows the
 document down.
 
-## The line buttons are too faint
-
-The copy and filter buttons sit at 35% opacity until the line is hovered, which
-is too little to notice in either theme and worst in light, where a grey glyph
-on near-white all but disappears. They need to read as available without
-crowding the value they sit next to.
-
 ## Quit once the page has been fetched
 
 `jqweb file.json` serves until Ctrl-C, which is a nuisance for the common case

@@ -23,12 +23,14 @@
 .sgn { color: var(--muted); white-space: nowrap; }
 .sg.on .sgn { color: var(--fg); }
 .sgc {
-  font: inherit; color: var(--muted); background: none; border: none;
-  cursor: pointer; padding: 3px 6px; opacity: .45;
+  font: inherit; color: var(--icon); background: none; border: none;
+  border-radius: 3px; cursor: pointer; padding: 3px 6px;
 }
-.sg:hover .sgc, .sgc:focus { opacity: 1; }
-.sgc.ok { color: var(--ok); opacity: 1; }
-.sgc.fail { color: var(--fail); opacity: 1; }
+.sg:hover .sgc { color: var(--muted); }
+.sgc:hover, .sgc:focus { color: var(--fg); background: var(--icon-chip); outline: none; }
+.sgc:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; }
+.sgc.ok { color: var(--ok); }
+.sgc.fail { color: var(--fail); }
 
 .result { position: relative; padding-left: 2.6em; margin-bottom: 3px; }
 .result::before {

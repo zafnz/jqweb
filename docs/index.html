@@ -26,6 +26,8 @@
   --ok: #57d364;
   --fail: #e5534b;
   --hit: rgba(210,168,60,.16);
+  --icon: #5e6670;
+  --icon-chip: rgba(255,255,255,.12);
   --menu-bg: #1b1e23;
   --menu-on: #2b3038;
   --menu-hover: #262a31;
@@ -53,6 +55,8 @@
   --ok: #1a7f37;
   --fail: #cf222e;
   --hit: rgba(226,178,39,.32);
+  --icon: #8a9199;
+  --icon-chip: rgba(0,0,0,.09);
   --menu-bg: #ffffff;
   --menu-on: #dceafb;
   --menu-hover: #f2f2ee;
@@ -121,13 +125,17 @@ main { padding: 10px 14px 60px; }
 .c { color: var(--muted); }
 
 .cp, .fq {
-  background: none; border: none; padding: 0 5px;
-  font: inherit; font-size: .92em; color: var(--muted); cursor: pointer; opacity: .35;
+  background: none; border: none; border-radius: 3px; padding: 1px 4px;
+  font: inherit; font-size: .92em; color: var(--icon); cursor: pointer;
 }
-.fq { padding-left: 0; }
-.line:hover .cp, .line:hover .fq, .cp:focus, .fq:focus { opacity: 1; }
-.cp.ok { color: var(--ok); opacity: 1; }
-.cp.fail { color: var(--fail); opacity: 1; }
+.fq { margin-left: 1px; }
+.line:hover .cp, .line:hover .fq { color: var(--muted); }
+.cp:hover, .fq:hover, .cp:focus, .fq:focus {
+  color: var(--fg); background: var(--icon-chip); outline: none;
+}
+.cp:focus-visible, .fq:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; }
+.cp.ok { color: var(--ok); }
+.cp.fail { color: var(--fail); }
 
 .node.hidden { display: none; }
 .node.hit > .line { background: var(--hit); }
@@ -156,12 +164,14 @@ main { padding: 10px 14px 60px; }
 .sgn { color: var(--muted); white-space: nowrap; }
 .sg.on .sgn { color: var(--fg); }
 .sgc {
-  font: inherit; color: var(--muted); background: none; border: none;
-  cursor: pointer; padding: 3px 6px; opacity: .45;
+  font: inherit; color: var(--icon); background: none; border: none;
+  border-radius: 3px; cursor: pointer; padding: 3px 6px;
 }
-.sg:hover .sgc, .sgc:focus { opacity: 1; }
-.sgc.ok { color: var(--ok); opacity: 1; }
-.sgc.fail { color: var(--fail); opacity: 1; }
+.sg:hover .sgc { color: var(--muted); }
+.sgc:hover, .sgc:focus { color: var(--fg); background: var(--icon-chip); outline: none; }
+.sgc:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; }
+.sgc.ok { color: var(--ok); }
+.sgc.fail { color: var(--fail); }
 
 .result { position: relative; padding-left: 2.6em; margin-bottom: 3px; }
 .result::before {

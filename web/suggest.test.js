@@ -66,6 +66,16 @@ test('the line itself is always offered', () => {
   assert.ok(queries([{ key: 'rows' }, { index: 0 }, { key: 'id' }]).includes('.rows[0].id'));
 });
 
+test('the reading of the line itself is marked', () => {
+  /* The caller puts it first when nothing else narrows the document down, so
+     it has to be findable without matching on the label. */
+  for (const segs of [TAG, [{ key: 'version' }], [{ key: 'rows' }, { index: 0 }]]) {
+    const plain = suggest(DOC, segs).filter((c) => c.plain);
+    assert.strictEqual(plain.length, 1, `for ${JSON.stringify(segs)}`);
+    assert.strictEqual(plain[0].q, suggest(DOC, segs).find((c) => c.why === 'this line').q);
+  }
+});
+
 test('a key that needs quoting is quoted', () => {
   for (const q of queries(TAG)) {
     assert.ok(!/\.\/page\//.test(q), `unquoted key in ${q}`);

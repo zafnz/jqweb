@@ -113,10 +113,11 @@ var jqsuggest = (function () {
     var below = inArray ? segs.slice(0, -1) : segs;
 
     function add(q, why, shape, rank) {
-      if (q && !seen[q]) {
-        seen[q] = true;
-        out.push({ q: q, why: why, shape: shape, rank: rank });
-      }
+      if (!q || seen[q]) return null;
+      seen[q] = true;
+      var c = { q: q, why: why, shape: shape, rank: rank };
+      out.push(c);
+      return c;
     }
 
     depths(segs.length).forEach(function (d) {
@@ -166,8 +167,12 @@ var jqsuggest = (function () {
       : '.. | objects | select(' + condition('', [{ key: key }], literal, inArray) + ')',
     'anywhere', 'results', RANK.anywhere);
 
-    /* And the line itself, which is what the copy button gives you. */
-    add(pathText(segs), 'this line', 'results', RANK.line);
+    /* And the line itself, which is what the copy button gives you. plain marks
+       it out for the caller: when no reading narrows the document down, every
+       one of them returns the line that was clicked, and then this is the one
+       that was meant. */
+    var line = add(pathText(segs), 'this line', 'results', RANK.line);
+    if (line) line.plain = true;
     return out;
   }
 

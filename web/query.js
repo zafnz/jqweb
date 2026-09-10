@@ -170,6 +170,19 @@ var jqui = function (page) {
       var an = a.count === null ? -1 : a.count, bn = b.count === null ? -1 : b.count;
       return an === bn ? a.rank - b.rank : bn - an;
     });
+    /* Nothing on the list narrowing anything means every reading found the one
+       line that was clicked, and then the line itself is what was meant --
+       where it otherwise sorts last, being the least general reading. */
+    var narrows = false, i;
+    for (i = 0; i < rows.length; i++) if (rows[i].count > 1) narrows = true;
+    if (!narrows) {
+      for (i = 1; i < rows.length; i++) {
+        if (rows[i].plain) {
+          rows.unshift(rows.splice(i, 1)[0]);
+          break;
+        }
+      }
+    }
     draw();
     if (rows.length) pick(0);
     show();

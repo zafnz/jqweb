@@ -46,10 +46,18 @@ test('the corpus exercises every builtin', () => {
   const names = new Set();
   for (const m of table.slice(table.indexOf('var builtins = {'))
     .matchAll(/^ {4}'([a-z_0-9]+)\/\d+':/gm)) names.add(m[1]);
-  assert.ok(names.size > 50, `only found ${names.size} builtins to check`);
+  /* The format strings are put into the table by name, so they are read out
+     of the object that declares them instead. */
+  for (const m of table.slice(table.indexOf('var FORMATS = {'), table.indexOf('function asText'))
+    .matchAll(/^ {4}'(@[a-z0-9]+)':/gm)) names.add(m[1]);
+  assert.ok(names.size > 80, `only found ${names.size} builtins to check`);
 
   const queries = corpus.cases.map((c) => c.q).join('\n');
-  const missing = [...names].filter((n) => !new RegExp(`\\b${n}\\b`).test(queries));
+  /* A word boundary cannot sit before the "@" of a format name, so those are
+     looked for as plain text. */
+  const missing = [...names].filter((n) => n.startsWith('@')
+    ? !queries.includes(n)
+    : !new RegExp(`\\b${n}\\b`).test(queries));
   assert.deepStrictEqual(missing, [], 'builtins with no corpus case');
 });
 
@@ -202,7 +210,7 @@ test('syntax the subset leaves out is named, not mis-parsed', () => {
     'reduce .[] as $x (0; . + $x)': 'reduce is not supported',
     'foreach .[] as $x (0; . + $x)': 'foreach is not supported',
     'try .a catch "e"': 'try/catch is not supported, but a trailing "?" is',
-    '@base64': 'format strings are not supported',
+    '@base64 "x"': '@base64 applied to a string needs interpolation, which is not supported',
     '"a \\(.b) c"': 'string interpolation is not supported',
     'label $out | 1': 'labels are not supported'
   };
@@ -212,10 +220,21 @@ test('syntax the subset leaves out is named, not mis-parsed', () => {
 });
 
 test('a filter that does not exist says so', () => {
-  assert.strictEqual(error('splits("x")'), 'parse: splits is not a supported filter');
-  assert.strictEqual(error('getpath(["a"])'), 'parse: getpath is not a supported filter');
+  for (const name of ['tostream', 'env', 'inputs', 'leaf_paths']) {
+    assert.strictEqual(error(name), `parse: ${name} is not a supported filter`);
+  }
   assert.strictEqual(error('sort_by(.a; .b)'), 'parse: sort_by takes 1 argument, not 2');
   assert.strictEqual(error('range(1;2;3;4)'), 'parse: range takes 1, 2 or 3 arguments, not 4');
+  assert.strictEqual(error('@nope'), 'parse: @nope is not a supported format');
+});
+
+test('the filters that change a document are not here', () => {
+  /* The page shows a document; nothing in it edits one. Leaving these out
+     keeps path expressions out of the evaluator, which is what del and the
+     assignment operators would need. */
+  for (const q of ['del(.a)', 'setpath(["a"]; 1)', 'delpaths([["a"]])']) {
+    assert.ok(error(q).startsWith('parse:'), q);
+  }
 });
 
 test('a malformed query reports where it gave up', () => {

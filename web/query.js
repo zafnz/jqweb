@@ -17,12 +17,16 @@ var jqui = function (page) {
   /* Both of these are meaningless without the engine, so the shell ships them
      hidden and unexplained and they are turned on here. */
   mode.hidden = false;
-  input.placeholder = 'Filter, a path, or a jq query such as .items[] | select(.n > 3)';
+  input.placeholder = 'Text to find, a path, or a jq query such as .items[] | select(.n > 3)';
   mode.addEventListener('change', function () { input.focus(); page.rerun(); });
 
   /* The characters a path or a jq expression can start with. In auto mode they
-     are what tells a query from a filter, so that typing a word still
-     filters. */
+     are what tells a query from plain text, so that typing a word still
+     searches the document rather than being run.
+
+     The select offers Auto, Text and jq, all three naming how the box is read
+     rather than what happens next; the option value is still "filter", which
+     is what the text half of the page has always been called. */
   var QUERY_START = '.[($|';
 
   /* A name with an argument list after it -- with_entries(...), select(...) --
@@ -31,7 +35,7 @@ var jqui = function (page) {
      which is what the mode select is for. */
   var CALL = /^[a-z_][a-z0-9_]*\s*\(/;
 
-  /* Whether the box should be read as a query rather than filtered on. */
+  /* Whether the box should be read as a query rather than as text to find. */
   function wants(raw) {
     if (mode.value === 'jq') return true;
     if (mode.value !== 'auto') return false;

@@ -219,13 +219,13 @@ var jqtheme = (function () {
   <span class="name">jqweb &middot; wikipedia-reset-spec.json</span>
   <button id="expand" type="button">Expand all</button>
   <button id="collapse" type="button">Collapse all</button>
-  <select id="mode" title="What the search box means" hidden>
+  <select id="mode" title="How to read what you type" hidden>
     <option value="auto">Auto</option>
-    <option value="filter">Filter</option>
+    <option value="filter">Text</option>
     <option value="jq">jq</option>
   </select>
   <div class="qwrap">
-    <input id="q" type="search" placeholder="Filter keys and values, or paste a path (press /)" autocomplete="off" spellcheck="false">
+    <input id="q" type="search" placeholder="Text to find, or paste a path (press /)" autocomplete="off" spellcheck="false">
     <div id="suggest" hidden></div>
   </div>
   <span id="stats"></span>
@@ -1721,7 +1721,7 @@ var jqui = function (page) {
   var mode = document.getElementById('mode');
   var stats = document.getElementById('stats');
   mode.hidden = false;
-  input.placeholder = 'Filter, a path, or a jq query such as .items[] | select(.n > 3)';
+  input.placeholder = 'Text to find, a path, or a jq query such as .items[] | select(.n > 3)';
   mode.addEventListener('change', function () { input.focus(); page.rerun(); });
   var QUERY_START = '.[($|';
   var CALL = /^[a-z_][a-z0-9_]*\s*\(/;

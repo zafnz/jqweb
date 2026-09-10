@@ -81,10 +81,10 @@ its results, numbered down the left. A query that only walks down, such as
 `.a.b[3]`, still highlights that node in the document, the way a pasted path
 always has.
 
-The dropdown decides what the text in the box means. On `auto` anything
-starting with `.` `[` `(` `$` or `|` is a query and anything else is a filter,
-so typing a word still searches; `jq` forces a query, which is how to run a
-bare-word one such as `keys`.
+The dropdown decides how the box is read: `Auto`, `Text` or `jq`. On `Auto`
+anything starting with `.` `[` `(` `$` or `|` is a query and anything else is
+text to find, so typing a word still searches; `jq` forces a query, which is
+how to run a bare-word one such as `keys`.
 
 This is a subset of jq, not all of it. Paths, `[]`, slices, `|`, `,`, `//`,
 `?`, comparisons, arithmetic, `if/then/elif/else/end`, array and object

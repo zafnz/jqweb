@@ -162,7 +162,7 @@
     if (e.key === 'Escape' && e.target === input) { input.value = ''; run(); }
   });
 
-  /* Runs whatever is in the box. Without query.js that is the text filter or a
+  /* Runs whatever is in the box. Without query.js that is text to find or a
      path, as it has always been; with it, the mode decides. */
   function run() {
     var raw = input.value.trim();

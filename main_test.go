@@ -243,24 +243,52 @@ func dataBlock(t *testing.T, page string) string {
 }
 
 func TestRenderPageSubstitutesEveryPlaceholder(t *testing.T) {
-	page := renderPage([]byte(`{"a":1}`), "doc.json")
+	page := renderPage([]byte(`{"a":1}`), "doc.json", false)
 	if i := strings.Index(page, "{{"); i >= 0 {
 		t.Errorf("page still contains a placeholder at offset %d: %.20q", i, page[i:])
 	}
 }
 
 func TestRenderPageInlinesAssets(t *testing.T) {
-	page := renderPage([]byte(`{}`), "t")
+	page := renderPage([]byte(`{}`), "t", false)
 	for _, want := range []string{
-		"<style>",      // the shell
-		"color-scheme", // from page.css
-		"parseJSON",    // from page.js
-		`id="tree"`,    // the mount point the script writes into
-		`id="q"`,       // the search box
+		"<style>",       // the shell
+		"color-scheme",  // from page.css
+		"parseJSON",     // from core.js
+		"function run(", // from page.js
+		`id="tree"`,     // the mount point the script writes into
+		`id="results"`,  // where a query's output goes
+		`id="q"`,        // the search box
+		`id="mode"`,     // what the search box means
 		`id="stats"`,
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("page does not contain %q", want)
+		}
+	}
+}
+
+// The query engine is the largest part of the script, so it goes in only when
+// --jq asked for it.
+func TestRenderPageIncludesTheEngineOnlyWithJQ(t *testing.T) {
+	with := renderPage([]byte(`{}`), "t", true)
+	without := renderPage([]byte(`{}`), "t", false)
+
+	for _, want := range []string{"var jqjs", "function compile(src)", "'sort_by/1'"} {
+		if !strings.Contains(with, want) {
+			t.Errorf("--jq page does not contain %q", want)
+		}
+		if strings.Contains(without, want) {
+			t.Errorf("page built without --jq contains %q", want)
+		}
+	}
+	if len(with) <= len(without) {
+		t.Errorf("--jq page is %d bytes, no bigger than the %d without", len(with), len(without))
+	}
+	// Both are still whole pages, not one with a hole in it.
+	for _, page := range []string{with, without} {
+		if i := strings.Index(page, "{{"); i >= 0 {
+			t.Errorf("page still contains a placeholder at offset %d", i)
 		}
 	}
 }
@@ -274,7 +302,7 @@ func TestRenderPageRoundTripsTheDocument(t *testing.T) {
 		`{"big":123456789012345678901234567890}`,
 	}
 	for _, doc := range docs {
-		block := dataBlock(t, renderPage([]byte(doc), "t"))
+		block := dataBlock(t, renderPage([]byte(doc), "t", false))
 		var got, want any
 		if err := json.Unmarshal([]byte(block), &got); err != nil {
 			t.Errorf("data block for %s does not parse: %v", doc, err)
@@ -293,7 +321,7 @@ func TestRenderPageRoundTripsTheDocument(t *testing.T) {
 // holding the document.
 func TestRenderPageDataCannotEscapeItsElement(t *testing.T) {
 	doc := `{"payload":"</script><script>alert(1)</script>"}`
-	page := renderPage([]byte(doc), "t")
+	page := renderPage([]byte(doc), "t", false)
 	block := dataBlock(t, page)
 	if strings.Contains(block, "</script") {
 		t.Errorf("data block contains a literal </script: %s", block)
@@ -313,19 +341,19 @@ func TestRenderPageDataCannotEscapeItsElement(t *testing.T) {
 // Substitution is a single pass, so placeholder text inside the document or
 // the title is data, not a placeholder to expand.
 func TestRenderPageDoesNotRescanSubstitutions(t *testing.T) {
-	page := renderPage([]byte(`{"a":"{{TITLE}}"}`), "t")
+	page := renderPage([]byte(`{"a":"{{TITLE}}"}`), "t", false)
 	if !strings.Contains(dataBlock(t, page), `{{TITLE}}`) {
 		t.Error("a document containing {{TITLE}} had it substituted away")
 	}
 
-	page = renderPage([]byte(`{"a":1}`), "{{DATA}}")
+	page = renderPage([]byte(`{"a":1}`), "{{DATA}}", false)
 	if strings.Count(page, `{{DATA}}`) != 2 { // the <title> and the header
 		t.Error("a title containing {{DATA}} had it substituted away")
 	}
 }
 
 func TestRenderPageEscapesTitle(t *testing.T) {
-	page := renderPage([]byte(`{}`), `<img src=x onerror="alert(1)">`)
+	page := renderPage([]byte(`{}`), `<img src=x onerror="alert(1)">`, false)
 	if strings.Contains(page, "<img src=x") {
 		t.Error("page contains an unescaped title")
 	}
@@ -368,7 +396,7 @@ func TestStripComments(t *testing.T) {
 }
 
 func TestStripCommentsIsIdempotent(t *testing.T) {
-	for _, name := range []string{"web/core.js", "web/page.js"} {
+	for _, name := range []string{"web/core.js", "web/jq.js", "web/page.js"} {
 		once := stripComments(asset(name))
 		if twice := stripComments(once); twice != once {
 			t.Errorf("%s: stripping twice differs from stripping once", name)
@@ -376,9 +404,24 @@ func TestStripCommentsIsIdempotent(t *testing.T) {
 	}
 }
 
+// stripComments gives up on any line where a "/" turns up outside a string
+// without a "*" after it, and emits that line as written -- comment and all.
+// A regular expression or a division in the scripts can trip that, so no page
+// should carry a comment opener at all. The stylesheet is inlined as written,
+// so this covers it too.
+func TestPageCarriesNoComments(t *testing.T) {
+	for _, jq := range []bool{false, true} {
+		page := renderPage([]byte(`{"a":1}`), "t", jq)
+		if i := strings.Index(page, "/*"); i >= 0 {
+			line := 1 + strings.Count(page[:i], "\n")
+			t.Errorf("page with jq=%v carries a comment at line %d: %.70q", jq, line, page[i:])
+		}
+	}
+}
+
 // The comments go, the code stays.
 func TestPageShipsWithoutComments(t *testing.T) {
-	page := renderPage([]byte(`{"a":1}`), "t")
+	page := renderPage([]byte(`{"a":1}`), "t", false)
 	for _, gone := range []string{
 		"Pure helpers shared by the page", // core.js file comment
 		"recursive-descent scanner",       // inside parseJSON

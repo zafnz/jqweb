@@ -21,6 +21,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode/utf8"
 )
 
@@ -52,6 +53,7 @@ self-contained interactive HTML page.
       --host <ip>      bind address for -p (default 127.0.0.1)
   -o, --output <file>  write the page to <file>; "-" writes to stdout
   -O, --open           open the page in the default browser
+      --jq             answer jq queries in the search box
 
 With no -p and no -o, it listens on a random available port.
 `)
@@ -63,6 +65,7 @@ func main() {
 		output  string
 		host    string
 		open    bool
+		jq      bool
 		version bool
 	)
 	flag.IntVar(&port, "p", 0, "")
@@ -72,6 +75,7 @@ func main() {
 	flag.StringVar(&host, "host", "127.0.0.1", "")
 	flag.BoolVar(&open, "open", false, "")
 	flag.BoolVar(&open, "O", false, "")
+	flag.BoolVar(&jq, "jq", false, "")
 	flag.BoolVar(&version, "version", false, "")
 	flag.BoolVar(&version, "v", false, "")
 
@@ -132,7 +136,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	page := []byte(renderPage(data, title))
+	page := []byte(renderPage(data, title, jq))
 
 	if outSet {
 		if output == "-" {
@@ -179,6 +183,7 @@ func reorderArgs(args []string) []string {
 		"-o": true, "--output": true,
 		"-O": false, "--open": false,
 		"-v": false, "--version": false,
+		"--jq":   false,
 		"--host": true,
 	}
 	var flags, pos []string
@@ -519,8 +524,9 @@ func lineCol(data []byte, off int64) (int, int) {
 // ---- page assembly ----
 
 // renderPage embeds the document in the page as compact JSON; the script in
-// pageTemplate parses it and builds the tree in the browser.
-func renderPage(data []byte, title string) string {
+// the template parses it and builds the tree in the browser. jq selects the
+// template that carries the query engine.
+func renderPage(data []byte, title string, jq bool) string {
 	var buf bytes.Buffer
 	if err := json.Compact(&buf, data); err != nil {
 		// check has already accepted the document, so this cannot fail.
@@ -530,7 +536,7 @@ func renderPage(data []byte, title string) string {
 	return strings.NewReplacer(
 		"{{TITLE}}", html.EscapeString(title),
 		"{{DATA}}", scriptSafe(buf.String()),
-	).Replace(pageTemplate)
+	).Replace(pageTemplate(jq))
 }
 
 // scriptSafe escapes "<" as its \u003c escape so that a string containing
@@ -540,25 +546,48 @@ func scriptSafe(s string) string {
 	return strings.ReplaceAll(s, "<", `\u003c`)
 }
 
-//go:embed web/page.html web/page.css web/core.js web/page.js
+//go:embed web/page.html web/page.css web/core.js web/jq.js web/page.js
 var assets embed.FS
 
-// pageTemplate is the page shell with its stylesheet and script inlined,
-// leaving {{TITLE}} and {{DATA}} for renderPage to fill in.
-var pageTemplate = buildTemplate()
+// pageTemplate returns the page shell with its stylesheet and script inlined,
+// leaving {{TITLE}} and {{DATA}} for renderPage to fill in. The two states of
+// --jq give two different scripts, so there is a template for each, built the
+// first time it is wanted.
+func pageTemplate(jq bool) string {
+	if jq {
+		return withJQ()
+	}
+	return withoutJQ()
+}
 
-func buildTemplate() string {
+var withJQ = sync.OnceValue(func() string { return buildTemplate(true) })
+var withoutJQ = sync.OnceValue(func() string { return buildTemplate(false) })
+
+func buildTemplate(jq bool) string {
 	return strings.NewReplacer(
 		"{{STYLE}}", inline("web/page.css"),
-		"{{SCRIPT}}", script(),
+		"{{SCRIPT}}", script(jq),
 	).Replace(asset("web/page.html"))
 }
 
-// script returns the page's JavaScript: the pure core, then the DOM wiring
-// that drives it. The comments in those files are written for someone reading
-// the source, and are not worth inlining into every rendered page.
-func script() string {
-	return stripComments(inline("web/core.js")) + "\n" + stripComments(inline("web/page.js"))
+// script returns the page's JavaScript: the pure core, the query engine when
+// it was asked for, then the DOM wiring that drives them. The comments in
+// those files are written for someone reading the source, and are not worth
+// inlining into every rendered page.
+func script(jq bool) string {
+	parts := []string{"web/core.js"}
+	if jq {
+		parts = append(parts, "web/jq.js")
+	}
+	parts = append(parts, "web/page.js")
+	var b strings.Builder
+	for i, name := range parts {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		b.WriteString(stripComments(inline(name)))
+	}
+	return b.String()
 }
 
 // stripComments removes /* ... */ comments, and the lines left empty by

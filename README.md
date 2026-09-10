@@ -46,7 +46,7 @@ jqweb: serving on http://[::]:9000/ (Ctrl-C to stop)
 <br clear="right">
 
 ## Usage
-usage: `jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [-O|--open] [<input-file>]`
+usage: `jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [-O|--open] [--jq] [<input-file>]`
 
 Reads JSON from <input-file> ("-" or absent: stdin) and renders it as a
 self-contained interactive HTML page, served on a random port or written to file
@@ -55,6 +55,7 @@ self-contained interactive HTML page, served on a random port or written to file
       --host <ip>      bind address for -p (default 127.0.0.1)
   -o, --output <file>  write the page to <file>; "-" writes to stdout
   -O, --open           opens your default web browser with the output
+      --jq             answer jq queries in the search box
 ```
 With no -p and no -o, it listens on a random available port.
 
@@ -70,6 +71,44 @@ path can be pasted straight back into the box.
 The leading dot is optional, `["quoted keys"]` and negative array indices such
 as `[-1]` both work, and text that does not resolve to a path is used as a
 filter instead.
+
+## jq queries
+
+With `--jq`, the box answers jq queries as well:
+
+```
+.items[] | select(.status.phase == "Running") | .metadata.name
+[.users[] | {name, admin: (.user.username == "admin")}] | sort_by(.name)
+.. | objects | select(has("error"))
+```
+
+A query whose output is not part of the document -- anything with `map`,
+`keys`, `to_entries` or a constructed object in it -- replaces the tree with
+its results, numbered down the left. A query that only walks down, such as
+`.a.b[3]`, still highlights that node in the document, the way a pasted path
+always has.
+
+The dropdown decides what the text in the box means. On `auto` anything
+starting with `.` `[` `(` `$` or `|` is a query and anything else is a filter,
+so typing a word still searches; `jq` forces a query, which is how to run a
+bare-word one such as `keys`.
+
+This is a subset of jq, not all of it. Paths, `[]`, slices, `|`, `,`, `//`,
+`?`, comparisons, arithmetic, `if/then/elif/else/end`, array and object
+construction, and about 60 builtins are there: `select`, `map`, `map_values`,
+`keys`, `length`, `type`, `has`, `to_entries`, `from_entries`, `with_entries`,
+`add`, `any`, `all`, `sort_by`, `group_by`, `unique_by`, `min_by`, `max_by`,
+`flatten`, `range`, `limit`, `first`, `last`, `join`, `split`, `test`,
+`startswith`, `contains`, `tostring`, `tonumber`, `tojson`, `recurse` and the
+type filters. Regular expressions are JavaScript's rather than Oniguruma's,
+which differ in the corners.
+
+Variables and `as`, `def`, `reduce`, `foreach`, assignment, `path`, string
+interpolation and format strings are not. A query using one says so by name
+instead of guessing at what it meant.
+
+The engine adds about 40KB to every page it is built into, which is why it is
+behind a flag rather than always on.
 
 ## Why?
 

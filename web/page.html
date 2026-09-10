@@ -13,10 +13,18 @@
   <span class="name">jqweb &middot; {{TITLE}}</span>
   <button id="expand" type="button">Expand all</button>
   <button id="collapse" type="button">Collapse all</button>
+  <select id="mode" title="What the search box means" hidden>
+    <option value="auto">Auto</option>
+    <option value="filter">Filter</option>
+    <option value="jq">jq</option>
+  </select>
   <input id="q" type="search" placeholder="Filter keys and values, or paste a path (press /)" autocomplete="off" spellcheck="false">
   <span id="stats"></span>
 </header>
-<main id="tree"></main>
+<main>
+  <div id="tree"></div>
+  <div id="results" hidden></div>
+</main>
 <script id="data" type="application/json">{{DATA}}</script>
 <script>
 {{SCRIPT}}

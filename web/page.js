@@ -5,20 +5,32 @@
 (function () {
   'use strict';
   var tree = document.getElementById('tree');
+  var results = document.getElementById('results');
   var input = document.getElementById('q');
+  var mode = document.getElementById('mode');
   var stats = document.getElementById('stats');
   var parseJSON = jqweb.parseJSON, renderTree = jqweb.renderTree, parsePath = jqweb.parsePath;
 
+  /* The query engine is only inlined when the page was built with --jq. */
+  var jq = typeof jqjs !== 'undefined' ? jqjs : null;
+
   /* Build the whole tree in one write. The document is served inside the page
      as JSON rather than as markup, which keeps the file smaller and lets the
-     tree be rendered here where the collapsing state lives. */
-  tree.innerHTML = renderTree(parseJSON(document.getElementById('data').textContent));
+     tree be rendered here where the collapsing state lives. The parsed
+     document is kept as well, because a query runs against it. */
+  var rootValue = parseJSON(document.getElementById('data').textContent);
+  tree.innerHTML = renderTree(rootValue);
   var rootNode = tree.querySelector(':scope > .node');
 
-  /* One delegated listener for every line in the tree, however many there
+  if (jq) {
+    mode.hidden = false;
+    input.placeholder = 'Filter, a path, or a jq query such as .items[] | select(.n > 3)';
+  }
+
+  /* One delegated listener for every line in either view, however many there
      are: a click either hits a copy button, a toggle, or the collapsed
      summary, which expands the node it belongs to. */
-  tree.addEventListener('click', function (e) {
+  document.querySelector('main').addEventListener('click', function (e) {
     var cp = e.target.closest('.cp');
     if (cp) { copyPath(cp); return; }
     var tg = e.target.closest('.toggle');
@@ -36,10 +48,10 @@
     each('.node.branch', function (n) { if (n !== rootNode) n.classList.add('collapsed'); });
   });
 
-  /* Runs fn over every node in the tree matching sel. querySelectorAll gives
-     a NodeList, which in older browsers has no forEach of its own. */
+  /* Runs fn over every node in either view matching sel. querySelectorAll
+     gives a NodeList, which in older browsers has no forEach of its own. */
   function each(sel, fn) {
-    Array.prototype.forEach.call(tree.querySelectorAll(sel), fn);
+    Array.prototype.forEach.call(document.querySelectorAll('main ' + sel), fn);
   }
 
   /* ---- copy path ---- */
@@ -50,7 +62,10 @@
   /* Builds the jq-style path of a node by walking up its ancestors and
      reading back the data attributes emit() wrote, prepending each segment as
      it goes. The result is what parsePath() reads, so a copied path can be
-     pasted straight into the search box. */
+     pasted straight into the search box.
+
+     The walk stops at whichever tree the node is in, so in the result view the
+     path is relative to the result it sits in rather than to the document. */
   function pathOf(node) {
     var segs = [];
     var n = node;
@@ -131,27 +146,65 @@
     if (e.key === 'Escape' && e.target === input) { input.value = ''; run(); }
   });
 
-  /* Text containing "." or "[" may be a path such as .a.b[3].c, so it is tried
-     as one first; a bare word is always a text filter. A path that does not
-     resolve falls back to text filtering unless it was written with a leading
-     dot, which takes it as a path regardless. */
+  mode.addEventListener('change', function () { input.focus(); run(); });
+
+  /* Runs whatever is in the box. Without the query engine that is the text
+     filter or a path, as it has always been; with it, the mode decides. */
   function run() {
     var raw = input.value.trim();
+    input.classList.remove('bad');
     if (!raw) { reset(); return; }
+    if (!jq) { runPath(raw); return; }
+    if (queryMode(raw) === 'jq') { runQuery(raw); return; }
+    showDocument();
+    textFilter(raw.toLowerCase());
+  }
+
+  /* The characters a path or a jq expression can start with. In auto mode
+     they are what tells a query from a filter, so that typing a word still
+     filters; a bare-word query such as "keys" needs the mode set to jq. */
+  var QUERY_START = '.[($|';
+
+  function queryMode(raw) {
+    return mode.value !== 'auto' ? mode.value
+      : QUERY_START.indexOf(raw.charAt(0)) >= 0 ? 'jq' : 'filter';
+  }
+
+  /* Compiles and runs the box as a jq query. One that only walks down the
+     document is shown in place, as a pasted path always has been; anything
+     else produces values that are not in the document, so its output replaces
+     the view. */
+  function runQuery(raw) {
+    var query, out;
+    showDocument();
+    try {
+      query = jq.compile(raw);
+    } catch (e) {
+      fault(e.message, e.pos);
+      return;
+    }
+    if (query.path) { showFound(resolvePath(query.path), query.path.length); return; }
+    try {
+      out = query.run(rootValue);
+    } catch (e) {
+      fault(e.message);
+      return;
+    }
+    showResults(out);
+  }
+
+  /* The old behaviour, and still what a page built without --jq does: text
+     containing "." or "[" may be a path such as .a.b[3].c, so it is tried as
+     one first, and a bare word is always a text filter. A path that does not
+     resolve falls back to text filtering unless it was written with a leading
+     dot, which takes it as a path regardless. */
+  function runPath(raw) {
     if (/[.[]/.test(raw)) {
       var segs = parsePath(raw);
       if (segs) {
         var found = resolvePath(segs);
-        if (found.depth === segs.length) {
-          showPath(found.node, true);
-          stats.textContent = pathOf(found.node);
-          return;
-        }
-        /* A leading dot means the text was meant as a path, so say where it
-           stopped resolving rather than silently filtering instead. */
-        if (raw.charAt(0) === '.') {
-          showPath(found.node, found.depth > 0);
-          stats.textContent = found.depth ? 'no path past ' + pathOf(found.node) : 'no such path';
+        if (found.depth === segs.length || raw.charAt(0) === '.') {
+          showFound(found, segs.length);
           return;
         }
       }
@@ -159,9 +212,59 @@
     textFilter(raw.toLowerCase());
   }
 
+  /* Reveals the node a path led to, or says how far it got. A partial match is
+     still worth showing, since it says where the path stopped resolving. */
+  function showFound(found, want) {
+    if (found.depth === want) {
+      showPath(found.node, true);
+      stats.textContent = pathOf(found.node);
+      return;
+    }
+    showPath(found.node, found.depth > 0);
+    stats.textContent = found.depth ? 'no path past ' + pathOf(found.node) : 'no such path';
+  }
+
+  /* Reports a query that would not compile or would not run. */
+  function fault(message, pos) {
+    input.classList.add('bad');
+    stats.textContent = pos === undefined ? message : message + ' (at ' + (pos + 1) + ')';
+  }
+
+  /* Building the markup for a query's whole output is what would stall the
+     page, so only this many are rendered; the count still reports them all. */
+  var RESULT_CAP = 500;
+
+  /* Shows a query's outputs in place of the document. Each carries its
+     position, which the stylesheet puts in the gutter, because a query
+     produces a list of values rather than one document; a single value is left
+     unnumbered. The document tree is hidden rather than thrown away, so it
+     comes back with its collapsed state intact and without being rendered
+     again. */
+  function showResults(out) {
+    var shown = Math.min(out.length, RESULT_CAP), parts = [], i;
+    for (i = 0; i < shown; i++) {
+      parts.push('<div class="result" data-n="' + i + '">' + renderTree(out[i]) + '</div>');
+    }
+    results.innerHTML = parts.join('');
+    results.classList.toggle('one', out.length === 1);
+    results.hidden = false;
+    tree.hidden = true;
+    stats.textContent = shown < out.length
+      ? 'first ' + shown + ' of ' + out.length + ' results'
+      : out.length === 1 ? '1 result' : out.length + ' results';
+  }
+
+  function showDocument() {
+    if (results.hidden) return;
+    results.hidden = true;
+    results.innerHTML = '';
+    tree.hidden = false;
+  }
+
   /* Clears any filtering and shows the whole document again. Collapsed state
      is left alone: it is the reader's, not the search's. */
   function reset() {
+    showDocument();
     each('.node', function (n) { n.classList.remove('hidden', 'hit'); });
     stats.textContent = '';
   }

@@ -22,8 +22,22 @@ header button:hover { background: #2a2e35; }
   padding: 4px 9px; outline: none;
 }
 #q:focus { border-color: #4a90d9; }
+#q.bad, #q.bad:focus { border-color: #e5534b; }
+#mode {
+  font: inherit; color: #d4d7dd; background: #22252b;
+  border: 1px solid #33373f; border-radius: 4px; padding: 3px 4px; cursor: pointer;
+}
 #stats { color: #8a9199; }
 main { padding: 10px 14px 60px; }
+
+.result { position: relative; padding-left: 2.6em; margin-bottom: 3px; }
+.result::before {
+  content: attr(data-n);
+  position: absolute; left: 0; width: 2em;
+  text-align: right; color: #5c636d;
+}
+#results.one .result { padding-left: 0; }
+#results.one .result::before { content: none; }
 
 .line { white-space: pre-wrap; word-break: break-word; border-radius: 3px; }
 .line:hover { background: rgba(255,255,255,.045); }

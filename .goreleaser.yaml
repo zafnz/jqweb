@@ -61,58 +61,28 @@ snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
 release:
+  # Rewritten for each release: it is what this one changed, not what the tool
+  # does. GoReleaser puts it above the commit list on the release page.
   header: |
-    ## jq queries
+    A bug fix and a small addition, on top of 0.4.0.
 
-    The search box answers jq queries as well as finding text: paths,
-    iteration, slices, pipes, `//`, `?`, comparisons, arithmetic,
-    if/then/elif/else/end, array and object construction, and about 60 builtins
-    including `select`, `map`, `keys`, `to_entries`, `sort_by`, `group_by`,
-    `unique_by`, `flatten`, `range`, `join`, `test` and `index`. Variables,
-    `def`, `reduce`, assignment, string interpolation and format strings are
-    not there, and a query using one says so by name rather than guessing at
-    what it meant.
+    ## Typing "." no longer jumps into the middle of the document
 
-    A query whose output is not part of the document replaces the tree with its
-    results. One that only walks down, such as `.a.b[3]`, highlights that node,
-    the way a pasted path always has.
+    "." is jq's identity, so it resolved to the whole document, and revealing
+    that scrolled the middle of it to the middle of the window -- half way
+    down the file, whatever the file. Anything taller than the window did the
+    same, so a match on a large subtree opened at its midpoint rather than at
+    its top.
 
-    ## Filtering on a value
+    A match that does not fit on screen now opens at its top, under the
+    toolbar. One already on screen is left where it is, so typing a path one
+    character at a time no longer drags the page about.
 
-    Every line has a second button. It fills the search box with a query built
-    from that line and offers the other queries the line could have meant, each
-    labelled with what it returns -- 14 results against 1 says which reading
-    was meant without anyone having to work out the jq.
+    ## The name in the toolbar links to the project
 
-    ## Light and dark
-
-    The page follows the reader's system. The button at the right of the
-    toolbar cycles auto, light and dark and remembers the choice; `--theme
-    light` or `--theme dark` sets what a page starts in.
-
-    ## Toolbar
-
-    Expand all and Collapse all are one button, moved to the right, and the
-    search box fills the room they left.
-
-    ## Page size
-
-    The query engine is inlined into every page, which makes one about 57KB
-    larger than 0.3.0 whatever the document. `--simple` leaves it out, for a
-    page that browses, filters and looks up paths and nothing else; that one is
-    about 5KB larger than 0.3.0, which is the second colour palette.
-
-    Against that, the comments in the page scripts are no longer served to
-    every reader of a page. They were written for someone reading `web/*.js`
-    and were being inlined along with the code; stripping them takes about 10KB
-    off a page before any of the above is added.
-
-    ## Truncated input
-
-    JSON that ends inside an unclosed container reports that it was truncated,
-    rather than an end-of-input error, whichever version of Go built the
-    binary. Go 1.27 changed what the decoder returns there, which had made the
-    message worse in a binary built with it.
+    jqweb carries the GitHub mark and the full text colour, next to the file
+    name, which stays muted. It opens in a new tab, because a page holds a
+    filter, a collapsed tree and whatever query has been built up in it.
 
 changelog:
   # The empty string is git order, which reads as the work happened; "asc" is

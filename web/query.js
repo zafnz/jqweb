@@ -20,15 +20,22 @@ var jqui = function (page) {
   input.placeholder = 'Filter, a path, or a jq query such as .items[] | select(.n > 3)';
   mode.addEventListener('change', function () { input.focus(); page.rerun(); });
 
-  /* The characters a path or a jq expression can start with. In auto mode
-     they are what tells a query from a filter, so that typing a word still
-     filters; a bare-word query such as "keys" needs the mode set to jq. */
+  /* The characters a path or a jq expression can start with. In auto mode they
+     are what tells a query from a filter, so that typing a word still
+     filters. */
   var QUERY_START = '.[($|';
+
+  /* A name with an argument list after it -- with_entries(...), select(...) --
+     which no one types meaning to search for that text. A bare name is left
+     alone: "keys" is far more likely to be a search for the word than a call,
+     which is what the mode select is for. */
+  var CALL = /^[a-z_][a-z0-9_]*\s*\(/;
 
   /* Whether the box should be read as a query rather than filtered on. */
   function wants(raw) {
-    return mode.value === 'jq' ||
-      (mode.value === 'auto' && QUERY_START.indexOf(raw.charAt(0)) >= 0);
+    if (mode.value === 'jq') return true;
+    if (mode.value !== 'auto') return false;
+    return QUERY_START.indexOf(raw.charAt(0)) >= 0 || CALL.test(raw);
   }
 
   /* Compiles and runs the box as a query. One that only walks down the
@@ -144,11 +151,7 @@ var jqui = function (page) {
       return an === bn ? a.rank - b.rank : bn - an;
     });
     draw();
-    if (rows.length) {
-      input.value = rows[0].q;
-      mark();
-      page.rerun();
-    }
+    if (rows.length) pick(0);
     show();
   }
 
@@ -198,11 +201,16 @@ var jqui = function (page) {
   function hide() { suggestions.hidden = true; }
 
   /* Picking a row leaves the list open: trying the next one is the whole
-     reason there is a list. */
+     reason there is a list.
+
+     It runs the query itself rather than going back through the box, because
+     every row is a query by construction and nothing about it should depend on
+     what the mode select would have guessed. */
   function pick(i) {
     input.value = rows[i].q;
+    input.classList.remove('bad');
     mark();
-    page.rerun();
+    run(rows[i].q);
   }
 
   suggestions.addEventListener('click', function (e) {

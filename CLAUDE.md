@@ -95,10 +95,16 @@ it. Comments go on their own line.
 colour anywhere means one theme gets it wrong. Check the contrast ratio rather
 than the look on one screen: dimming a grey with `opacity` once gave 1.6:1.
 
-**`docs/index.html` is generated and committed.** Regenerate it after any change
-under `web/`, with the command in `CONTRIBUTING.md`.
+**`docs/index.html` is generated and committed.** It is `docs/k8s.json`
+rendered, so regenerate it after any change under `web/`, with the command in
+`CONTRIBUTING.md`.
 
-**Sample documents are gitignored** — `simple.json`, `large.json`,
+**`docs/k8s.json` is the example document.** It is a generated `kubectl get all
+-o json` listing, committed and served at https://zafnz.github.io/jqweb/k8s.json,
+and the `curl` in `README.md` fetches it from there. Examples that need a
+document use this one.
+
+**Other sample documents are gitignored** — `simple.json`, `large.json`,
 `wiki-rest.json`. They are scratch fixtures. A wide `git add` has swept one in
 before.
 

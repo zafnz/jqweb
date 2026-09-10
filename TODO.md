@@ -39,12 +39,25 @@ document down.
 ## Quit once the page has been fetched
 
 `jqweb file.json` serves until Ctrl-C, which is a nuisance for the common case
-of looking at a document once. Exit shortly after the first successful GET of
-`/` -- half a second or so, enough for the browser to have the whole response.
-`-A|--auto` for it, or make it the default and add `--no-close`; the second is
-friendlier and the bigger change to what people already expect. Either way it
-has to stay off when `-p` was given explicitly, since naming a port says the
-page is meant to be visited more than once.
+of looking at a document once. `-C|--close` for it, off by default: this
+changes when the process exits, which is the kind of thing that surprises
+people mid-task, so it should be asked for rather than assumed.
+
+`-OC` -- open the browser and quit once it has the page -- is the combination
+worth designing for. Go's `flag` package does not bundle short flags, so `-OC`
+is read as one flag named `OC` and rejected; `reorderArgs` would have to split
+a run of single-letter flags before parsing.
+
+Exiting on the first GET of `/` is the obvious rule and a weak one. The page is
+one self-contained file with no subresources, so exactly one GET happens per
+view, which is what makes it tempting -- but a reload is a second view, and by
+then the server is gone, so the fix for the problem is the thing that is
+broken. Prefetch, link scanners and corporate proxies all issue GETs of their
+own and would end the server before anyone saw the page.
+
+Waiting for an idle period with no requests, rather than for the first one,
+survives all of that. Holding a connection open and exiting when it drops --
+what dev servers do -- is better still and tells you the tab actually closed.
 
 ## Changing text in filter/search/jq box should delete dropdown
 

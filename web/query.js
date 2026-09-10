@@ -7,7 +7,7 @@
    itself, and gets back the entry points it needs. */
 var jqui = function (page) {
   'use strict';
-  var renderTree = jqweb.renderTree, esc = jqweb.esc;
+  var renderTree = jqweb.renderTree, esc = jqweb.esc, pathText = jqweb.pathText;
   var tree = document.getElementById('tree');
   var results = document.getElementById('results');
   var input = document.getElementById('q');
@@ -98,8 +98,12 @@ var jqui = function (page) {
      again. */
   function showResults(out) {
     var shown = Math.min(out.length, RESULT_CAP), parts = [], i;
+    /* Lines carry the button that picks them for the output, except in a view
+       that is already the output of picking: there the lines are the columns
+       themselves, and there is nothing left in them to pick. */
+    var mode = cols.length ? '' : 'add';
     for (i = 0; i < shown; i++) {
-      parts.push('<div class="result" data-n="' + i + '">' + renderTree(out[i]) + '</div>');
+      parts.push('<div class="result" data-n="' + i + '">' + renderTree(out[i], mode) + '</div>');
     }
     results.innerHTML = parts.join('');
     results.classList.toggle('one', out.length === 1);
@@ -155,6 +159,7 @@ var jqui = function (page) {
   /* Builds the list for one line of the document, puts the widest reading in
      the box, and runs it. */
   function filter(node) {
+    unpick();
     var segs = page.segsOf(node);
     var deadline = Date.now() + COUNT_BUDGET_MS;
     rows = jqsuggest.suggest(page.value, segs).map(function (c) {
@@ -245,6 +250,7 @@ var jqui = function (page) {
      every row is a query by construction and nothing about it should depend on
      what the mode select would have guessed. */
   function pick(i) {
+    unpick();
     input.value = rows[i].q;
     mark(i);
     run(rows[i].q);
@@ -266,20 +272,31 @@ var jqui = function (page) {
      answering a question that is no longer being asked -- so the rows go, and
      focusing the box brings nothing back.
 
-     Only a person typing gets here: filling the box from a row sets the value
-     directly, which fires nothing. Escape is the one way to put the list away
-     and still get it back. */
+     Only a person typing gets here: filling the box from a row, or from a
+     column button, sets the value directly, which fires nothing. Escape is the
+     one way to put the list away and still get it back.
+
+     A picked column goes the same way and for the same reason: it is a member
+     of a query the box no longer holds. */
   input.addEventListener('input', function () {
     forget();
+    unpick();
   });
 
   /* Up and down step through the readings, running each, which is the quick
      way to find out which one you meant. Escape puts the list away without
      clearing the box, which is what Escape does when there is no list. */
   input.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && !suggestions.hidden) {
-      hide();
-      e.stopPropagation();
+    if (e.key === 'Escape') {
+      /* With the list up, Escape puts it away and the box keeps what it has.
+         With the list down, page.js empties the box, and a column picked into
+         it goes with it. */
+      if (!suggestions.hidden) {
+        hide();
+        e.stopPropagation();
+        return;
+      }
+      unpick();
       return;
     }
     if (suggestions.hidden || !rows.length) return;
@@ -297,10 +314,89 @@ var jqui = function (page) {
     if (!suggestions.contains(e.target) && e.target !== input) hide();
   });
 
+  /* ---- columns ----
+
+     Finding the records is half of it. The other half is saying what to show
+     about each one, and that is a question no reading of the clicked line can
+     answer: the port is what was searched for, and .metadata.name is what
+     names the thing that has it.
+
+     So the button on a line of a result adds that line to the output. segsOf
+     stops at the result the line sits in, so the path is relative and names
+     the same field in every result; a second pick makes it an object with two
+     members, and picking a line already picked takes it out again.
+
+     Nothing runs until Enter. The results on screen are what the picking is
+     done against and the projection replaces them, so running early would
+     take the rest of the fields away before they could be picked. What each
+     click does show is the query, which is being written into the box a
+     member at a time. */
+
+  var cols = [];        /* the picked lines, as segments relative to a result */
+  var base = '';        /* the query whose results they are being picked from */
+  var baseStats = '';   /* what the toolbar said about it before picking began */
+
+  function column(node, btn) {
+    var segs = page.segsOf(node), path = pathText(segs), at = held(path);
+    if (at >= 0) {
+      cols.splice(at, 1);
+      unmark(path);
+    } else {
+      if (!cols.length) { base = input.value.trim(); baseStats = stats.textContent; }
+      cols.push(segs);
+      btn.classList.add('on');
+    }
+    input.value = cols.length ? projection() : base;
+    stats.textContent = cols.length
+      ? plural(cols.length, 'column') + ', press Enter to run'
+      : baseStats;
+    /* The list held readings of a line of the document. The box no longer
+       holds one of them. */
+    forget();
+  }
+
+  /* Where a path sits in the picked lines, or -1. */
+  function held(path) {
+    for (var i = 0; i < cols.length; i++) if (pathText(cols[i]) === path) return i;
+    return -1;
+  }
+
+  /* The query the picked lines add up to. A member named after the key its
+     line sat under is what someone picking .metadata.name is looking for, and
+     jq takes a bare name as a key -- unless it is a word its parser wants,
+     which is what the second attempt is for. */
+  function projection() {
+    var q = jqsuggest.project(base, cols, false);
+    try {
+      jqjs.compile(q);
+    } catch (e) {
+      q = jqsuggest.project(base, cols, true);
+    }
+    return q;
+  }
+
+  /* Takes the mark off the button standing for a field. The same field can be
+     picked in whichever result it is read off, so the marked buttons are asked
+     where they are rather than the click being remembered. */
+  function unmark(path) {
+    var on = results.querySelectorAll('.ad.on'), i;
+    for (i = 0; i < on.length; i++) {
+      if (pathText(page.segsOf(on[i].closest('.node'))) === path) on[i].classList.remove('on');
+    }
+  }
+
+  /* Drops what was picked, for when the box stops holding what it built. */
+  function unpick() {
+    cols = [];
+    base = '';
+    baseStats = '';
+  }
+
   return {
     wants: wants,
     run: run,
     filter: filter,
+    column: column,
     clearFault: clearFault,
     showDocument: showDocument
   };

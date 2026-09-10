@@ -122,16 +122,19 @@ main { padding: 10px 14px 60px; }
 .pn { color: var(--fg); }
 .c { color: var(--muted); }
 
-.cp, .fq {
+.cp, .fq, .ad {
   background: none; border: none; border-radius: 3px; padding: 1px 4px;
   font: inherit; font-size: .92em; color: var(--icon); cursor: pointer;
 }
-.fq { margin-left: 1px; }
-.line:hover .cp, .line:hover .fq { color: var(--muted); }
-.cp:hover, .fq:hover, .cp:focus, .fq:focus {
+.fq, .ad { margin-left: 1px; }
+.line:hover .cp, .line:hover .fq, .line:hover .ad { color: var(--muted); }
+.cp:hover, .fq:hover, .ad:hover, .cp:focus, .fq:focus, .ad:focus {
   color: var(--fg); background: var(--icon-chip); outline: none;
 }
-.cp:focus-visible, .fq:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; }
+.cp:focus-visible, .fq:focus-visible, .ad:focus-visible {
+  outline: 1px solid var(--focus); outline-offset: -1px;
+}
+.line .ad.on { color: var(--fg); background: var(--icon-chip); }
 .cp.ok { color: var(--ok); }
 .cp.fail { color: var(--fail); }
 

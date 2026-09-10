@@ -13,7 +13,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { parseJSON } = require('./core.js');
 const { compile } = require('./jq.js');
-const { suggest } = require('./suggest.js');
+const { suggest, project } = require('./suggest.js');
 
 /* A document with the shapes that have caught the generator out: an object
    used as a map, records reached through a second map level, an array of
@@ -35,6 +35,24 @@ const DOC = parseJSON(JSON.stringify({
 
 /* Where "Page content" sits in .paths["/page/"].get.tags. */
 const TAG = [{ key: 'paths' }, { key: '/page/' }, { key: 'get' }, { key: 'tags' }, { index: 0 }];
+
+/* Records of two shapes in one list, as a kubectl listing holds them: a Pod
+   keeps its containers at .spec.containers, and a Deployment keeps them one
+   level further down under a template. */
+const LIST = parseJSON(JSON.stringify({
+  items: [
+    { kind: 'Pod', metadata: { name: 'a' }, spec: { containers: [{ ports: [{ containerPort: 80 }] }] } },
+    {
+      kind: 'Deployment',
+      metadata: { name: 'b' },
+      spec: { template: { spec: { containers: [{ ports: [{ containerPort: 80 }] }] } } }
+    }
+  ]
+}));
+
+/* Where the Pod's port sits. */
+const PORT = [{ key: 'items' }, { index: 0 }, { key: 'spec' }, { key: 'containers' },
+  { index: 0 }, { key: 'ports' }, { index: 0 }, { key: 'containerPort' }];
 
 const queries = (segs) => suggest(DOC, segs).map((c) => c.q);
 
@@ -90,6 +108,50 @@ test('the key a value sat under can be left open', () => {
   assert.ok(qs.includes(anyKey), qs.join('\n'));
   assert.strictEqual(compile(anyKey).run(DOC).length, 3);
   assert.strictEqual(compile('.paths[] | select(.get.tags? | index("Page content")?)').run(DOC).length, 2);
+});
+
+test('a list of records can be searched a whole record at a time', () => {
+  /* The shapes differ between records, so the path the port was clicked at
+     finds the record it was read from and nothing else. */
+  const all = suggest(LIST, PORT);
+  const deep = all.find((c) => c.q === '.items[] | select(any(.. | objects; .containerPort? == 80))');
+  assert.ok(deep, all.map((c) => c.q).join('\n'));
+  assert.strictEqual(yields(deep, LIST), 2);
+  const exact = all.find((c) => c.q === '.items[] | select(.spec.containers[0].ports[0].containerPort? == 80)');
+  assert.strictEqual(yields(exact, LIST), 1);
+});
+
+test('the record beats the search that gives up on structure', () => {
+  /* Both find two here, so the order the reader sees them in comes down to
+     what they hand back: the record, or the port object, which no longer says
+     which record it came from. */
+  const all = suggest(LIST, PORT);
+  const deep = all.find((c) => c.q.includes('.items[] | select(any('));
+  const anywhere = all.find((c) => c.why === 'anywhere');
+  assert.ok(deep.rank < anywhere.rank, `${deep.rank} should beat ${anywhere.rank}`);
+});
+
+test('a record answers for itself once it is what came back', () => {
+  /* Which is the whole point of keeping it: the port is what was searched
+     for, and .metadata.name is what says which thing has it. */
+  const q = project('.items[] | select(any(.. | objects; .containerPort? == 80))',
+    [[{ key: 'metadata' }, { key: 'name' }]], false);
+  const out = compile(q).run(LIST);
+  assert.deepStrictEqual(out.map((n) => n.v[0].r), ['a', 'b']);
+});
+
+test('a deep reading is not offered where an exact path asks the same thing', () => {
+  /* .rows[] | select(.id? == 1) looks at the same records for the same value
+     and says where it is looking. */
+  const qs = queries([{ key: 'rows' }, { index: 0 }, { key: 'id' }]);
+  assert.ok(!qs.some((q) => q.includes('any(.. | objects')), qs.join('\n'));
+});
+
+test('a container holding one member is not a list of records', () => {
+  /* .big holds .blob and nothing else, so asking which of its members holds
+     the value has one answer whatever the value is. */
+  const qs = queries([{ key: 'big' }, { key: 'blob' }]);
+  assert.ok(!qs.some((q) => q.includes('.big | with_entries(select(.value | any(')), qs.join('\n'));
 });
 
 test('a value too big to read is asked about by presence instead', () => {
@@ -189,5 +251,52 @@ test('the reading of the line itself always finds the line', () => {
     const line = all.find((c) => c.why === 'this line');
     assert.ok(line, `no path row for ${JSON.stringify(segs)}`);
     assert.strictEqual(compile(line.q).run(DOC).length, 1, `${line.q} did not resolve`);
+  }
+});
+
+/* ---- picking the output ---- */
+
+test('a picked line is named after the key it sat under', () => {
+  assert.strictEqual(project('.items[]', [[{ key: 'metadata' }, { key: 'name' }]], false),
+    '.items[] | {name: .metadata.name}');
+});
+
+test('a second pick under the same key is named by its whole path', () => {
+  const picks = [[{ key: 'metadata' }, { key: 'name' }], [{ key: 'spec' }, { key: 'name' }]];
+  assert.strictEqual(project('.items[]', picks, false),
+    '.items[] | {name: .metadata.name, "spec.name": .spec.name}');
+});
+
+test('a name that is not a bare word is quoted where it is written', () => {
+  const q = project('.items[]', [[{ key: 'app.kubernetes.io/name' }]], false);
+  assert.strictEqual(q, '.items[] | {"app.kubernetes.io/name": .["app.kubernetes.io/name"]}');
+  assert.doesNotThrow(() => compile(q));
+});
+
+test('a line reached by index alone is named by its path', () => {
+  const q = project('.[]', [[{ index: 0 }]], false);
+  assert.strictEqual(q, '.[] | {"[0]": .[0]}');
+  assert.doesNotThrow(() => compile(q));
+});
+
+test('quoting every name is what a key the parser wants for itself needs', () => {
+  /* {and: .and} is a parse error, which is the caller's cue to ask again. */
+  assert.throws(() => compile(project('.', [[{ key: 'and' }]], false)));
+  assert.doesNotThrow(() => compile(project('.', [[{ key: 'and' }]], true)));
+});
+
+test('every field of a record can be picked out of it', () => {
+  /* A pick is a line of a result, so whatever the document holds can be one,
+     and the query has to run whichever line that was. */
+  for (const segs of allPaths(LIST.v[0].v[0])) {
+    if (!segs.length) continue;
+    const q = project('.items[]', [segs], false);
+    let ran = q;
+    try {
+      compile(q);
+    } catch (e) {
+      ran = project('.items[]', [segs], true);
+    }
+    assert.doesNotThrow(() => compile(ran).run(LIST), ran);
   }
 });

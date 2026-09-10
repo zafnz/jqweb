@@ -21,6 +21,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode/utf8"
 )
 
@@ -52,6 +53,9 @@ self-contained interactive HTML page.
       --host <ip>      bind address for -p (default 127.0.0.1)
   -o, --output <file>  write the page to <file>; "-" writes to stdout
   -O, --open           open the page in the default browser
+      --simple         leave out the jq query engine, for a smaller page
+      --theme <name>   light, dark, or auto to follow the reader's system
+                       (default auto)
 
 With no -p and no -o, it listens on a random available port.
 `)
@@ -63,6 +67,8 @@ func main() {
 		output  string
 		host    string
 		open    bool
+		simple  bool
+		theme   string
 		version bool
 	)
 	flag.IntVar(&port, "p", 0, "")
@@ -72,6 +78,8 @@ func main() {
 	flag.StringVar(&host, "host", "127.0.0.1", "")
 	flag.BoolVar(&open, "open", false, "")
 	flag.BoolVar(&open, "O", false, "")
+	flag.BoolVar(&simple, "simple", false, "")
+	flag.StringVar(&theme, "theme", "auto", "")
 	flag.BoolVar(&version, "version", false, "")
 	flag.BoolVar(&version, "v", false, "")
 
@@ -86,6 +94,14 @@ func main() {
 	if version {
 		fmt.Fprintf(os.Stdout, "jqweb %s\n", releaseVersion())
 		os.Exit(0)
+	}
+
+	switch theme {
+	case "auto", "light", "dark":
+	default:
+		fmt.Fprintf(os.Stderr, "jqweb: --theme must be auto, light or dark, not %q\n", theme)
+		usage()
+		os.Exit(2)
 	}
 
 	if flag.NArg() > 1 {
@@ -132,7 +148,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	page := []byte(renderPage(data, title))
+	// The page assembly asks for what to put in rather than what to leave out,
+	// so the flag is turned round here and nowhere else.
+	page := []byte(renderPage(data, title, options{jq: !simple, theme: theme}))
 
 	if outSet {
 		if output == "-" {
@@ -179,7 +197,9 @@ func reorderArgs(args []string) []string {
 		"-o": true, "--output": true,
 		"-O": false, "--open": false,
 		"-v": false, "--version": false,
-		"--host": true,
+		"--simple": false,
+		"--theme":  true,
+		"--host":   true,
 	}
 	var flags, pos []string
 	for i := 0; i < len(args); i++ {
@@ -518,9 +538,18 @@ func lineCol(data []byte, off int64) (int, int) {
 
 // ---- page assembly ----
 
+// options are the parts of the command line that change the page rather than
+// where it goes.
+type options struct {
+	jq    bool   // inline the query engine, which --simple turns off
+	theme string // auto, light or dark
+}
+
 // renderPage embeds the document in the page as compact JSON; the script in
-// pageTemplate parses it and builds the tree in the browser.
-func renderPage(data []byte, title string) string {
+// the template parses it and builds the tree in the browser. opt.jq selects
+// the template that carries the query engine, and opt.theme is the palette the
+// page starts in, which the reader can change afterwards.
+func renderPage(data []byte, title string, opt options) string {
 	var buf bytes.Buffer
 	if err := json.Compact(&buf, data); err != nil {
 		// check has already accepted the document, so this cannot fail.
@@ -529,8 +558,9 @@ func renderPage(data []byte, title string) string {
 	}
 	return strings.NewReplacer(
 		"{{TITLE}}", html.EscapeString(title),
+		"{{PREF}}", opt.theme,
 		"{{DATA}}", scriptSafe(buf.String()),
-	).Replace(pageTemplate)
+	).Replace(pageTemplate(opt.jq))
 }
 
 // scriptSafe escapes "<" as its \u003c escape so that a string containing
@@ -540,25 +570,60 @@ func scriptSafe(s string) string {
 	return strings.ReplaceAll(s, "<", `\u003c`)
 }
 
-//go:embed web/page.html web/page.css web/core.js web/page.js
+//go:embed web/page.html web/page.css web/query.css web/theme.js web/core.js web/jq.js web/suggest.js web/query.js web/page.js
 var assets embed.FS
 
-// pageTemplate is the page shell with its stylesheet and script inlined,
-// leaving {{TITLE}} and {{DATA}} for renderPage to fill in.
-var pageTemplate = buildTemplate()
+// pageTemplate returns the page shell with its stylesheet and script inlined,
+// leaving {{TITLE}} and {{DATA}} for renderPage to fill in. A page with the
+// query engine and one without are two different scripts, so there is a
+// template for each, built the first time it is wanted.
+func pageTemplate(jq bool) string {
+	if jq {
+		return withJQ()
+	}
+	return withoutJQ()
+}
 
-func buildTemplate() string {
+var withJQ = sync.OnceValue(func() string { return buildTemplate(true) })
+var withoutJQ = sync.OnceValue(func() string { return buildTemplate(false) })
+
+func buildTemplate(jq bool) string {
 	return strings.NewReplacer(
-		"{{STYLE}}", inline("web/page.css"),
-		"{{SCRIPT}}", script(),
+		"{{STYLE}}", style(jq),
+		"{{HEAD}}", stripComments(inline("web/theme.js")),
+		"{{SCRIPT}}", script(jq),
 	).Replace(asset("web/page.html"))
 }
 
-// script returns the page's JavaScript: the pure core, then the DOM wiring
-// that drives it. The comments in those files are written for someone reading
-// the source, and are not worth inlining into every rendered page.
-func script() string {
-	return stripComments(inline("web/core.js")) + "\n" + stripComments(inline("web/page.js"))
+// style returns the page's CSS. query.css styles what only a page with the
+// query engine has, so it goes in only alongside it.
+func style(jq bool) string {
+	if !jq {
+		return inline("web/page.css")
+	}
+	return inline("web/page.css") + "\n" + inline("web/query.css")
+}
+
+// script returns the page's JavaScript: the pure core, then the query engine
+// and the search box wiring that drives it unless --simple left them out, then
+// the rest of the page. query.js has to precede page.js, which calls into it.
+//
+// The comments in those files are written for someone reading the source, and
+// are not worth inlining into every rendered page.
+func script(jq bool) string {
+	parts := []string{"web/core.js"}
+	if jq {
+		parts = append(parts, "web/jq.js", "web/suggest.js", "web/query.js")
+	}
+	parts = append(parts, "web/page.js")
+	var b strings.Builder
+	for i, name := range parts {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		b.WriteString(stripComments(inline(name)))
+	}
+	return b.String()
 }
 
 // stripComments removes /* ... */ comments, and the lines left empty by

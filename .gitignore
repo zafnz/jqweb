@@ -35,6 +35,8 @@ simple.json
 simple.html
 large.json
 large.html
+wiki-rest.json
+wiki-rest.html
 jqweb
 # GoReleaser
 dist/

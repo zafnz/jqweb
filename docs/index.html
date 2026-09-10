@@ -1,108 +1,259 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-pref="auto">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>wikipedia-reset-spec.json &middot; jqweb</title>
 <style>
-:root { color-scheme: dark; }
+:root {
+  color-scheme: dark;
+  --bg: #101114;
+  --fg: #d4d7dd;
+  --head-bg: #17191d;
+  --head-border: #26292f;
+  --muted: #8a9199;
+  --dim: #7d848d;
+  --btn-bg: #22252b;
+  --btn-border: #33373f;
+  --btn-hover: #2a2e35;
+  --field-bg: #101114;
+  --focus: #4a90d9;
+  --row-hover: rgba(255,255,255,.045);
+  --rule: #24272c;
+  --key: #6cb6ff;
+  --str: #57d364;
+  --bracket: #eceef2;
+  --ok: #57d364;
+  --fail: #e5534b;
+  --hit: rgba(210,168,60,.16);
+  --icon: #5e6670;
+  --icon-chip: rgba(255,255,255,.12);
+  --menu-bg: #1b1e23;
+  --menu-on: #2b3038;
+  --menu-hover: #262a31;
+  --menu-shadow: rgba(0,0,0,.45);
+  --gutter: #5c636d;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #fbfbfa;
+  --fg: #24292f;
+  --head-bg: #f1f1ee;
+  --head-border: #dcdcd6;
+  --muted: #6a737d;
+  --dim: #8a8f96;
+  --btn-bg: #ffffff;
+  --btn-border: #cfcfc8;
+  --btn-hover: #eeeee9;
+  --field-bg: #ffffff;
+  --focus: #0969da;
+  --row-hover: rgba(0,0,0,.05);
+  --rule: #e3e3dd;
+  --key: #0550ae;
+  --str: #0a7d32;
+  --bracket: #1f2328;
+  --ok: #1a7f37;
+  --fail: #cf222e;
+  --hit: rgba(226,178,39,.32);
+  --icon: #8a9199;
+  --icon-chip: rgba(0,0,0,.09);
+  --menu-bg: #ffffff;
+  --menu-on: #dceafb;
+  --menu-hover: #f2f2ee;
+  --menu-shadow: rgba(0,0,0,.18);
+  --gutter: #9a9a94;
+}
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 body {
-  background: #101114; color: #d4d7dd;
+  background: var(--bg); color: var(--fg);
   font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
 header {
   position: sticky; top: 0; z-index: 5;
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  padding: 8px 14px; background: #17191d; border-bottom: 1px solid #26292f;
+  padding: 8px 14px; background: var(--head-bg); border-bottom: 1px solid var(--head-border);
 }
-header .name { color: #8a9199; margin-right: 4px; }
+header .name { color: var(--muted); margin-right: 4px; }
 header button {
-  font: inherit; color: #d4d7dd; background: #22252b;
-  border: 1px solid #33373f; border-radius: 4px; padding: 3px 10px; cursor: pointer;
+  font: inherit; color: var(--fg); background: var(--btn-bg);
+  border: 1px solid var(--btn-border); border-radius: 4px; padding: 3px 10px; cursor: pointer;
 }
-header button:hover { background: #2a2e35; }
+header button:hover { background: var(--btn-hover); }
+#fold { margin-left: auto; }
+#theme { padding: 3px 9px; }
+.qwrap { position: relative; flex: 1 1 220px; min-width: 220px; }
 #q {
-  font: inherit; flex: 1 1 220px; max-width: 420px; color: inherit;
-  background: #101114; border: 1px solid #33373f; border-radius: 4px;
+  font: inherit; width: 100%; color: inherit;
+  background: var(--field-bg); border: 1px solid var(--btn-border); border-radius: 4px;
   padding: 4px 9px; outline: none;
 }
-#q:focus { border-color: #4a90d9; }
-#stats { color: #8a9199; }
+#q:focus { border-color: var(--focus); }
+#q::-webkit-search-cancel-button {
+  -webkit-appearance: none; appearance: none;
+  height: 1.4em; width: 1.4em; margin-left: 4px; cursor: pointer; opacity: .5;
+  background:
+    linear-gradient(45deg, transparent 44%, currentColor 44%, currentColor 56%, transparent 56%),
+    linear-gradient(-45deg, transparent 44%, currentColor 44%, currentColor 56%, transparent 56%);
+  background-size: .78em .78em; background-position: center; background-repeat: no-repeat;
+}
+#q::-webkit-search-cancel-button:hover { opacity: 1; }
+#stats { color: var(--muted); }
 main { padding: 10px 14px 60px; }
 
 .line { white-space: pre-wrap; word-break: break-word; border-radius: 3px; }
-.line:hover { background: rgba(255,255,255,.045); }
+.line:hover { background: var(--row-hover); }
 .toggle, .sp { display: inline-block; width: 1.15em; }
 .toggle {
   background: none; border: none; padding: 0; margin: 0;
-  color: #7d848d; cursor: pointer; font: inherit; text-align: left;
+  color: var(--dim); cursor: pointer; font: inherit; text-align: left;
 }
 .toggle::before { content: "\25BE"; }
 .node.collapsed > .line > .toggle::before { content: "\25B8"; }
-.kids { margin-left: .55em; padding-left: .8em; border-left: 1px solid #24272c; }
+.kids { margin-left: .55em; padding-left: .8em; border-left: 1px solid var(--rule); }
 .closer { padding-left: 1.15em; }
 .node.collapsed > .kids, .node.collapsed > .closer { display: none; }
 .node:not(.collapsed) > .line > .fold { display: none; }
-.fold { color: #7d848d; cursor: pointer; }
+.fold { color: var(--dim); cursor: pointer; }
 
-.key { color: #6cb6ff; font-weight: 600; }
-.str { color: #57d364; }
-.num { color: #d4d7dd; }
-.bool { color: #d4d7dd; font-weight: 600; }
-.null { color: #8a9199; font-weight: 600; }
-.p { color: #eceef2; font-weight: 600; }
-.pn { color: #d4d7dd; }
-.c { color: #8a9199; }
+.key { color: var(--key); font-weight: 600; }
+.str { color: var(--str); }
+.num { color: var(--fg); }
+.bool { color: var(--fg); font-weight: 600; }
+.null { color: var(--muted); font-weight: 600; }
+.p { color: var(--bracket); font-weight: 600; }
+.pn { color: var(--fg); }
+.c { color: var(--muted); }
 
-.cp {
-  background: none; border: none; padding: 0 5px;
-  font: inherit; font-size: .92em; color: #8a9199; cursor: pointer; opacity: .35;
+.cp, .fq {
+  background: none; border: none; border-radius: 3px; padding: 1px 4px;
+  font: inherit; font-size: .92em; color: var(--icon); cursor: pointer;
 }
-.line:hover .cp, .cp:focus { opacity: 1; }
-.cp.ok { color: #57d364; opacity: 1; }
-.cp.fail { color: #e5534b; opacity: 1; }
+.fq { margin-left: 1px; }
+.line:hover .cp, .line:hover .fq { color: var(--muted); }
+.cp:hover, .fq:hover, .cp:focus, .fq:focus {
+  color: var(--fg); background: var(--icon-chip); outline: none;
+}
+.cp:focus-visible, .fq:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; }
+.cp.ok { color: var(--ok); }
+.cp.fail { color: var(--fail); }
 
 .node.hidden { display: none; }
-.node.hit > .line { background: rgba(210,168,60,.16); }
+.node.hit > .line { background: var(--hit); }
+#q.bad, #q.bad:focus { border-color: var(--fail); }
+
+#fault {
+  position: absolute; z-index: 10; top: calc(100% + 4px); left: 0; width: 100%;
+  background: var(--menu-bg); border: 1px solid var(--fail); border-radius: 4px;
+  padding: 4px 8px; color: var(--fail); box-shadow: 0 6px 20px var(--menu-shadow);
+}
+#mode {
+  font: inherit; color: var(--fg); background: var(--btn-bg);
+  border: 1px solid var(--btn-border); border-radius: 4px; padding: 3px 4px; cursor: pointer;
+}
+
+#suggest {
+  position: absolute; z-index: 10; top: calc(100% + 4px); left: 0;
+  width: 100%;
+  background: var(--menu-bg); border: 1px solid var(--btn-border); border-radius: 4px;
+  padding: 3px; box-shadow: 0 6px 20px var(--menu-shadow);
+  max-height: 60vh; overflow-y: auto;
+}
+.sg { display: flex; align-items: stretch; border-radius: 3px; }
+.sg.on { background: var(--menu-on); }
+.sg:hover { background: var(--menu-hover); }
+.sgq {
+  font: inherit; color: var(--fg); background: none; border: none; cursor: pointer;
+  flex: 1; display: flex; gap: 18px; align-items: baseline;
+  justify-content: space-between; text-align: left; padding: 3px 6px;
+}
+.sgt { white-space: pre-wrap; word-break: break-all; }
+.sgn { color: var(--muted); white-space: nowrap; }
+.sg.on .sgn { color: var(--fg); }
+.sgc {
+  font: inherit; color: var(--icon); background: none; border: none;
+  border-radius: 3px; cursor: pointer; padding: 3px 6px;
+}
+.sg:hover .sgc { color: var(--muted); }
+.sgc:hover, .sgc:focus { color: var(--fg); background: var(--icon-chip); outline: none; }
+.sgc:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; }
+.sgc.ok { color: var(--ok); }
+.sgc.fail { color: var(--fail); }
+
+.result { position: relative; padding-left: 2.6em; margin-bottom: 3px; }
+.result::before {
+  content: attr(data-n);
+  position: absolute; left: 0; width: 2em;
+  text-align: right; color: var(--gutter);
+}
+#results.one .result { padding-left: 0; }
+#results.one .result::before { content: none; }
 </style>
+<script>
+var jqtheme = (function () {
+  'use strict';
+  var KEY = 'jqweb-theme';
+  var ORDER = ['auto', 'light', 'dark'];
+  var root = document.documentElement;
+  var light = window.matchMedia('(prefers-color-scheme: light)');
+  var pref = root.getAttribute('data-pref') || 'auto';
+  try {
+    pref = localStorage.getItem(KEY) || pref;
+  } catch (e) {  }
+  if (ORDER.indexOf(pref) < 0) pref = 'auto';
+  function paint() {
+    root.setAttribute('data-theme', pref === 'auto' ? (light.matches ? 'light' : 'dark') : pref);
+    root.setAttribute('data-pref', pref);
+  }
+  function cycle() {
+    pref = ORDER[(ORDER.indexOf(pref) + 1) % ORDER.length];
+    try {
+      localStorage.setItem(KEY, pref);
+    } catch (e) {  }
+    paint();
+    return pref;
+  }
+  if (light.addEventListener) {
+    light.addEventListener('change', function () { if (pref === 'auto') paint(); });
+  }
+  paint();
+  return { cycle: cycle, current: function () { return pref; } };
+})();
+</script>
 </head>
 <body>
 <header>
   <span class="name">jqweb &middot; wikipedia-reset-spec.json</span>
-  <button id="expand" type="button">Expand all</button>
-  <button id="collapse" type="button">Collapse all</button>
-  <input id="q" type="search" placeholder="Filter keys and values, or paste a path (press /)" autocomplete="off" spellcheck="false">
+  <select id="mode" title="How to read what you type" hidden>
+    <option value="auto">Auto</option>
+    <option value="filter">Text</option>
+    <option value="jq">jq</option>
+  </select>
+  <div class="qwrap">
+    <input id="q" type="search" placeholder="Text to find, or paste a path (press /)" autocomplete="off" spellcheck="false">
+    <div id="suggest" hidden></div>
+    <div id="fault" hidden></div>
+  </div>
   <span id="stats"></span>
+  <button id="fold" type="button">Collapse all</button>
+  <button id="theme" type="button"></button>
 </header>
-<main id="tree"></main>
+<main>
+  <div id="tree"></div>
+  <div id="results" hidden></div>
+</main>
 <script id="data" type="application/json">{"openapi":"3.0.1","info":{"version":"1.0.0","title":"Wikimedia REST API","description":"This API provides cacheable and straightforward access to Wikimedia content and data, in machine-readable formats.\n\nCaution: The REST Sandbox executes calls against the production database by default. To avoid unintended edits to live content, select the sandbox server (test.wikimedia.org) from the server dropdown before making POST, PUT, PATCH, or DELETE requests.\n### Global Rules\n- Limit your clients to no more than 200 requests/s to this API.\n  Each API endpoint's documentation may detail more specific usage limits.\n- Set a unique `User-Agent` or `Api-User-Agent` header that\n  allows us to contact you quickly. Email addresses or URLs\n  of contact pages work well.\n\nBy using this API, you agree to Wikimedia's [Terms of Use](https://wikimediafoundation.org/wiki/Terms_of_Use) and [Privacy Policy](https://wikimediafoundation.org/wiki/Privacy_policy). Unless otherwise specified in the endpoint documentation below, content accessed via this API is licensed under the [CC-BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) and [GFDL](https://www.gnu.org/copyleft/fdl.html) licenses, and you irrevocably agree to release modifications or additions made through this API under these licenses. Check the [Wikimedia REST API documentation](https://www.mediawiki.org/wiki/Wikimedia_REST_API) for background and details.\n### Endpoint documentation\nPlease consult each endpoint's documentation for details on:\n- Licensing information for the specific type of content\n  and data served via the endpoint.\n- Stability markers to inform you about development status and\n  change policy, according to\n  [our API version policy](https://www.mediawiki.org/wiki/API_versioning).\n- Endpoint specific usage limits.\n","termsOfService":"https://wikimediafoundation.org/wiki/Terms_of_Use","contact":{"name":"the Wikimedia Services team","url":"http://mediawiki.org/wiki/Wikimedia_REST_API"},"license":{"name":"Apache2","url":"http://www.apache.org/licenses/LICENSE-2.0"}},"x-host-basePath":"/api/rest_v1","paths":{"/page/":{"get":{"tags":["Page content"],"summary":"List page-related API entry points.","description":"Stability: [stable](https://www.mediawiki.org/wiki/API_versioning#Stable)\n","responses":{"200":{"description":"A list of page-related API end points.","content":{"application/json":{"schema":{"$ref":"#/components/schemas/listing"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/page/title/{title}":{"get":{"tags":["Page content"],"summary":"Get revision metadata for a title.","description":"Returns the revision metadata for the given title. If a revision ID is provided,\nmetadata for that revision is returned, otherwise the latest revision ID is assumed.\n\nStability: [stable](https://www.mediawiki.org/wiki/API_versioning#Stable).\n","parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"The latest revision metadata for the provided title.","content":{"application/json":{"schema":{"$ref":"#/components/schemas/revision"}}}},"301":{"description":"A permanent redirect is returned if the supplied article title was not in the normalized form.\nTo avoid these redirects, you can use the [mediawiki-title](https://github.com/wikimedia/mediawiki-title) library to perform\ntitle normalization client side.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"302":{"description":"The page is a [redirect page](https://www.mediawiki.org/wiki/Help:Redirects).\nThe `location` header points to the redirect target.\nIf you would like to avoid automatically following redirect pages, set the `redirect=false` query parameter.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"404":{"description":"Unknown page title or no revisions found.","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":true,"x-amples":[{"title":"Get rev by title from storage","request":{"params":{"domain":"en.wikipedia.org","title":"User:BSitzmann_(WMF)/MCS/Test/Frankenstein"}},"response":{"status":200,"headers":{"etag":"/.+/","content-type":"application/json"},"body":{"items":[{"title":"User:BSitzmann_(WMF)/MCS/Test/Frankenstein","rev":"/\\d+/","tid":"/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/","comment":"/.*/","page_language":"en"}]}}}]}},"/page/title/{title}/{revision}":{"get":{"tags":["Page content"],"summary":"Get revision metadata for a title.","description":"Returns the revision metadata for the given title. If a revision ID is provided,\nmetadata for that revision is returned, otherwise the latest revision ID is assumed.\n\nStability: [stable](https://www.mediawiki.org/wiki/API_versioning#Stable).\n","parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}},{"name":"revision","in":"path","description":"The revision id","required":true,"schema":{"type":"integer"}}],"responses":{"200":{"description":"The latest revision metadata for the provided title.","content":{"application/json":{"schema":{"$ref":"#/components/schemas/revision"}}}},"301":{"description":"A permanent redirect is returned if the supplied article title was not in the normalized form.\nTo avoid these redirects, you can use the [mediawiki-title](https://github.com/wikimedia/mediawiki-title) library to perform\ntitle normalization client side.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"302":{"description":"The page is a [redirect page](https://www.mediawiki.org/wiki/Help:Redirects).\nThe `location` header points to the redirect target.\nIf you would like to avoid automatically following redirect pages, set the `redirect=false` query parameter.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"404":{"description":"Unknown page title or no revisions found.","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false,"x-amples":[{"title":"Get rev by title from storage","request":{"params":{"domain":"en.wikipedia.org","title":"User:BSitzmann_(WMF)/MCS/Test/Frankenstein"}},"response":{"status":200,"headers":{"etag":"/.+/","content-type":"application/json"},"body":{"items":[{"title":"User:BSitzmann_(WMF)/MCS/Test/Frankenstein","rev":"/\\d+/","tid":"/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/","comment":"/.*/","page_language":"en"}]}}}]}},"/page/html/{title}":{"get":{"tags":["Page content"],"summary":"Get latest HTML for a title.","description":"Stability: [stable](https://www.mediawiki.org/wiki/API_versioning#Stable)\n","parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}},{"name":"redirect","in":"query","description":"Requests for [redirect pages](https://www.mediawiki.org/wiki/Help:Redirects) return HTTP 302 with a redirect target in `Location` header and content in the body.\nTo get a 200 response instead, supply `false` to the `redirect` parameter.\n","schema":{"type":"boolean"},"required":false},{"name":"stash","in":"query","description":"Whether to temporary stash data-parsoid metadata in order to support transforming the\nmodified content later. If this parameter is set, requests are rate-limited on\na per-client basis (max 5 requests per second per client)\n","schema":{"type":"boolean"}},{"name":"Accept-Language","in":"header","description":"The desired language variant code for wikis where LanguageConverter is enabled. Example: `sr-el` for Latin transcription of the Serbian language.\n","schema":{"type":"string"}}],"responses":{"200":{"description":"The latest HTML for the given page title.\n\nSee [the MediaWiki DOM\nspec](https://www.mediawiki.org/wiki/Parsoid/MediaWiki_DOM_spec) for a\ndescription of the MediaWiki-specific semantic markup in this HTML.\nNote that additional metadata is available in the HTML head.\n","headers":{"ETag":{"description":"ETag header indicating the revision and render timeuuid\nseparated by a slash:\n\"701384379/154d7bca-c264-11e5-8c2f-1b51b33b59fc\"\nThis ETag can be passed to the HTML save end point (as\n`base_etag` POST parameter), and can also be used to retrieve\nthe exact corresponding data-parsoid metadata, by requesting\nthe specific `revision` and `tid` indicated by the `ETag`.\n","schema":{"type":"string"}}},"content":{"text/html; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/HTML/2.1.0\"":{"schema":{"type":"string"}},"application/json":{"schema":{"type":"object"}}}},"301":{"description":"A permanent redirect is returned if the supplied article title was not in the normalized form.\nTo avoid this kind of redirect, you can use the [mediawiki-title](https://github.com/wikimedia/mediawiki-title) library to perform\ntitle normalization client-side.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"302":{"description":"The page is a [redirect page](https://www.mediawiki.org/wiki/Help:Redirects).\nThe `location` header points to the redirect target, and the body contains the actual page contents as HTML.\nIf you would like to avoid automatically following redirect pages, set the `redirect=false` query parameter.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"404":{"description":"Unknown page title","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":true,"x-amples":[{"title":"Get html by title from storage","request":{"params":{"domain":"en.wikipedia.org","title":"User:BSitzmann_(WMF)/MCS/Test/Frankenstein"}},"response":{"status":200,"headers":{"etag":"/.+/","content-type":"/^text\\/html.+/"},"body":"/^\u003c!DOCTYPE html>.*/"}}]}},"/page/html/{title}/{revision}":{"get":{"tags":["Page content"],"summary":"Get HTML for a specific title/revision & optionally timeuuid.","description":"Stability: [stable](https://www.mediawiki.org/wiki/API_versioning#Stable)\n","operationId":"getFormatRevision","parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}},{"name":"revision","in":"path","description":"The revision","required":true,"schema":{"type":"integer"}},{"name":"redirect","in":"query","description":"Requests for [redirect pages](https://www.mediawiki.org/wiki/Help:Redirects) return HTTP 302 with a redirect target in `Location` header and content in the body.\nTo get a 200 response instead, supply `false` to the `redirect` parameter.\n","schema":{"type":"boolean"}},{"name":"stash","in":"query","description":"Whether to temporary stash data-parsoid metadata in order to support transforming the\nmodified content later. If this parameter is set, requests are rate-limited on\na per-client basis (max 5 requests per second per client)\n","schema":{"type":"boolean"}},{"name":"Accept-Language","in":"header","description":"The desired language variant code for wikis where LanguageConverter is enabled. Example: `sr-el` for Latin transcription of the Serbian language.\n","schema":{"type":"string"}}],"responses":{"200":{"description":"The html for the given page, revision and tid.\n\nSee [the MediaWiki DOM\nspec](https://www.mediawiki.org/wiki/Parsoid/MediaWiki_DOM_spec) for a\ndescription of the MediaWiki-specific semantic markup in this HTML.\nNote that additional metadata is available in the HTML head.\n\nThis HTML can be edited using arbitrary HTML tools. The modified HTML\ncan be converted back to wikitext using the\n[/transform/html/to/wikitext{/title}{/revision}](#!/Transforms/transform_html_to_wikitext__title___revision__post)\nentry point.\n","headers":{"ETag":{"description":"ETag header indicating the revision and render timeuuid\nseparated by a slash:\n\"701384379/154d7bca-c264-11e5-8c2f-1b51b33b59fc\"\nThis ETag can be passed to the HTML save end point (as\n`base_etag` POST parameter), and can also be used to retrieve\nthe exact corresponding data-parsoid metadata, by requesting\nthe specific `revision` and `tid` indicated by the `ETag`.\n","schema":{"type":"string"}}},"content":{"text/html; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/HTML/2.1.0\"":{"schema":{"type":"string"}},"application/json":{"schema":{"type":"object"}}}},"301":{"description":"A permanent redirect is returned if the supplied article title was not in the normalized form.\nTo avoid this kind of redirect, you can use the [mediawiki-title](https://github.com/wikimedia/mediawiki-title) library to perform\ntitle normalization client-side.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"302":{"description":"The page is a [redirect page](https://www.mediawiki.org/wiki/Help:Redirects).\nThe `location` header points to the redirect target, and the body contains the actual page revision contents as HTML.\nIf you would like to avoid automatically following redirect pages, set the `redirect=false` query parameter.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"400":{"description":"Invalid revision or tid","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"403":{"description":"Access to the specific revision is restricted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"404":{"description":"Unknown page, revision or tid","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/page/lint/{title}":{"get":{"tags":["Page content"],"summary":"Get the linter errors for a specific title/revision.","description":"Stability: [experimental](https://www.mediawiki.org/wiki/API_versioning#Experimental)\n","parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"The lint errors for the given page and optionally revision.\n\nSee [the Linter extension docs](https://www.mediawiki.org/wiki/Extension:Linter) for more\ndetails.\n","content":{"application/json":{"schema":{"type":"object"}}}},"301":{"description":"A permanent redirect is returned if the supplied article title was not in the normalized form.\nTo avoid this kind of redirect, you can use the [mediawiki-title](https://github.com/wikimedia/mediawiki-title) library to perform\ntitle normalization client-side.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"302":{"description":"The page is a [redirect page](https://www.mediawiki.org/wiki/Help:Redirects).\nThe `location` header points to the redirect target, and the body contains the actual page revision contents as HTML.\nIf you would like to avoid automatically following redirect pages, set the `redirect=false` query parameter.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"400":{"description":"Invalid revision or tid","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"403":{"description":"Access to the specific revision is restricted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"404":{"description":"Unknown page, revision or tid","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/page/lint/{title}/{revision}":{"get":{"tags":["Page content"],"summary":"Get the linter errors for a specific title/revision.","description":"Stability: [experimental](https://www.mediawiki.org/wiki/API_versioning#Experimental)\n","parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}},{"name":"revision","in":"path","description":"The revision","required":true,"schema":{"type":"integer"}}],"responses":{"200":{"description":"The lint errors for the given page and optionally revision.\n\nSee [the Linter extension docs](https://www.mediawiki.org/wiki/Extension:Linter) for more\ndetails.\n","content":{"application/json":{"schema":{"type":"object"}}}},"301":{"description":"A permanent redirect is returned if the supplied article title was not in the normalized form.\nTo avoid this kind of redirect, you can use the [mediawiki-title](https://github.com/wikimedia/mediawiki-title) library to perform\ntitle normalization client-side.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"302":{"description":"The page is a [redirect page](https://www.mediawiki.org/wiki/Help:Redirects).\nThe `location` header points to the redirect target, and the body contains the actual page revision contents as HTML.\nIf you would like to avoid automatically following redirect pages, set the `redirect=false` query parameter.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"400":{"description":"Invalid revision or tid","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"403":{"description":"Access to the specific revision is restricted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"404":{"description":"Unknown page, revision or tid","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/page/summary/{title}":{"get":{"tags":["Page content"],"summary":"Get basic metadata and simplified article introduction.","description":"The summary response includes an extract of the first paragraph of the page in plain text\nand HTML as well as the type of page. This is useful for page previews (fka. Hovercards,\naka. Popups) on the web and link previews in the apps.\n\nStability: [stable](https://www.mediawiki.org/wiki/Wikimedia_Product/Wikimedia_Product_Infrastructure_team/API_endpoint_stability_policy#Stable)\n\nPlease follow [wikitech-l](https://lists.wikimedia.org/mailman/listinfo/wikitech-l) or [mediawiki-api-announce](https://lists.wikimedia.org/mailman/listinfo/mediawiki-api-announce) for announcements of breaking changes.\n","parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}},{"name":"redirect","in":"query","description":"Requests for [redirect pages](https://www.mediawiki.org/wiki/Help:Redirects) return HTTP 302 with a redirect target in `Location` header and content in the body.\nTo get a 200 response instead, supply `false` to the `redirect` parameter.\n","schema":{"type":"boolean"}},{"name":"Accept-Language","in":"header","description":"The desired language variant code for wikis where LanguageConverter is enabled. Example: `sr-el` for Latin transcription of the Serbian language.\n","schema":{"type":"string"}}],"responses":{"200":{"description":"The summary for the given page","headers":{"ETag":{"description":"Syntax: \"{revision}/{tid}\". Example: \"701384379/154d7bca-c264-11e5-8c2f-1b51b33b59fc\"\n","schema":{"type":"string"}}},"content":{"application/json; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/Summary/1.4.2\"":{"schema":{"$ref":"#/components/schemas/summary"}}}},"301":{"description":"A permanent redirect is returned if the supplied article title was not in the normalized form.\nTo avoid this kind of redirect, you can use the [mediawiki-title](https://github.com/wikimedia/mediawiki-title) library to perform\ntitle normalization client-side.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"302":{"description":"The page is a [redirect page](https://www.mediawiki.org/wiki/Help:Redirects).\nThe `location` header points to the redirect target.\nIf you would like to avoid automatically following redirect pages, set the `redirect=false` query parameter.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"404":{"description":"Unknown page title","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":true,"x-amples":[{"title":"Get summary from storage","request":{"params":{"domain":"en.wikipedia.org","title":"San_Francisco"}},"response":{"status":200,"headers":{"etag":"/.+/","content-type":"/^application\\/json/"},"body":{"extract":"/.+/","extract_html":"/.+/","thumbnail":{"source":"/^https:/"},"originalimage":{"source":"/^https:/"},"lang":"en","dir":"ltr","description":"/.+/"}}}]}},"/page/media-list/{title}":{"get":{"tags":["Page content"],"summary":"Get list of media files used on a page.","description":"Gets the list of media items (images, audio, and video) in the order in which they appear on a\ngiven wiki page.\n\nStability: [unstable](https://www.mediawiki.org/wiki/Wikimedia_Product/Wikimedia_Product_Infrastructure_team/API_endpoint_stability_policy#Unstable)\n\nPlease follow [wikitech-l](https://lists.wikimedia.org/mailman/listinfo/wikitech-l) or [mediawiki-api-announce](https://lists.wikimedia.org/mailman/listinfo/mediawiki-api-announce) for announcements of breaking changes.\n","parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}},{"name":"redirect","in":"query","description":"Requests for [redirect pages](https://www.mediawiki.org/wiki/Help:Redirects) return HTTP 302 with a redirect target in `Location` header and content in the body.\nTo get a 200 response instead, supply `false` to the `redirect` parameter.\n","schema":{"type":"boolean"}}],"responses":{"200":{"description":"JSON containing metadata of media items appearing on the given page.","headers":{"ETag":{"description":"Syntax: \"{revision}/{tid}\". Example: \"701384379/154d7bca-c264-11e5-8c2f-1b51b33b59fc\"\n","schema":{"type":"string"}}},"content":{"application/json; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/Media/1.3.1\"":{"schema":{"$ref":"#/components/schemas/media_list"}}}},"301":{"description":"A permanent redirect is returned if the supplied article title was not in the normalized form.\nTo avoid this kind of redirect, you can use the [mediawiki-title](https://github.com/wikimedia/mediawiki-title) library to perform\ntitle normalization client-side.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"302":{"description":"The page is a [redirect page](https://www.mediawiki.org/wiki/Help:Redirects).\nThe `location` header points to the redirect target.\nIf you would like to avoid automatically following redirect pages, set the `redirect=false` query parameter.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"404":{"description":"Unknown page title","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"operationId":"getContent-media-list","x-monitor":true,"x-amples":[{"title":"Get media-list from storage","request":{"params":{"domain":"en.wikipedia.org","title":"User:BSitzmann_(WMF)/MCS/Test/Frankenstein"}},"response":{"status":200,"headers":{"etag":"/.+/","content-type":"/^application\\/json/"},"body":{"revision":"/\\d+/","tid":"/.+/","items":[{"type":"/.+/","section_id":"/\\d+/","showInGallery":"/.+/"}]}}}]}},"/page/media-list/{title}/{revision}":{"get":{"tags":["Page content"],"summary":"Get list of media files used on a page.","description":"Gets the list of media items (images, audio, and video) in the order in which they appear on a\ngiven wiki page.\n\nStability: [unstable](https://www.mediawiki.org/wiki/Wikimedia_Product/Wikimedia_Product_Infrastructure_team/API_endpoint_stability_policy#Unstable)\n\nPlease follow [wikitech-l](https://lists.wikimedia.org/mailman/listinfo/wikitech-l) or [mediawiki-api-announce](https://lists.wikimedia.org/mailman/listinfo/mediawiki-api-announce) for announcements of breaking changes.\n","parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}},{"name":"revision","in":"path","description":"Optional page revision. Note that older revisions are not stored, so request latency with the revision would be higher.\n","required":true,"schema":{"type":"integer"}},{"name":"redirect","in":"query","description":"Requests for [redirect pages](https://www.mediawiki.org/wiki/Help:Redirects) return HTTP 302 with a redirect target in `Location` header and content in the body.\nTo get a 200 response instead, supply `false` to the `redirect` parameter.\n","schema":{"type":"boolean"}}],"responses":{"200":{"description":"JSON containing metadata of media items appearing on the given page.","headers":{"ETag":{"description":"Syntax: \"{revision}/{tid}\". Example: \"701384379/154d7bca-c264-11e5-8c2f-1b51b33b59fc\"\n","schema":{"type":"string"}}},"content":{"application/json; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/Media/1.3.1\"":{"schema":{"$ref":"#/components/schemas/media_list"}}}},"301":{"description":"A permanent redirect is returned if the supplied article title was not in the normalized form.\nTo avoid this kind of redirect, you can use the [mediawiki-title](https://github.com/wikimedia/mediawiki-title) library to perform\ntitle normalization client-side.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"302":{"description":"The page is a [redirect page](https://www.mediawiki.org/wiki/Help:Redirects).\nThe `location` header points to the redirect target.\nIf you would like to avoid automatically following redirect pages, set the `redirect=false` query parameter.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"404":{"description":"Unknown page title","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"operationId":"getContentWithRevision-media-list","x-monitor":false,"x-amples":[{"title":"Get media-list from storage","request":{"params":{"domain":"en.wikipedia.org","title":"User:BSitzmann_(WMF)/MCS/Test/Frankenstein"}},"response":{"status":200,"headers":{"etag":"/.+/","content-type":"/^application\\/json/"},"body":{"revision":"/\\d+/","tid":"/.+/","items":[{"type":"/.+/","section_id":"/\\d+/","showInGallery":"/.+/"}]}}}]}},"/page/mobile-html/{title}":{"get":{"tags":["Page content"],"summary":"Get page content HTML optimized for mobile consumption.","description":"Gets the content HTML optimized for mobile consumption for the given page. This content\nis derived from Parsoid HTML (see `/page/html/{title}` endpoint).\nThe difference to Parsoid HTML is roughly:\n* Some elements and attributes not needed for the reading case are removed.\n* LeadIntroductionTransform: The introductory paragraph is moved before an infobox.\n* RedLinks: Red links are flattened (=turned into span elements).\n* WidenImage: images that should be displayed in gallery are widened.\n* Section headings are slightly changed by wrapping the headings inside a div and adding\n  a span element inside the new div for the edit buttons.\n* Additional classes are added to img elements to fix issues with non-white backgrounds.\n  See Theme support below for instructions on how to enable that.\n* Pagelib CSS files needed to display the content are referenced.\n* LazyLoadTransform: server-side portion/prep for lazy loading of images.\n* CollapseTable: server-side portion/prep for collapsing tables.\n\nWhat's not included? What parts of the PageLibrary does a client still have to do?\n* Theme support: Themes can be turned on by adding a theme class to the root \u003chtml> tag.\n  Possible class names are:\n  * `pagelib_theme_default`\n  * `pagelib_theme_dark`\n  * `pagelib_theme_black`\n  * `pagelib_theme_sepia`\n\n  The pagelib JS has functionality to do that: ThemeTransform.setTheme(document, theme).\n* Dim images: DimImagesTransform.dim(window, enable)\n* PlatformTransform.classify(window) to trigger Android and iOS app specific CSS rules\n* LazyLoadTransformer: client side companion of LazyLoadTransform (note the extra *er*\nhere)\n* FooterTransformer: seems to be more UI than content, requires I18N, too\n\nStability: [experimental](https://www.mediawiki.org/wiki/API_versioning#Experimental)\n","parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}},{"name":"redirect","in":"query","description":"Requests for [redirect pages](https://www.mediawiki.org/wiki/Help:Redirects) return HTTP 302 with a redirect target in `Location` header and content in the body.\nTo get a 200 response instead, supply `false` to the `redirect` parameter.\n","schema":{"type":"boolean"}}],"responses":{"200":{"description":"mobile-optimized HTML of the given page.","headers":{"ETag":{"description":"Syntax: \"{revision}/{tid}\". Example: \"701384379/154d7bca-c264-11e5-8c2f-1b51b33b59fc\"\n","schema":{"type":"string"}}},"content":{"text/html; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/Mobile-HTML/1.2.2\"":{"schema":{"type":"string"}}}},"301":{"description":"A permanent redirect is returned if the supplied article title was not in the normalized form.\nTo avoid this kind of redirect, you can use the [mediawiki-title](https://github.com/wikimedia/mediawiki-title) library to perform\ntitle normalization client-side.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"302":{"description":"The page is a [redirect page](https://www.mediawiki.org/wiki/Help:Redirects).\nThe `location` header points to the redirect target.\nIf you would like to avoid automatically following redirect pages, set the `redirect=false` query parameter.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"404":{"description":"Unknown page title","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"operationId":"getContent-mobile-html","x-monitor":true,"x-amples":[{"title":"Get mobile-html from storage","request":{"params":{"domain":"en.wikipedia.org","title":"User:BSitzmann_(WMF)/MCS/Test/Frankenstein"}},"response":{"status":200,"headers":{"etag":"/.+/","content-type":"/^text\\/html.+/"},"body":"/^\u003c!DOCTYPE html>.*/"}}]}},"/page/mobile-html/{title}/{revision}":{"get":{"tags":["Page content"],"summary":"Get page content HTML optimized for mobile consumption.","description":"Gets the content HTML optimized for mobile consumption for the given page. This content\nis derived from Parsoid HTML (see `/page/html/{title}` endpoint).\nThe difference to Parsoid HTML is roughly:\n* Some elements and attributes not needed for the reading case are removed.\n* LeadIntroductionTransform: The introductory paragraph is moved before an infobox.\n* RedLinks: Red links are flattened (=turned into span elements).\n* WidenImage: images that should be displayed in gallery are widened.\n* Section headings are slightly changed by wrapping the headings inside a div and adding\n  a span element inside the new div for the edit buttons.\n* Additional classes are added to img elements to fix issues with non-white backgrounds.\n  See Theme support below for instructions on how to enable that.\n* Pagelib CSS files needed to display the content are referenced.\n* LazyLoadTransform: server-side portion/prep for lazy loading of images.\n* CollapseTable: server-side portion/prep for collapsing tables.\n\nWhat's not included? What parts of the PageLibrary does a client still have to do?\n* Theme support: Themes can be turned on by adding a theme class to the root \u003chtml> tag.\n  Possible class names are:\n  * `pagelib_theme_default`\n  * `pagelib_theme_dark`\n  * `pagelib_theme_black`\n  * `pagelib_theme_sepia`\n\n  The pagelib JS has functionality to do that: ThemeTransform.setTheme(document, theme).\n* Dim images: DimImagesTransform.dim(window, enable)\n* PlatformTransform.classify(window) to trigger Android and iOS app specific CSS rules\n* LazyLoadTransformer: client side companion of LazyLoadTransform (note the extra *er*\nhere)\n* FooterTransformer: seems to be more UI than content, requires I18N, too\n\nStability: [experimental](https://www.mediawiki.org/wiki/API_versioning#Experimental)\n","parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}},{"name":"revision","in":"path","description":"Optional page revision. Note that older revisions are not stored, so request latency with the revision would be higher.\n","required":true,"schema":{"type":"integer"}},{"name":"redirect","in":"query","description":"Requests for [redirect pages](https://www.mediawiki.org/wiki/Help:Redirects) return HTTP 302 with a redirect target in `Location` header and content in the body.\nTo get a 200 response instead, supply `false` to the `redirect` parameter.\n","schema":{"type":"boolean"}}],"responses":{"200":{"description":"mobile-optimized HTML of the given page.","headers":{"ETag":{"description":"Syntax: \"{revision}/{tid}\". Example: \"701384379/154d7bca-c264-11e5-8c2f-1b51b33b59fc\"\n","schema":{"type":"string"}}},"content":{"text/html; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/Mobile-HTML/1.2.2\"":{"schema":{"type":"string"}}}},"301":{"description":"A permanent redirect is returned if the supplied article title was not in the normalized form.\nTo avoid this kind of redirect, you can use the [mediawiki-title](https://github.com/wikimedia/mediawiki-title) library to perform\ntitle normalization client-side.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"302":{"description":"The page is a [redirect page](https://www.mediawiki.org/wiki/Help:Redirects).\nThe `location` header points to the redirect target.\nIf you would like to avoid automatically following redirect pages, set the `redirect=false` query parameter.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"404":{"description":"Unknown page title","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"operationId":"getContentWithRevision-mobile-html","x-monitor":false,"x-amples":[{"title":"Get mobile-html from storage","request":{"params":{"domain":"en.wikipedia.org","title":"User:BSitzmann_(WMF)/MCS/Test/Frankenstein"}},"response":{"status":200,"headers":{"etag":"/.+/","content-type":"/^text\\/html.+/"},"body":"/^\u003c!DOCTYPE html>.*/"}}]}},"/page/mobile-html-offline-resources/{title}":{"get":{"tags":["Page content","offline"],"summary":"Get styles and scripts for offline consumption of mobile-html-formatted pages","description":"Provides links to scripts and styles needed for viewing mobile-html-formatted pages offline.\n\nStability: [experimental](https://www.mediawiki.org/wiki/API_versioning#Experimental)\n","parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"links to scripts and styles to accompany the mobile-html of the page for offline consumption","content":{"application/json; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/Mobile-HTML-Offline-Resources/1.2.1\"":{"schema":{"type":"string"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":true,"x-amples":[{"title":"Get offline resource links to accompany page content HTML for test page","request":{"params":{"title":"User:BSitzmann_(WMF)/MCS/Test/Frankenstein"}},"response":{"status":200,"headers":{"content-type":"/^application\\/json.+/"}}}]}},"/page/mobile-html-offline-resources/{title}/{revision}":{"get":{"tags":["Page content","offline"],"summary":"Get styles and scripts for offline consumption of mobile-html-formatted pages","description":"Provides links to scripts and styles needed for viewing mobile-html-formatted pages offline.\n\nStability: [experimental](https://www.mediawiki.org/wiki/API_versioning#Experimental)\n","parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}},{"name":"revision","in":"path","description":"Optional page revision. Note that older revisions are not stored, so request latency with the revision would be higher.\n","required":true,"schema":{"type":"integer"}}],"responses":{"200":{"description":"links to scripts and styles to accompany the mobile-html of the page for offline consumption","content":{"application/json; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/Mobile-HTML-Offline-Resources/1.2.1\"":{"schema":{"type":"string"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false,"x-amples":[{"title":"Get offline resource links to accompany page content HTML for test page","request":{"params":{"title":"User:BSitzmann_(WMF)/MCS/Test/Frankenstein"}},"response":{"status":200,"headers":{"content-type":"/^application\\/json.+/"}}}]}},"/page/talk/{title}":{"get":{"tags":["Talk pages"],"summary":"Get structured talk page contents","description":"Gets structured talk page contents for the provided title.\n\nStability: [experimental](https://www.mediawiki.org/wiki/Wikimedia_Product/Wikimedia_Product_Infrastructure_team/API_endpoint_stability_policy#Experimental)\n","parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}},{"name":"redirect","in":"query","description":"Requests for [redirect pages](https://www.mediawiki.org/wiki/Help:Redirects) return HTTP 302 with a redirect target in `Location` header and content in the body.\nTo get a 200 response instead, supply `false` to the `redirect` parameter.\n","schema":{"type":"boolean"}}],"responses":{"200":{"description":"structured talk page JSON.","headers":{"ETag":{"description":"Syntax: \"{revision}/{tid}\". Example: \"701384379/154d7bca-c264-11e5-8c2f-1b51b33b59fc\"\n","schema":{"type":"string"}}},"content":{"application/json; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/Talk/0.1.0\"":{"schema":{"type":"string"}}}},"301":{"description":"A permanent redirect is returned if the supplied article title was not in the normalized form.\nTo avoid this kind of redirect, you can use the [mediawiki-title](https://github.com/wikimedia/mediawiki-title) library to perform\ntitle normalization client-side.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"302":{"description":"The page is a [redirect page](https://www.mediawiki.org/wiki/Help:Redirects).\nThe `location` header points to the redirect target.\nIf you would like to avoid automatically following redirect pages, set the `redirect=false` query parameter.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"404":{"description":"Unknown page title","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":true,"x-amples":[{"title":"Get structured talk page for enwiki Salt article","request":{"params":{"domain":"en.wikipedia.org","title":"Salt"}},"response":{"status":200,"headers":{"content-type":"/application\\/json; charset=utf-8; profile=\".+Talk.+\"/","etag":"/.+/"},"body":{"topics":[{"id":"/.+/","replies":[{"sha":"/.+/","depth":"/.+/","html":"/.*/"}],"depth":"/.+/","html":"/.*/","shas":{"html":"/.+/","indicator":"/.+/"}}]}}}]}},"/page/talk/{title}/{revision}":{"get":{"tags":["Talk pages"],"summary":"Get structured talk page contents","description":"Gets structured talk page contents for the provided title.\n\nStability: [experimental](https://www.mediawiki.org/wiki/Wikimedia_Product/Wikimedia_Product_Infrastructure_team/API_endpoint_stability_policy#Experimental)\n","parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}},{"name":"revision","in":"path","description":"Optional page revision. Note that older revisions are not stored, so request latency with the revision would be higher.\n","required":true,"schema":{"type":"integer"}},{"name":"redirect","in":"query","description":"Requests for [redirect pages](https://www.mediawiki.org/wiki/Help:Redirects) return HTTP 302 with a redirect target in `Location` header and content in the body.\nTo get a 200 response instead, supply `false` to the `redirect` parameter.\n","schema":{"type":"boolean"}}],"responses":{"200":{"description":"structured talk page JSON.","headers":{"ETag":{"description":"Syntax: \"{revision}/{tid}\". Example: \"701384379/154d7bca-c264-11e5-8c2f-1b51b33b59fc\"\n","schema":{"type":"string"}}},"content":{"application/json; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/Talk/0.1.0\"":{"schema":{"type":"string"}}}},"301":{"description":"A permanent redirect is returned if the supplied article title was not in the normalized form.\nTo avoid this kind of redirect, you can use the [mediawiki-title](https://github.com/wikimedia/mediawiki-title) library to perform\ntitle normalization client-side.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"302":{"description":"The page is a [redirect page](https://www.mediawiki.org/wiki/Help:Redirects).\nThe `location` header points to the redirect target.\nIf you would like to avoid automatically following redirect pages, set the `redirect=false` query parameter.\n\nBeware that redirected pre-flighted cross-origin requests (such as those sending custom request headers like `Api-User-Agent`)\nwill fail in most current browsers [due to a spec bug](https://github.com/whatwg/fetch/issues/204).\n"},"404":{"description":"Unknown page title","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false,"x-amples":[{"title":"Get structured talk page for enwiki Salt article","request":{"params":{"domain":"en.wikipedia.org","title":"Salt"}},"response":{"status":200,"headers":{"content-type":"/application\\/json; charset=utf-8; profile=\".+Talk.+\"/","etag":"/.+/"},"body":{"topics":[{"id":"/.+/","replies":[{"sha":"/.+/","depth":"/.+/","html":"/.*/"}],"depth":"/.+/","html":"/.*/","shas":{"html":"/.+/","indicator":"/.+/"}}]}}}]}},"/transform/html/to/wikitext":{"post":{"tags":["Transforms"],"summary":"Transform HTML to Wikitext","description":"Transform [Parsoid HTML](https://www.mediawiki.org/wiki/Parsoid/MediaWiki_DOM_spec)\nto Wikitext.\n\nWhen converting pre-existing (possibly modified) content, you should\npass in the `title`, `revision`, and `If-Match` header. This lets\n[Parsoid](https://www.mediawiki.org/wiki/Parsoid) preserve small\nsyntactic variations in wikitext, which ensures that diffs are\nreadable.\n\n- Stability: [stable](https://www.mediawiki.org/wiki/API_versioning#Stable)\n- Rate limit: 25 req/s\n","parameters":[{"name":"if-match","in":"header","description":"The `ETag` header of the original render indicating it's revision and timeuuid.\nRequired if both `title` and `revision` parameters are present.\n","schema":{"type":"string"}}],"requestBody":{"content":{"multipart/form-data":{"schema":{"required":["html"],"properties":{"html":{"type":"string","description":"The HTML to transform","x-textarea":true},"scrub_wikitext":{"type":"boolean","description":"Normalise the DOM to yield cleaner wikitext?"}}}}},"required":true},"responses":{"200":{"description":"MediaWiki Wikitext.","content":{"text/plain; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/wikitext/1.0.0\"":{"schema":{"type":"string"}}}},"403":{"description":"Access to the specific revision is restricted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"404":{"description":"Unknown page title or revision","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"409":{"description":"Revision was restricted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"410":{"description":"Page was deleted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/transform/html/to/wikitext/{title}":{"post":{"tags":["Transforms"],"summary":"Transform HTML to Wikitext","description":"Transform [Parsoid HTML](https://www.mediawiki.org/wiki/Parsoid/MediaWiki_DOM_spec)\nto Wikitext.\n\nWhen converting pre-existing (possibly modified) content, you should\npass in the `title`, `revision`, and `If-Match` header. This lets\n[Parsoid](https://www.mediawiki.org/wiki/Parsoid) preserve small\nsyntactic variations in wikitext, which ensures that diffs are\nreadable.\n\n- Stability: [stable](https://www.mediawiki.org/wiki/API_versioning#Stable)\n- Rate limit: 25 req/s\n","parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}},{"name":"if-match","in":"header","description":"The `ETag` header of the original render indicating it's revision and timeuuid.\nRequired if both `title` and `revision` parameters are present.\n","schema":{"type":"string"}}],"requestBody":{"content":{"multipart/form-data":{"schema":{"required":["html"],"properties":{"html":{"type":"string","description":"The HTML to transform","x-textarea":true},"scrub_wikitext":{"type":"boolean","description":"Normalise the DOM to yield cleaner wikitext?"}}}}},"required":true},"responses":{"200":{"description":"MediaWiki Wikitext.","content":{"text/plain; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/wikitext/1.0.0\"":{"schema":{"type":"string"}}}},"403":{"description":"Access to the specific revision is restricted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"404":{"description":"Unknown page title or revision","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"409":{"description":"Revision was restricted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"410":{"description":"Page was deleted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/transform/html/to/wikitext/{title}/{revision}":{"post":{"tags":["Transforms"],"summary":"Transform HTML to Wikitext","description":"Transform [Parsoid HTML](https://www.mediawiki.org/wiki/Parsoid/MediaWiki_DOM_spec)\nto Wikitext.\n\nWhen converting pre-existing (possibly modified) content, you should\npass in the `title`, `revision`, and `If-Match` header. This lets\n[Parsoid](https://www.mediawiki.org/wiki/Parsoid) preserve small\nsyntactic variations in wikitext, which ensures that diffs are\nreadable.\n\n- Stability: [stable](https://www.mediawiki.org/wiki/API_versioning#Stable)\n- Rate limit: 25 req/s\n","parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}},{"name":"revision","in":"path","description":"The page revision","required":true,"schema":{"type":"integer"}},{"name":"if-match","in":"header","description":"The `ETag` header of the original render indicating it's revision and timeuuid.\nRequired if both `title` and `revision` parameters are present.\n","schema":{"type":"string"}}],"requestBody":{"content":{"multipart/form-data":{"schema":{"required":["html"],"properties":{"html":{"type":"string","description":"The HTML to transform","x-textarea":true},"scrub_wikitext":{"type":"boolean","description":"Normalise the DOM to yield cleaner wikitext?"}}}}},"required":true},"responses":{"200":{"description":"MediaWiki Wikitext.","content":{"text/plain; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/wikitext/1.0.0\"":{"schema":{"type":"string"}}}},"403":{"description":"Access to the specific revision is restricted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"404":{"description":"Unknown page title or revision","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"409":{"description":"Revision was restricted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"410":{"description":"Page was deleted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/transform/wikitext/to/html":{"post":{"tags":["Transforms"],"summary":"Transform Wikitext to HTML","description":"Transform wikitext to HTML. Note that if you set `stash: true`, you\nalso need to supply the title.\n\n- Stability: [stable](https://www.mediawiki.org/wiki/API_versioning#Stable)\n- Rate limit: 25 req/s (5 req/s when `stash: true`)\n","requestBody":{"content":{"multipart/form-data":{"schema":{"required":["wikitext"],"properties":{"wikitext":{"type":"string","description":"The Wikitext to transform to HTML","x-textarea":true},"body_only":{"type":"boolean","description":"Return only `body.innerHTML`"},"stash":{"type":"boolean","description":"Whether to temporarily stash the result of the transformation"}}}}},"required":true},"responses":{"200":{"description":"See wikipage https://www.mediawiki.org/wiki/Parsoid/MediaWiki_DOM_spec","content":{"text/html; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/HTML/2.1.0\"":{"schema":{"type":"string"}}}},"403":{"description":"access to the specific revision is restricted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"404":{"description":"Unknown page title or revision","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"409":{"description":"Revision was restricted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"410":{"description":"Page was deleted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/transform/wikitext/to/html/{title}":{"post":{"tags":["Transforms"],"summary":"Transform Wikitext to HTML","description":"Transform wikitext to HTML. Note that if you set `stash: true`, you\nalso need to supply the title.\n\n- Stability: [stable](https://www.mediawiki.org/wiki/API_versioning#Stable)\n- Rate limit: 25 req/s (5 req/s when `stash: true`)\n","requestBody":{"content":{"multipart/form-data":{"schema":{"required":["wikitext"],"properties":{"wikitext":{"type":"string","description":"The Wikitext to transform to HTML","x-textarea":true},"body_only":{"type":"boolean","description":"Return only `body.innerHTML`"},"stash":{"type":"boolean","description":"Whether to temporarily stash the result of the transformation"}}}}},"required":true},"responses":{"200":{"description":"See wikipage https://www.mediawiki.org/wiki/Parsoid/MediaWiki_DOM_spec","content":{"text/html; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/HTML/2.1.0\"":{"schema":{"type":"string"}}}},"403":{"description":"access to the specific revision is restricted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"404":{"description":"Unknown page title or revision","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"409":{"description":"Revision was restricted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"410":{"description":"Page was deleted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":true,"parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}}],"x-amples":[{"title":"Transform wikitext to html","request":{"params":{"domain":"en.wikipedia.org","title":"User:BSitzmann_(WMF)/MCS/Test/Frankenstein"},"body":{"wikitext":"== Heading ==","body_only":true}},"response":{"status":200,"headers":{"content-type":"/^text\\/html.+/"},"body":"/^\u003ch2.*>Heading\u003c\\/h2>$/"}}]}},"/transform/wikitext/to/html/{title}/{revision}":{"post":{"tags":["Transforms"],"summary":"Transform Wikitext to HTML","description":"Transform wikitext to HTML. Note that if you set `stash: true`, you\nalso need to supply the title.\n\n- Stability: [stable](https://www.mediawiki.org/wiki/API_versioning#Stable)\n- Rate limit: 25 req/s (5 req/s when `stash: true`)\n","requestBody":{"content":{"multipart/form-data":{"schema":{"required":["wikitext"],"properties":{"wikitext":{"type":"string","description":"The Wikitext to transform to HTML","x-textarea":true},"body_only":{"type":"boolean","description":"Return only `body.innerHTML`"},"stash":{"type":"boolean","description":"Whether to temporarily stash the result of the transformation"}}}}},"required":true},"responses":{"200":{"description":"See wikipage https://www.mediawiki.org/wiki/Parsoid/MediaWiki_DOM_spec","content":{"text/html; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/HTML/2.1.0\"":{"schema":{"type":"string"}}}},"403":{"description":"access to the specific revision is restricted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"404":{"description":"Unknown page title or revision","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"409":{"description":"Revision was restricted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"410":{"description":"Page was deleted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false,"parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}},{"name":"revision","in":"path","description":"The page revision","required":true,"schema":{"type":"integer"}}]}},"/transform/wikitext/to/lint":{"post":{"tags":["Transforms"],"summary":"Check Wikitext for lint errors","description":"Parse the supplied wikitext and check it for lint errors.\n\n- Stability: [experimental](https://www.mediawiki.org/wiki/API_versioning#Experimental)\n- Rate limit: 25 req/s\n","requestBody":{"content":{"multipart/form-data":{"schema":{"required":["wikitext"],"properties":{"wikitext":{"type":"string","description":"The Wikitext to check","x-textarea":true}}}},"application/json":{"schema":{"required":["wikitext"],"properties":{"wikitext":{"type":"string","description":"The Wikitext to check","x-textarea":true}}}}},"required":true},"responses":{"200":{"description":"Linter errors, if any, as a JSON blob","content":{"application/json":{"schema":{"type":"object"}}}},"404":{"description":"Unknown page title","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"409":{"description":"Latest revision was restricted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"410":{"description":"Page was deleted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/transform/wikitext/to/lint/{title}":{"post":{"tags":["Transforms"],"summary":"Check Wikitext for lint errors","description":"Parse the supplied wikitext and check it for lint errors.\n\n- Stability: [experimental](https://www.mediawiki.org/wiki/API_versioning#Experimental)\n- Rate limit: 25 req/s\n","requestBody":{"content":{"multipart/form-data":{"schema":{"required":["wikitext"],"properties":{"wikitext":{"type":"string","description":"The Wikitext to check","x-textarea":true}}}}},"required":true},"responses":{"200":{"description":"Linter errors, if any, as a JSON blob","content":{"application/json":{"schema":{"type":"object"}}}},"404":{"description":"Unknown page title","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"409":{"description":"Latest revision was restricted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"410":{"description":"Page was deleted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false,"parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}}]}},"/transform/wikitext/to/lint/{title}/{revision}":{"post":{"tags":["Transforms"],"summary":"Check Wikitext for lint errors","description":"Parse the supplied wikitext and check it for lint errors.\n\n- Stability: [experimental](https://www.mediawiki.org/wiki/API_versioning#Experimental)\n- Rate limit: 25 req/s\n","requestBody":{"content":{"multipart/form-data":{"schema":{"required":["wikitext"],"properties":{"wikitext":{"type":"string","description":"The Wikitext to check","x-textarea":true}}}}},"required":true},"responses":{"200":{"description":"Linter errors, if any, as a JSON blob","content":{"application/json":{"schema":{"type":"object"}}}},"404":{"description":"Unknown page title","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"409":{"description":"Latest revision was restricted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"410":{"description":"Page was deleted","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false,"parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}},{"name":"revision","in":"path","description":"The page revision","required":true,"schema":{"type":"integer"}}]}},"/transform/wikitext/to/mobile-html/{title}":{"post":{"tags":["Transforms"],"summary":"Transform Wikitext to Mobile HTML","description":"Transform wikitext to Mobile HTML.\n\n- Stability: [stable](https://www.mediawiki.org/wiki/Wikimedia_Product/Wikimedia_Product_Infrastructure_team/API_endpoint_stability_policy#Stable)\n- Rate limit: 25 req/s (5 req/s when `stash: true`)\n\nPlease follow [wikitech-l](https://lists.wikimedia.org/mailman/listinfo/wikitech-l) or [mediawiki-api-announce](https://lists.wikimedia.org/mailman/listinfo/mediawiki-api-announce) for announcements of breaking changes.\n","parameters":[{"name":"title","in":"path","description":"Page title. Use underscores instead of spaces. Use percent-encoding. Example: `Main_Page`.","required":true,"schema":{"type":"string"}},{"name":"Accept-Language","in":"header","description":"The desired language variant code for wikis where LanguageConverter is enabled. Example: `sr-el` for Latin transcription of the Serbian language.\n","schema":{"type":"string"}},{"name":"output-mode","in":"header","description":"Output mode for mobile-html. Default is `editPreview`.","required":false,"schema":{"type":"string","enum":["editPreview","contentAndReferences","content","references"]}}],"requestBody":{"content":{"multipart/form-data":{"schema":{"required":["wikitext"],"properties":{"wikitext":{"type":"string","description":"The Wikitext to transform to HTML","x-textarea":true}}}}},"required":true},"responses":{"200":{"description":"See wikipage https://www.mediawiki.org/wiki/Parsoid/MediaWiki_DOM_spec","content":{"text/html; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/Mobile-HTML/1.0.0\"":{"schema":{"type":"string"}}}},"404":{"description":"Unknown page title","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"operationId":"transformWikitextToMobileHtml","x-monitor":false}},"/media/math/check/{type}":{"post":{"deprecated":true,"tags":["Math"],"summary":"Check and normalize a TeX formula.","description":"Checks the supplied TeX formula for correctness and returns the\nnormalised formula representation as well as information about\nidentifiers. Available types are tex and inline-tex. The response\ncontains the `x-resource-location` header which can be used to retrieve\nthe render of the checked formula in one of the supported rendering\nformats. Just append the value of the header to `/media/math/{format}/`\nand perform a GET request against that URL.\n\n**NOTE**: the use of this endpoint is *strongly discouraged*. Instead, use the identical endpoint of the (canonical) Math API on the `wikimedia.org` domain.\n\nStability: [deprecated](https://www.mediawiki.org/wiki/API_versioning#Deprecated).\n","parameters":[{"name":"type","in":"path","description":"The input type of the given formula; can be tex or inline-tex","required":true,"schema":{"type":"string","enum":["tex","inline-tex","chem"]}}],"requestBody":{"content":{"multipart/form-data":{"schema":{"required":["q"],"properties":{"q":{"type":"string","description":"The formula to check"}}}}},"required":true},"responses":{"200":{"description":"Information about the checked formula","content":{"application/json":{"schema":{"type":"object"}}}},"400":{"description":"Invalid type","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":true,"x-amples":[{"title":"Mathoid - check test formula","request":{"params":{"domain":"wikimedia.org","type":"tex"},"body":{"q":"E=mc^{2}"}},"response":{"status":200,"headers":{"content-type":"/^application\\/json/","x-resource-location":"/.+/","cache-control":"no-cache"},"body":{"success":true,"checked":"/.+/"}}}]}},"/media/math/formula/{hash}":{"get":{"deprecated":true,"tags":["Math"],"summary":"Get a previously-stored formula","description":"Returns the previously-stored formula via `/media/math/check/{type}` for\nthe given hash.\n\n**NOTE**: the use of this endpoint is *strongly discouraged*. Instead, use the identical endpoint of the (canonical) Math API on the `wikimedia.org` domain.\n\nStability: [deprecated](https://www.mediawiki.org/wiki/API_versioning#Deprecated).\n","parameters":[{"name":"hash","in":"path","description":"The hash string of the previous POST data","required":true,"schema":{"minLength":1,"type":"string"}}],"responses":{"200":{"description":"Information about the checked formula","content":{"application/json":{"schema":{"type":"object"}}}},"404":{"description":"Data for the given hash cannot be found","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/media/math/render/{format}/{hash}":{"get":{"deprecated":true,"tags":["Math"],"summary":"Get rendered formula in the given format.","description":"Given a request hash, renders a TeX formula into its mathematic\nrepresentation in the given format. When a request is issued to the\n`/media/math/check/{format}` POST endpoint, the response contains the\n`x-resource-location` header denoting the hash ID of the POST data. Once\nobtained, this endpoint has to be used to obtain the actual render.\n\n**NOTE**: the use of this endpoint is *strongly discouraged*. Instead, use the identical endpoint of the (canonical) Math API on the `wikimedia.org` domain.\n\nStability: [deprecated](https://www.mediawiki.org/wiki/API_versioning#Deprecated).\n","parameters":[{"name":"format","in":"path","description":"The output format; can be svg or mml","required":true,"schema":{"type":"string","enum":["svg","mml","png"]}},{"name":"hash","in":"path","description":"The hash string of the previous POST data","required":true,"schema":{"minLength":1,"type":"string"}}],"responses":{"200":{"description":"The rendered formula","content":{"image/svg+xml":{"schema":{"type":"string"}},"application/mathml+xml":{"schema":{"type":"string"}}}},"404":{"description":"Unknown format or hash ID","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/data/citation/{format}/{query}":{"get":{"tags":["Citation"],"summary":"Get citation data given an article identifier.","description":"Generates citation data given a URL, DOI, PMID, or PMCID.\n\nAutomated requests can be made at a rate of 1 request per second (rps).\n\nSee more at [Citoid service documentation](https://www.mediawiki.org/wiki/Citoid)\n\nThe citation data can be requested in one of the following formats:\n  - `mediawiki`: format designed for MediaWiki to be used with `templateData`.\n    Uses [Zotero field names](https://aurimasv.github.io/z2csl/typeMap.xml).\n  - `mediawiki-basefields`: `mediawiki` format with Zotero `basefield` field names.\n  - `zotero`: format used by [Zotero](https://www.zotero.org/).\n  - `bibtex`: format used in conjunction with LaTeX documents.\n    See [bibtex.org](http://www.bibtex.org/).\n  - `wikibase`: format designed for [Wikibase](https://www.mediawiki.org/wiki/Extension:Wikibase_Repository).\n\nStability: [unstable](https://www.mediawiki.org/wiki/API_versioning#Unstable)\n","parameters":[{"name":"format","in":"path","description":"The format to use for the resulting citation data","schema":{"type":"string","enum":["mediawiki","mediawiki-basefields","zotero","bibtex","wikibase"]},"required":true},{"name":"query","in":"path","description":"URL of an article, DOI, PMCID or PMID in the URL-encoded format. Note that on the Swagger-UI doc page you don't need to URI-encode the parameter manually, it will be done by the docs engine.\n","required":true,"schema":{"type":"string"}},{"name":"Accept-Language","in":"header","description":"For some articles the result depends on the `Accept-Language` header, so provide it if localized content is required.\n","schema":{"type":"string"}}],"responses":{"200":{"description":"The citation data in the requested format","content":{"application/json; charset=utf-8;":{"schema":{"$ref":"#/components/schemas/result"}},"application/x-bibtex; charset=utf-8":{"schema":{"$ref":"#/components/schemas/result"}}}},"404":{"description":"Citation data was not found.","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"operationId":"getCitation","x-monitor":false}},"/data/lists/setup":{"post":{"tags":["Reading lists"],"summary":"Opt in to use reading lists.","description":"Must precede other list operations.\n\nRequest must be authenticated with a MediaWiki session cookie.\n\nStability: [unstable](https://www.mediawiki.org/wiki/API_versioning#Unstable)\n","parameters":[{"name":"csrf_token","in":"query","required":true,"schema":{"type":"string","example":"f63c343876da566045e6b59c4532450559c828d3+\\"},"description":"The CRSF edit token provided by the MediaWiki API"}],"responses":{"200":{"description":"Success.","content":{"application/json; charset=utf-8":{"schema":{"type":"object"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/data/lists/teardown":{"post":{"tags":["Reading lists"],"summary":"Opt out from using reading lists.","description":"Deletes all data. User needs to opt in again before being able to do anything.\n\nRequest must be authenticated with a MediaWiki session cookie.\n\nStability: [unstable](https://www.mediawiki.org/wiki/API_versioning#Unstable)\n","parameters":[{"name":"csrf_token","in":"query","required":true,"schema":{"type":"string","example":"f63c343876da566045e6b59c4532450559c828d3+\\"},"description":"The CRSF edit token provided by the MediaWiki API"}],"responses":{"200":{"description":"Success.","content":{"application/json; charset=utf-8":{"schema":{"type":"object"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/data/lists/":{"get":{"tags":["Reading lists"],"summary":"Get all lists of the current user.","description":"Returns metadata describing the lists of the current user. Might be truncated and include\na continuation token.\n\nRequest must be authenticated with a MediaWiki session cookie.\n\nStability: [unstable](https://www.mediawiki.org/wiki/API_versioning#Unstable)\n","parameters":[{"name":"next","in":"query","description":"Continuation parameter from previous request","schema":{"type":"string"}},{"name":"sort","in":"query","description":"Sort order\n- `name`: by name, ascending;\n- `updated`: by last modification date, descending.\n","schema":{"type":"string","default":"updated","enum":["name","updated"]}}],"responses":{"200":{"description":"An array of list metadata.","content":{"application/json; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/Lists/0.1\"":{"schema":{"type":"object","properties":{"lists":{"type":"array","items":{"$ref":"#/components/schemas/list_read"}},"next":{"type":"string","description":"Continuation token."},"continue-from":{"type":"string","format":"date-time","description":"Timestamp to sync from, to be used with the `GET /lists/changes/since/{date}`\nendpoint.\n"}}}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false},"post":{"tags":["Reading lists"],"summary":"Create a new list for the current user.","description":"Creates a new empty list. On name conflict, does nothing and returns the data of an\nexisting list.\n\nRequest must be authenticated with a MediaWiki session cookie.\n\nStability: [unstable](https://www.mediawiki.org/wiki/API_versioning#Unstable)\n\nThis endpoint is deprecated and might be removed without warning. Use the batch version\ninstead.\n","x-maxsize":5000,"parameters":[{"name":"csrf_token","in":"query","required":true,"schema":{"type":"string","example":"f63c343876da566045e6b59c4532450559c828d3+\\"},"description":"The CRSF edit token provided by the MediaWiki API"}],"requestBody":{"content":{"*/*":{"schema":{"$ref":"#/components/schemas/list_write"}}},"required":true},"responses":{"200":{"description":"The data for the new list.","content":{"application/json; charset=utf-8":{"schema":{"type":"object","properties":{"id":{"type":"integer","description":"List ID.\n\nDeprecated, will be removed. Use the full list object.\n","example":7},"list":{"$ref":"#/components/schemas/list_read"}},"required":["id","list"]}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/data/lists/{id}":{"put":{"tags":["Reading lists"],"summary":"Update a list.","description":"List must belong to current user and request must be authenticated with\na MediaWiki session cookie. If the name is changed, the new name must not be in use.\n\nStability: [unstable](https://www.mediawiki.org/wiki/API_versioning#Unstable)\n","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","example":42}},{"name":"csrf_token","in":"query","required":true,"schema":{"type":"string","example":"f63c343876da566045e6b59c4532450559c828d3+\\"},"description":"The CRSF edit token provided by the MediaWiki API"}],"requestBody":{"content":{"*/*":{"schema":{"$ref":"#/components/schemas/list_write"}}},"required":false},"responses":{"200":{"description":"The updated data for the list.","content":{"application/json; charset=utf-8":{"schema":{"type":"object","properties":{"id":{"type":"integer","description":"List ID.\n\nDeprecated, will be removed. Use the full list object.\n","example":7},"list":{"$ref":"#/components/schemas/list_read"}},"required":["id","list"]}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false},"delete":{"tags":["Reading lists"],"summary":"Delete a list.","description":"List must belong to current user and request must be authenticated with\na MediaWiki session cookie.\n\nStability: [unstable](https://www.mediawiki.org/wiki/API_versioning#Unstable)\n","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","example":42}}],"responses":{"200":{"description":"Success.","content":{"application/json; charset=utf-8":{"schema":{"type":"object"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/data/lists/batch":{"post":{"tags":["Reading lists"],"summary":"Create multiple new lists for the current user.","description":"See `POST /lists/`.\n\nStability: [unstable](https://www.mediawiki.org/wiki/API_versioning#Unstable)\n","x-maxsize":5000,"parameters":[{"name":"csrf_token","in":"query","required":true,"schema":{"type":"string","example":"f63c343876da566045e6b59c4532450559c828d3+\\"},"description":"The CRSF edit token provided by the MediaWiki API"}],"requestBody":{"content":{"*/*":{"schema":{"title":"batch","required":["batch"],"type":"object","properties":{"batch":{"maxItems":500,"type":"array","items":{"$ref":"#/components/schemas/list_write"}}}}}},"required":true},"responses":{"200":{"description":"The data for the new lists (in the same order as the inputs).","content":{"application/json; charset=utf-8":{"schema":{"title":"list_create_batch","type":"object","properties":{"batch":{"type":"array","description":"Deprecated, will be removed. Use the full list objects instead.","items":{"title":"list_id","type":"object","required":["id"],"properties":{"id":{"type":"integer","description":"List ID","example":7}}}},"lists":{"type":"array","items":{"$ref":"#/components/schemas/list_read"}}},"required":["batch","lists"]}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/data/lists/{id}/entries/":{"get":{"tags":["Reading lists"],"summary":"Get all entries of a given list.","description":"Returns pages contained by the given list. Might be truncated and include\na continuation token.\n\nList must belong to current user and request must be authenticated with\na MediaWiki session cookie.\n\nStability: [unstable](https://www.mediawiki.org/wiki/API_versioning#Unstable)\n","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","example":42}},{"name":"next","in":"query","description":"Continuation parameter from previous request","schema":{"type":"string"}},{"name":"sort","in":"query","description":"Sort order\n- `name`: by page title, ascending;\n- `updated`: by last modification date, descending.\n","schema":{"type":"string","default":"updated","enum":["name","updated"]}}],"responses":{"200":{"description":"An array of list entries.","content":{"application/json; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/Lists/0.1\"":{"schema":{"type":"object","properties":{"entries":{"type":"array","items":{"$ref":"#/components/schemas/list_entry_read"}},"next":{"type":"string","description":"Continuation token."}}}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"operationId":"getListEntries","x-monitor":false},"post":{"tags":["Reading lists"],"summary":"Create a new list entry.","description":"Creates a new list entry in the given list. On conflict, does nothing and returns the\ndata of an existing list.\n\nThe list must belong to the current user and the request must be\nauthenticated with a MediaWiki session cookie.\n\nStability: [unstable](https://www.mediawiki.org/wiki/API_versioning#Unstable)\n\nThis endpoint is deprecated and might be removed without warning. Use the batch version\ninstead.\n","x-maxsize":100,"parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","example":42}},{"name":"csrf_token","in":"query","required":true,"schema":{"type":"string","example":"f63c343876da566045e6b59c4532450559c828d3+\\"},"description":"The CRSF edit token provided by the MediaWiki API"}],"requestBody":{"content":{"*/*":{"schema":{"$ref":"#/components/schemas/list_entry_write"}}},"required":true},"responses":{"200":{"description":"The data for the new list entry.","content":{"application/json; charset=utf-8":{"schema":{"type":"object","properties":{"id":{"type":"integer","description":"List entry ID\n\nDeprecated, will be removed. Use the full entry object instead.\n","example":13},"entry":{"$ref":"#/components/schemas/list_entry_read"}},"required":["id","entry"]}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/data/lists/{id}/entries/{entry_id}":{"delete":{"tags":["Reading lists"],"summary":"Delete a list entry.","description":"Deletes a given list entry.\n\nThe list must belong to the current user and the request must be\nauthenticated with a MediaWiki session cookie.\n\nStability: [unstable](https://www.mediawiki.org/wiki/API_versioning#Unstable)\n","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","example":42}},{"name":"entry_id","in":"path","required":true,"schema":{"type":"integer","example":64}}],"responses":{"200":{"description":"Success.","content":{"application/json; charset=utf-8":{"schema":{"type":"object"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/data/lists/{id}/entries/batch":{"post":{"tags":["Reading lists"],"summary":"Create multiple new list entries.","description":"See `POST /lists/{id}/entries/`.\n\nStability: [unstable](https://www.mediawiki.org/wiki/API_versioning#Unstable)\n","x-maxsize":100,"parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","example":42}},{"name":"csrf_token","in":"query","required":true,"schema":{"type":"string","example":"f63c343876da566045e6b59c4532450559c828d3+\\"},"description":"The CRSF edit token provided by the MediaWiki API"}],"requestBody":{"content":{"*/*":{"schema":{"type":"object","required":["batch"],"properties":{"batch":{"title":"list_entries","type":"array","maxItems":500,"items":{"$ref":"#/components/schemas/list_entry_write"}}}}}},"required":true},"responses":{"200":{"description":"The data for the new list entries (in the same order as the inputs).","content":{"application/json; charset=utf-8":{"schema":{"type":"object","properties":{"batch":{"type":"array","items":{"type":"object","properties":{"id":{"type":"integer","description":"List entry ID","example":13}}}},"entries":{"type":"array","items":{"$ref":"#/components/schemas/list_entry_read"}}},"required":["entries","batch"]}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/data/lists/pages/{project}/{title}":{"get":{"tags":["Reading lists"],"summary":"Get lists of the current user which contain a given page.","description":"Request must be authenticated with a MediaWiki session cookie.\n\nStability: [unstable](https://www.mediawiki.org/wiki/API_versioning#Unstable)\n","parameters":[{"name":"project","in":"path","schema":{"type":"string","description":"Domain of the wiki containing the page.","example":"https://en.wikipedia.org"},"required":true},{"name":"title","in":"path","schema":{"type":"string","description":"Title of the page containing the page, in database format.","example":"Barack_Obama"},"required":true},{"name":"next","in":"query","description":"Continuation parameter from previous request","schema":{"type":"string"}}],"responses":{"200":{"description":"An array of list metadata.","content":{"application/json; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/Lists/0.1\"":{"schema":{"type":"object","properties":{"lists":{"type":"array","items":{"$ref":"#/components/schemas/list_read"}},"next":{"type":"string","description":"Continuation token."}}}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/data/lists/changes/since/{date}":{"get":{"tags":["Reading lists"],"summary":"Get recent changes to the lists","description":"Returns metadata describing lists and entries which have changed. Might be truncated\nand include a continuation token.\n\nRequest must be authenticated with a MediaWiki session cookie.\n\nFor safe synchronization, the date parameter should be taken from the `continue-from`\nfield of a previous `GET /lists/` or `GET /lists/changes/since/{date}` request. This will\nensure that no changes are skipped, at the cost of sometimes receiving the same change\nmultitple times. Clients should handle changes in an idempotent way.\n\nStability: [unstable](https://www.mediawiki.org/wiki/API_versioning#Unstable)\n","parameters":[{"name":"date","in":"path","description":"Cutoff date (in ISO 8601). To ensure reliable synchronization, the API\nmight return changes which are slightly older than the cutoff date.\n","schema":{"type":"string","format":"date-time"},"required":true},{"name":"next","in":"query","description":"Continuation parameter from previous request","schema":{"type":"string"}}],"responses":{"200":{"description":"An array of list and entry metadata.","content":{"application/json; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/Lists/0.1\"":{"schema":{"type":"object","properties":{"lists":{"type":"array","items":{"$ref":"#/components/schemas/list_read"}},"next":{"type":"string","description":"Continuation token."},"continue-from":{"type":"string","format":"date-time","description":"Timestamp to sync from, to be used with the `GET /lists/changes/since/{date}`\nendpoint.\n"}}}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/data/recommendation/article/creation/translation/{from_lang}":{"get":{"tags":["Recommendation"],"summary":"Recommend articles for translation.","description":"Recommends articles to be translated from the source\nto the domain language.\n\nSee more at [Recommendation API documentation](https://meta.wikimedia.org/wiki/Recommendation_API)\n\nStability: [unstable](https://www.mediawiki.org/wiki/API_versioning#Unstable)\n","parameters":[{"name":"from_lang","in":"path","description":"The source language code","required":true,"schema":{"type":"string"}},{"name":"count","in":"query","description":"The max number of articles to return","schema":{"type":"integer","default":24}}],"responses":{"200":{"description":"the list of articles recommended for translation","content":{"application/json":{"schema":{"$ref":"#/components/schemas/recommendation_result"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/data/recommendation/article/creation/translation/{from_lang}/{seed_article}":{"get":{"tags":["Recommendation"],"summary":"Recommend articles for translation.","description":"Recommends articles to be translated from the source\nto the domain language.\n\nSee more at [Recommendation API documentation](https://meta.wikimedia.org/wiki/Recommendation_API)\n\nStability: [unstable](https://www.mediawiki.org/wiki/API_versioning#Unstable)\n","parameters":[{"name":"from_lang","in":"path","description":"The source language code","required":true,"schema":{"type":"string"}},{"name":"seed_article","in":"path","description":"The article to use as a search seed","required":true,"schema":{"type":"string"}},{"name":"count","in":"query","description":"The max number of articles to return","schema":{"type":"integer","default":24}}],"responses":{"200":{"description":"the list of articles recommended for translation","content":{"application/json":{"schema":{"$ref":"#/components/schemas/recommendation_result"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/data/recommendation/article/creation/morelike/{seed_article}":{"get":{"tags":["Recommendation"],"summary":"Recommend missing articles","description":"Recommends articles similar to the seed article but are missing\nfrom the domain language Wikipedia.\n\nStability: [unstable](https://www.mediawiki.org/wiki/API_versioning#Unstable)\n","parameters":[{"name":"seed_article","in":"path","description":"The article title used to search similar but missing articles","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"the prioritized list of Wikidata IDs recommended for creation as Wikipedia articles","content":{"application/json":{"schema":{"$ref":"#/components/schemas/morelike_result"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/data/css/mobile/{type}":{"get":{"tags":["Mobile"],"summary":"Get CSS for mobile apps.","description":"Gets common CSS mobile apps need to properly display pages using Page Content Service.\nIn most cases all of the types are needed (preferably in this order):\n* base (Common mobile CSS from ResourceLoader)\n* site (Site-specific, mobile CSS from ResourceLoader, as defined in MediaWiki\\:Mobile.css)\n* pcs (CSS for the Page Content Service)\n\nThe `base` and `pcs` responses are the same regardless of what domain is used.\nFor these we suggest meta.wikimedia.org.\n\nYou can still pass pagelib for type, but this is a legacy version of the CSS for\nexisting app clients.\n\nStability: [unstable](https://www.mediawiki.org/wiki/Wikimedia_Product/Wikimedia_Product_Infrastructure_team/API_endpoint_stability_policy#Unstable)\n\nPlease follow [wikitech-l](https://lists.wikimedia.org/mailman/listinfo/wikitech-l) or [mediawiki-api-announce](https://lists.wikimedia.org/mailman/listinfo/mediawiki-api-announce) for announcements of breaking changes.\n","parameters":[{"name":"type","in":"path","description":"The desired CSS bundle","schema":{"type":"string","enum":["base","pagelib","pcs","site"]},"required":true}],"responses":{"200":{"description":"Success","headers":{"ETag":{"description":"Different values indicate that the content has changed","schema":{"type":"string"}}},"content":{"application/json; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/CSS/1.0.0\"":{"schema":{"type":"object"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/data/javascript/mobile/{type}":{"get":{"tags":["Mobile"],"summary":"Get JavaScript for mobileapps","description":"Gets the JavaScript bundle so that clients can have\nconvenient access to that for consuming the page HTML.\nAmongst other things,\n* it allows to detect the platform and through that enable platform specific CSS rules,\n* has code to lazy load images on the page,\n* code for collapsing and expanding tables.\n\nValid types are pagelib or pcs. Passing pcs will return the JavaScript for the\nPage Content Service. Passing pagelib will return a deprecated legacy version\nof the wikimedia-page-library JavaScript to support existing app clients.\n\nStability: [unstable](https://www.mediawiki.org/wiki/Wikimedia_Product/Wikimedia_Product_Infrastructure_team/API_endpoint_stability_policy#Unstable)\n\nPlease follow [wikitech-l](https://lists.wikimedia.org/mailman/listinfo/wikitech-l) or [mediawiki-api-announce](https://lists.wikimedia.org/mailman/listinfo/mediawiki-api-announce) for announcements of breaking changes.\n","parameters":[{"name":"type","in":"path","description":"The desired JavaScript bundle","schema":{"type":"string","enum":["pagelib","pcs"]},"required":true}],"responses":{"200":{"description":"Success","headers":{"ETag":{"description":"Different values indicate that the content has changed","schema":{"type":"string"}}},"content":{"application/json; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/JavaScript/1.0.0\"":{"schema":{"type":"object"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}},"/data/i18n/{type}":{"get":{"tags":["Mobile"],"summary":"Get internationalization info","description":"Gets internationalization information for the given site. Currently the only\nsupported type is pcs for the Page Content Service.\n\nStability: [experimental](https://www.mediawiki.org/wiki/API_versioning#Experimental)\n","parameters":[{"name":"type","in":"path","description":"The desired internationalization bundle","schema":{"type":"string","enum":["pcs"]},"required":true}],"responses":{"200":{"description":"Success","headers":{"ETag":{"description":"Different values indicate that the content has changed","schema":{"type":"string"}}},"content":{"application/json; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/i18n/0.0.1\"":{"schema":{"type":"object"}}}},"default":{"description":"Error","content":{"application/problem+json":{"schema":{"$ref":"#/components/schemas/problem"}}}}},"x-monitor":false}}},"components":{"schemas":{"revisions":{"description":"The result format for revision listing","required":["items"],"type":"object","properties":{"items":{"$ref":"#/components/schemas/revisionIdentifier"}}},"listing":{"description":"The result format for listings","required":["items"],"type":"object","properties":{"items":{"type":"array","items":{"type":"string"}},"_links":{"type":"object","properties":{"next":{"type":"object","properties":{"href":{"type":"string","description":"Relative link to next result page."}}}}}}},"revision":{"description":"Result format for revision items","required":["count","items"],"type":"object","properties":{"count":{"type":"integer","format":"int32"},"items":{"$ref":"#/components/schemas/revisionInfo"}}},"revisionInfo":{"type":"object","description":"Complete information about the revision","properties":{"title":{"type":"string"},"page_id":{"type":"integer","format":"int32"},"rev":{"type":"integer","format":"int32"},"tid":{"type":"string"},"comment":{"type":"string"},"restrictions":{"type":"array","items":{"type":"string"}},"tags":{"type":"array","items":{"type":"string"}},"user_id":{"type":"integer","format":"int32"},"user_text":{"type":"string"},"timestamp":{"type":"string","format":"date-time"},"redirect":{"type":"boolean"},"page_language":{"type":"string"}}},"revisionIdentifier":{"type":"object","description":"Unique revision identifier","properties":{"revision":{"type":"integer","format":"int32"},"tid":{"type":"string"}}},"titles_set":{"type":"object","properties":{"canonical":{"type":"string","description":"the DB key (non-prefixed), e.g. may have _ instead of spaces, best for making request URIs, still requires Percent-encoding"},"normalized":{"type":"string","description":"the normalized title (https://www.mediawiki.org/wiki/API:Query#Example_2:_Title_normalization), e.g. may have spaces instead of _"},"display":{"type":"string","description":"the title as it should be displayed to the user"}},"required":["canonical","normalized","display"],"description":"a good example of the differences can be seen in https://en.wikipedia.org/api/rest_v1/page/summary/IOS_13"},"media_list":{"type":"object","properties":{"revision":{"type":"string","description":"the revision ID used to create the list"},"tid":{"type":"string","description":"the time uuid of the page rendering used to create the list"},"items":{"type":"array","description":"a list of media items","items":{"$ref":"#/components/schemas/media_item"}}},"required":["items","revision","tid"]},"media_item":{"type":"object","properties":{"title":{"type":"string","description":"The file page title"},"type":{"type":"string","enum":["image","video","audio"]},"section_id":{"type":"integer","description":"section ID in which the item is found on the page"},"showInGallery":{"type":"boolean","description":"whether the client should show the file in an image gallery presentation"},"caption":{"type":"object","properties":{"html":{"type":"string","description":"on-wiki caption for the media item, including all HTML markup"},"text":{"type":"string","description":"plain text of the on-wiki caption for the media item"}}},"original":{"type":"object","description":"reference to a Mathoid-rendered math formula image","properties":{"source":{"type":"string","description":"Mathoid image render URL"},"mime":{"type":"string","description":"the Mathoid image mime type"}}}},"required":["type","section_id","showInGallery"]},"problem":{"required":["type"],"type":"object","properties":{"type":{"type":"string"},"title":{"type":"string"},"detail":{"type":"string"},"instance":{"type":"string"}}},"originalimage":{"type":"object","properties":{"source":{"type":"string","description":"Original image URI"},"width":{"type":"integer","description":"Original image width"},"height":{"type":"integer","description":"Original image height"}},"required":["height","source","width"]},"thumbnail":{"type":"object","properties":{"source":{"type":"string","description":"Thumbnail image URI"},"width":{"type":"integer","description":"Thumbnail width"},"height":{"type":"integer","description":"Thumnail height"}},"required":["height","source","width"]},"summary":{"type":"object","properties":{"titles":{"$ref":"#/components/schemas/titles_set"},"title":{"deprecated":true,"type":"string","description":"The page title.\nDeprecated: Use `titles.normalized` instead.\n"},"displaytitle":{"deprecated":true,"type":"string","description":"The page title how it should be shown to the user.\nDeprecated: Use `titles.display` instead.\n"},"pageid":{"type":"integer","description":"The page ID"},"extract":{"type":"string","description":"First several sentences of an article in plain text"},"extract_html":{"type":"string","description":"First several sentences of an article in simple HTML format"},"thumbnail":{"$ref":"#/components/schemas/thumbnail"},"originalimage":{"$ref":"#/components/schemas/originalimage"},"lang":{"type":"string","description":"The page language code","example":"en"},"dir":{"type":"string","description":"The page language direction code","example":"ltr"},"timestamp":{"type":"string","description":"The time when the page was last edited in the [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601) format","example":[]},"description":{"type":"string","description":"Wikidata description for the page","example":"American poet"},"coordinates":{"type":"object","description":"The coordinates of the item","properties":{"lat":{"type":"number","description":"The latitude"},"lon":{"type":"number","description":"The longitude"}},"required":["lat","lon"]}},"required":["dir","extract","lang","titles"]},"cx_mt":{"type":"object","properties":{"contents":{"type":"string","description":"the translated content"}}},"cx_dict":{"type":"object","properties":{"source":{"type":"string","description":"the original word to look up"},"translations":{"type":"array","description":"the translations found","items":{"type":"object","properties":{"phrase":{"type":"string","description":"the translated phrase"},"info":{"type":"string","description":"extra information about the phrase"},"sources":{"type":"string","description":"the source dictionary used for the translation"}}}}}},"result":{"required":["title","url","itemType"],"type":"object","properties":{"itemType":{"type":"string"},"title":{"type":"string"},"url":{"type":"string"}}},"list_read":{"title":"list","type":"object","properties":{"id":{"type":"integer","example":42},"name":{"type":"string","example":"Planets"},"description":{"type":"string","example":"Planets of the Solar System"},"created":{"type":"string","format":"date-time","description":"Creation date (in ISO 8601)"},"updated":{"type":"string","format":"date-time","description":"Last modification date (in ISO 8601)"}},"required":["id","name","created","updated"]},"list_write":{"title":"list","type":"object","properties":{"name":{"type":"string","example":"Planets"},"description":{"type":"string","example":"Planets of the Solar System"}},"required":["name"]},"list_entry_read":{"title":"list_entry","type":"object","properties":{"id":{"type":"integer","example":64},"project":{"type":"string","description":"Domain of the wiki containing the page.","example":"https://en.wikipedia.org"},"title":{"type":"string","description":"Title of the page containing the page, in database format.","example":"Barack_Obama"},"created":{"type":"string","format":"date-time","description":"Creation date (in ISO 8601)"},"updated":{"type":"string","format":"date-time","description":"Last modification date (in ISO 8601)"}}},"list_entry_write":{"type":"object","properties":{"project":{"type":"string","description":"Domain of the wiki containing the page.","example":"https://en.wikipedia.org"},"title":{"type":"string","description":"Title of the page containing the page, in database format.","example":"Barack_Obama"}},"required":["project","title"]},"recommendation_result":{"type":"object","properties":{"count":{"type":"integer","description":"the number of recommendations returned"},"items":{"type":"array","description":"the list of articles recommended for translation","items":{"type":"object","properties":{"wikidata_id":{"type":"string","description":"wikidata id for the item"},"title":{"type":"string","description":"title of the article in the source language"},"sitelink_count":{"type":"integer","description":"count of sites the wikidata item is linked to"}}}}}},"morelike_result":{"type":"array","description":"the prioritized list of Wikidata IDs recommended for creation as Wikipedia articles","items":{"type":"object","properties":{"wikidata_id":{"type":"string","description":"Wikidata ID for the item"},"score":{"type":"number","description":"Score of the recommendation. The higher the score, the more important the recommendation is."},"source_language":{"type":"string","description":"Source of the recommendation -- which wiki is recommending the current article."}}}}}},"x-default-params":{},"tags":[{"name":"Page content","description":"page content in different formats"},{"name":"Transforms","description":"convert content between HTML and Wikitext"},{"name":"Math","description":"formula rendering"},{"name":"Citation","description":"generation of citation data"},{"name":"Reading lists","description":"Private lists of selected pages","externalDocs":{"description":"Project documentation","url":"https://www.mediawiki.org/wiki/Reading/Reading_Lists"}},{"name":"Recommendation","description":"contribution recommendations"}],"servers":[{"url":"/api/rest_v1","description":"(Production)"},{"url":"https://test.wikimedia.org/api/rest_v1","description":"(Sandbox)"}]}</script>
 <script>
-(function () {
+var jqweb = (function () {
   'use strict';
-  var tree = document.getElementById('tree');
-  var input = document.getElementById('q');
-  var stats = document.getElementById('stats');
-
-  /* ---- parse ---- */
-
-  /* The embedded document is compact JSON, parsed here rather than with
-     JSON.parse because the tree shows object keys in document order and
-     numbers exactly as written, neither of which survives JSON.parse. A node
-     is {t:'o',k:keys,v:children}, {t:'a',v:children} or {t:'l',h:leafHTML}. */
   function parseJSON(src) {
     var i = 0;
-
     function ws() { while (i < src.length && src.charCodeAt(i) <= 32) i++; }
-
-    /* Reads a string literal starting at src[i] and returns its value. */
     function str() {
       var start = i++;
       while (src.charCodeAt(i) !== 34) i += src.charCodeAt(i) === 92 ? 2 : 1;
       return JSON.parse(src.slice(start, ++i));
     }
-
     function value() {
       ws();
       var c = src.charAt(i), keys, vals, lit, start;
@@ -114,7 +265,7 @@ main { padding: 10px 14px 60px; }
           for (;;) {
             ws();
             keys.push(str());
-            ws(); i++;                 /* ':' */
+            ws(); i++;
             vals.push(value());
             ws();
             if (src.charAt(i++) === '}') break;
@@ -135,52 +286,80 @@ main { padding: 10px 14px 60px; }
         }
         return { t: 'a', v: vals };
       }
-      if (c === '"') return { t: 'l', h: span('str', esc(quote(str()))) };
+      if (c === '"') {
+        lit = str();
+        return { t: 'l', r: lit, h: span('str', esc(quote(lit))) };
+      }
       start = i;
       while (i < src.length && ',]}'.indexOf(src.charAt(i)) < 0 && src.charCodeAt(i) > 32) i++;
       lit = src.slice(start, i);
-      return { t: 'l', h: span(lit === 'null' ? 'null' : lit === 'true' || lit === 'false' ? 'bool' : 'num', lit) };
+      if (lit === 'null') return { t: 'l', r: null, h: span('null', lit) };
+      if (lit === 'true' || lit === 'false') return { t: 'l', r: lit === 'true', h: span('bool', lit) };
+      return { t: 'l', r: +lit, n: lit, h: span('num', lit) };
     }
-
     return value();
   }
-
   function span(cls, text) { return '<span class="v ' + cls + '">' + text + '</span>'; }
-
-  /* JSON.stringify leaves U+2028 and U+2029 raw; they are escaped so the tree
-     shows them instead of an invisible separator. */
   function quote(s) {
     return JSON.stringify(s).replace(/[\u2028\u2029]/g, function (c) {
       return '\\u202' + (c === '\u2028' ? '8' : '9');
     });
   }
-
   var escMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&#34;', "'": '&#39;' };
   function esc(s) { return s.replace(/[&<>"']/g, function (c) { return escMap[c]; }); }
-
-  /* ---- render ---- */
-
-  var CP = '<button class="cp" title="Copy path">&#x29C9;</button>';
-
-  function renderTree(root) {
+  function leafOf(v) {
+    if (v === null) return { t: 'l', r: null, h: span('null', 'null') };
+    if (v === true || v === false) return { t: 'l', r: v, h: span('bool', String(v)) };
+    if (typeof v === 'number') {
+      if (!isFinite(v)) return { t: 'l', r: null, h: span('null', 'null') };
+      return { t: 'l', r: v, n: String(v), h: span('num', String(v)) };
+    }
+    return { t: 'l', r: v, h: span('str', esc(quote(v))) };
+  }
+  function stringify(node, indent) {
     var out = [];
+    write(node, '');
+    return out.join('');
+    function write(n, pad) {
+      if (n.t === 'l') {
+        out.push(typeof n.r === 'string' ? quote(n.r)
+          : typeof n.r === 'number' ? (n.n !== undefined ? n.n : String(n.r))
+            : String(n.r));
+        return;
+      }
+      var obj = n.t === 'o';
+      if (!n.v.length) { out.push(obj ? '{}' : '[]'); return; }
+      var inner = pad + (indent || '');
+      var nl = indent ? '\n' : '';
+      out.push((obj ? '{' : '[') + nl);
+      for (var i = 0; i < n.v.length; i++) {
+        out.push(inner);
+        if (obj) out.push(quote(n.k[i]) + (indent ? ': ' : ':'));
+        write(n.v[i], inner);
+        out.push(i < n.v.length - 1 ? ',' + nl : nl);
+      }
+      out.push(pad + (obj ? '}' : ']'));
+    }
+  }
+  var CP = '<button class="cp" title="Copy path">&#x29C9;</button>';
+  var FQ = '<button class="fq" title="Filter on this value">&#x2261;</button>';
+  var buttons = CP;
+  function renderTree(root, withFilter) {
+    var out = [];
+    buttons = withFilter ? CP + FQ : CP;
     emit(out, root, null, -1, false);
     return out.join('');
   }
-
-  /* Emits one tree node. key is non-null for object members, idx >= 0 for
-     array elements; the root has neither. comma appends a trailing comma. */
   function emit(out, node, key, idx, comma) {
     var attrs = key !== null ? ' data-key="' + esc(key) + '"'
       : idx >= 0 ? ' data-index="' + idx + '"' : '';
-    var keyPart = '', endBtn = CP;   /* unkeyed nodes get the button at the end of the line */
+    var keyPart = '', endBtn = buttons;
     if (key !== null) {
-      keyPart = '<span class="key">' + esc(quote(key)) + '</span>' + CP +
+      keyPart = '<span class="key">' + esc(quote(key)) + '</span>' + buttons +
         '<span class="pn">: </span>';
       endBtn = '';
     }
     var c = comma ? '<span class="c">,</span>' : '';
-
     if (node.t === 'l') {
       out.push('<div class="node leaf"' + attrs + '><div class="line"><span class="sp"></span>' +
         keyPart + node.h + c + endBtn + '</div></div>');
@@ -206,136 +385,18 @@ main { padding: 10px 14px 60px; }
     }
     out.push('</div><div class="closer"><span class="p">' + close + '</span>' + c + '</div></div>');
   }
-
-  tree.innerHTML = renderTree(parseJSON(document.getElementById('data').textContent));
-  var rootNode = tree.querySelector(':scope > .node');
-
-  tree.addEventListener('click', function (e) {
-    var cp = e.target.closest('.cp');
-    if (cp) { copyPath(cp); return; }
-    var tg = e.target.closest('.toggle');
-    if (tg) { tg.closest('.node').classList.toggle('collapsed'); return; }
-    var fold = e.target.closest('.fold');
-    if (fold) { fold.closest('.node').classList.remove('collapsed'); }
-  });
-
-  document.getElementById('expand').addEventListener('click', function () {
-    each('.node.branch', function (n) { n.classList.remove('collapsed'); });
-  });
-  document.getElementById('collapse').addEventListener('click', function () {
-    each('.node.branch', function (n) { if (n !== rootNode) n.classList.add('collapsed'); });
-  });
-
-  function each(sel, fn) {
-    Array.prototype.forEach.call(tree.querySelectorAll(sel), fn);
-  }
-
-  /* ---- copy path ---- */
-  var identRe = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
-  function pathOf(node) {
-    var segs = [];
-    var n = node;
-    while (n) {
-      if (n.dataset.index !== undefined) {
-        segs.unshift('[' + n.dataset.index + ']');
-      } else if (n.dataset.key !== undefined) {
-        var k = n.dataset.key;
-        segs.unshift(identRe.test(k) ? '.' + k : '[' + JSON.stringify(k) + ']');
-      }
-      n = n.parentElement && n.parentElement.closest('.node');
-    }
-    var p = segs.join('');
-    if (!p) return '.';
-    if (p.charAt(0) === '[') p = '.' + p;
-    return p;
-  }
-
-  function copyPath(btn) {
-    var path = pathOf(btn.closest('.node'));
-    copyText(path, function (ok) { flash(btn, ok); });
-  }
-
-  function copyText(t, done) {
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(t).then(
-        function () { done(true); },
-        function () { done(legacyCopy(t)); });
-    } else {
-      done(legacyCopy(t));
-    }
-  }
-
-  function legacyCopy(t) {
-    var ta = document.createElement('textarea');
-    ta.value = t;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    var ok = false;
-    try { ok = document.execCommand('copy'); } catch (e) {}
-    ta.remove();
-    return ok;
-  }
-
-  function flash(btn, ok) {
-    btn.classList.add(ok ? 'ok' : 'fail');
-    btn.textContent = ok ? '✓' : '✗';
-    setTimeout(function () {
-      btn.classList.remove('ok', 'fail');
-      btn.textContent = '⧉';
-    }, 900);
-  }
-
-  /* ---- search ---- */
-  var timer = null;
-  input.addEventListener('input', function () {
-    clearTimeout(timer);
-    timer = setTimeout(run, 120);
-  });
-  document.addEventListener('keydown', function (e) {
-    if (e.key === '/' && e.target !== input) { e.preventDefault(); input.focus(); }
-    if (e.key === 'Escape' && e.target === input) { input.value = ''; run(); }
-  });
-
-  /* Text containing "." or "[" may be a path such as .a.b[3].c, so it is tried
-     as one first; a bare word is always a text filter. A path that does not
-     resolve falls back to text filtering unless it was written with a leading
-     dot, which takes it as a path regardless. */
-  function run() {
-    var raw = input.value.trim();
-    if (!raw) { reset(); return; }
-    if (/[.[]/.test(raw)) {
-      var segs = parsePath(raw);
-      if (segs) {
-        var found = resolvePath(segs);
-        if (found.depth === segs.length) {
-          showPath(found.node, true);
-          stats.textContent = pathOf(found.node);
-          return;
-        }
-        if (raw.charAt(0) === '.') {
-          showPath(found.node, found.depth > 0);
-          stats.textContent = found.depth ? 'no path past ' + pathOf(found.node) : 'no such path';
-          return;
-        }
-      }
-    }
-    textFilter(raw.toLowerCase());
-  }
-
-  function reset() {
-    each('.node', function (n) { n.classList.remove('hidden', 'hit'); });
-    stats.textContent = '';
-  }
-
-  /* ---- path navigation ---- */
   var pathChar = /[^.[\]"'\s]/;
-
-  /* parsePath splits a jq-style path such as .a.b[3]["x y"] into key and index
-     segments. The leading dot is optional. Returns null for text that is not a
-     path. */
+  var identRe = /^[A-Za-z_][A-Za-z0-9_]*$/;
+  function pathText(segs) {
+    var out = '', s, i;
+    for (i = 0; i < segs.length; i++) {
+      s = segs[i];
+      out += s.index !== undefined ? '[' + s.index + ']'
+        : identRe.test(s.key) ? '.' + s.key : '[' + JSON.stringify(s.key) + ']';
+    }
+    if (!out) return '.';
+    return out.charAt(0) === '[' ? '.' + out : out;
+  }
   function parsePath(str) {
     var s = str.trim();
     if (s === '.') return [];
@@ -379,9 +440,1613 @@ main { padding: 10px 14px 60px; }
     }
     return segs.length ? segs : null;
   }
-
-  /* Walks segs from the root, returning the deepest node reached and how many
-     segments matched; depth === segs.length is a full match. */
+  return {
+    parseJSON: parseJSON,
+    leafOf: leafOf,
+    stringify: stringify,
+    renderTree: renderTree,
+    parsePath: parsePath,
+    pathText: pathText,
+    quote: quote,
+    esc: esc
+  };
+})();
+if (typeof module === 'object' && module.exports) module.exports = jqweb;
+var jqjs = (function () {
+  'use strict';
+  var core = typeof jqweb !== 'undefined' ? jqweb : require('./core.js');
+  var leafOf = core.leafOf, stringify = core.stringify;
+  var NULL = leafOf(null), TRUE = leafOf(true), FALSE = leafOf(false);
+  var STEP_LIMIT = 5000000;
+  var steps = 0;
+  function fail(kind, msg, pos) {
+    var e = new Error(msg);
+    e.jq = kind;
+    e.pos = pos;
+    return e;
+  }
+  function parseErr(msg, pos) { return fail('parse', msg, pos); }
+  function runErr(msg) { return fail('run', msg); }
+  function arrayOf(list) { return { t: 'a', v: list }; }
+  function objectOf(keys, vals) { return { t: 'o', k: keys, v: vals }; }
+  function typeOf(n) {
+    if (n.t === 'o') return 'object';
+    if (n.t === 'a') return 'array';
+    if (n.r === null) return 'null';
+    var t = typeof n.r;
+    return t === 'boolean' ? 'boolean' : t === 'number' ? 'number' : 'string';
+  }
+  function truthy(n) { return !(n.t === 'l' && (n.r === null || n.r === false)); }
+  function members(n) {
+    var keys = [], vals = [], seen = {}, i, at;
+    for (i = 0; i < n.k.length; i++) {
+      at = seen['$' + n.k[i]];
+      if (at === undefined) {
+        seen['$' + n.k[i]] = keys.length;
+        keys.push(n.k[i]);
+        vals.push(n.v[i]);
+      } else {
+        vals[at] = n.v[i];
+      }
+    }
+    return { k: keys, v: vals };
+  }
+  function chars(s) { return Array.from(s); }
+  var RANK = { 'null': 0, boolean: 1, number: 3, string: 4, array: 5, object: 6 };
+  function rank(n) {
+    var t = typeOf(n);
+    return t === 'boolean' ? (n.r ? 2 : 1) : RANK[t];
+  }
+  function cmp(a, b) {
+    var ra = rank(a), rb = rank(b), i, c;
+    if (ra !== rb) return ra < rb ? -1 : 1;
+    if (ra <= 2) return 0;
+    if (ra === 3 || ra === 4) return a.r < b.r ? -1 : a.r > b.r ? 1 : 0;
+    if (ra === 5) {
+      for (i = 0; i < a.v.length && i < b.v.length; i++) {
+        c = cmp(a.v[i], b.v[i]);
+        if (c) return c;
+      }
+      return a.v.length === b.v.length ? 0 : a.v.length < b.v.length ? -1 : 1;
+    }
+    var ma = members(a), mb = members(b);
+    var ka = ma.k.slice().sort(), kb = mb.k.slice().sort();
+    c = cmp(arrayOf(ka.map(leafOf)), arrayOf(kb.map(leafOf)));
+    if (c) return c;
+    for (i = 0; i < ka.length; i++) {
+      c = cmp(ma.v[ma.k.indexOf(ka[i])], mb.v[mb.k.indexOf(kb[i])]);
+      if (c) return c;
+    }
+    return 0;
+  }
+  function equal(a, b) { return cmp(a, b) === 0; }
+  function field(n, key) {
+    if (n.t === 'o') {
+      var i = n.k.lastIndexOf(key);
+      return i < 0 ? NULL : n.v[i];
+    }
+    if (n.t === 'l' && n.r === null) return NULL;
+    throw runErr('cannot index ' + typeOf(n) + ' with "' + key + '"');
+  }
+  function elem(n, i) {
+    if (n.t === 'a') {
+      i = Math.floor(i);
+      if (i < 0) i += n.v.length;
+      return i < 0 || i >= n.v.length ? NULL : n.v[i];
+    }
+    if (n.t === 'l' && n.r === null) return NULL;
+    throw runErr('cannot index ' + typeOf(n) + ' with a number');
+  }
+  function lookup(n, key) {
+    var t = typeOf(key);
+    if (t === 'string') return field(n, key.r);
+    if (t === 'number') return elem(n, key.r);
+    if (t === 'null' && n.t === 'l' && n.r === null) return NULL;
+    throw runErr('cannot index ' + typeOf(n) + ' with ' + t);
+  }
+  function slice(n, from, to) {
+    if (n.t === 'l' && n.r === null) return NULL;
+    var isStr = n.t === 'l' && typeof n.r === 'string';
+    if (n.t !== 'a' && !isStr) throw runErr('cannot slice ' + typeOf(n));
+    var cs = isStr ? chars(n.r) : n.v;
+    var lo = bound(from, 0, cs.length), hi = bound(to, cs.length, cs.length);
+    if (hi < lo) hi = lo;
+    return isStr ? leafOf(cs.slice(lo, hi).join('')) : arrayOf(cs.slice(lo, hi));
+  }
+  function bound(v, dflt, len) {
+    if (v === null) return dflt;
+    if (typeOf(v) !== 'number') throw runErr('a slice bound must be a number');
+    var i = Math.floor(v.r);
+    if (i < 0) i += len;
+    return i < 0 ? 0 : i > len ? len : i;
+  }
+  function iterate(n) {
+    if (n.t === 'a') return n.v;
+    if (n.t === 'o') return members(n).v;
+    throw runErr('cannot iterate over ' + typeOf(n));
+  }
+  function descend(n, out) {
+    out.push(n);
+    if (n.t === 'a' || n.t === 'o') {
+      var v = n.t === 'o' ? members(n).v : n.v;
+      for (var i = 0; i < v.length; i++) descend(v[i], out);
+    }
+  }
+  function add2(a, b) {
+    var ta = typeOf(a), tb = typeOf(b);
+    if (ta === 'null') return b;
+    if (tb === 'null') return a;
+    if (ta === 'number' && tb === 'number') return leafOf(a.r + b.r);
+    if (ta === 'string' && tb === 'string') return leafOf(a.r + b.r);
+    if (ta === 'array' && tb === 'array') return arrayOf(a.v.concat(b.v));
+    if (ta === 'object' && tb === 'object') return merge(a, b, false);
+    throw runErr(ta + ' and ' + tb + ' cannot be added');
+  }
+  function sub2(a, b) {
+    var ta = typeOf(a), tb = typeOf(b);
+    if (ta === 'number' && tb === 'number') return leafOf(a.r - b.r);
+    if (ta === 'array' && tb === 'array') {
+      return arrayOf(a.v.filter(function (n) {
+        for (var i = 0; i < b.v.length; i++) if (equal(b.v[i], n)) return false;
+        return true;
+      }));
+    }
+    throw runErr(ta + ' and ' + tb + ' cannot be subtracted');
+  }
+  function mul2(a, b) {
+    var ta = typeOf(a), tb = typeOf(b);
+    if (ta === 'number' && tb === 'number') return leafOf(a.r * b.r);
+    if (ta === 'string' && tb === 'number') return repeat(a.r, b.r);
+    if (ta === 'number' && tb === 'string') return repeat(b.r, a.r);
+    if (ta === 'object' && tb === 'object') return merge(a, b, true);
+    throw runErr(ta + ' and ' + tb + ' cannot be multiplied');
+  }
+  function div2(a, b) {
+    var ta = typeOf(a), tb = typeOf(b);
+    if (ta === 'number' && tb === 'number') {
+      if (b.r === 0) throw runErr('cannot divide by zero');
+      return leafOf(a.r / b.r);
+    }
+    if (ta === 'string' && tb === 'string') return arrayOf(a.r.split(b.r).map(leafOf));
+    throw runErr(ta + ' and ' + tb + ' cannot be divided');
+  }
+  function mod2(a, b) {
+    if (typeOf(a) !== 'number' || typeOf(b) !== 'number') {
+      throw runErr(typeOf(a) + ' and ' + typeOf(b) + ' cannot be divided');
+    }
+    var d = Math.trunc(b.r);
+    if (d === 0) throw runErr('cannot divide by zero');
+    return leafOf(Math.trunc(a.r) % d);
+  }
+  function repeat(s, n) {
+    if (n < 0) return NULL;
+    var out = '', i;
+    for (i = Math.floor(n); i > 0; i--) out += s;
+    return leafOf(out);
+  }
+  function merge(a, b, deep) {
+    var ma = members(a), mb = members(b);
+    var keys = ma.k.slice(), vals = ma.v.slice(), i, at;
+    for (i = 0; i < mb.k.length; i++) {
+      at = keys.indexOf(mb.k[i]);
+      if (at < 0) {
+        keys.push(mb.k[i]);
+        vals.push(mb.v[i]);
+      } else {
+        vals[at] = deep && vals[at].t === 'o' && mb.v[i].t === 'o'
+          ? merge(vals[at], mb.v[i], true) : mb.v[i];
+      }
+    }
+    return objectOf(keys, vals);
+  }
+  var IDENT_HEAD = /[A-Za-z_]/;
+  var IDENT_TAIL = /[A-Za-z0-9_]/;
+  var DIGIT = /[0-9]/;
+  var OPS = ['?//', '==', '!=', '<=', '>=', '//', '|=', '+=', '-=', '*=', '/=',
+    '%=', '..', '|', ',', '(', ')', '[', ']', '{', '}', ':', ';', '+', '-',
+    '*', '%', '/', '<', '>', '=', '?', '.'];
+  var ESCAPES = {
+    '"': '"', '\\': '\\', '/': '/', b: '\b', f: '\f',
+    n: '\n', r: '\r', t: '\t'
+  };
+  function lex(src) {
+    var toks = [], i = 0, c, p, j, buf, d, e, hex, name;
+    while (i < src.length) {
+      c = src.charAt(i);
+      if (c === ' ' || c === '\t' || c === '\n' || c === '\r') { i++; continue; }
+      if (c === '#') {
+        while (i < src.length && src.charAt(i) !== '\n') i++;
+        continue;
+      }
+      p = i;
+      if (c === '"') {
+        j = i + 1;
+        buf = '';
+        for (;;) {
+          if (j >= src.length) throw parseErr('unterminated string', p);
+          d = src.charAt(j);
+          if (d === '"') { j++; break; }
+          if (d !== '\\') { buf += d; j++; continue; }
+          e = src.charAt(j + 1);
+          if (e === '(') throw parseErr('string interpolation is not supported', j);
+          if (ESCAPES[e] !== undefined) { buf += ESCAPES[e]; j += 2; continue; }
+          if (e === 'u') {
+            hex = src.substr(j + 2, 4);
+            if (!/^[0-9a-fA-F]{4}$/.test(hex)) throw parseErr('bad \\u escape', j);
+            buf += String.fromCharCode(parseInt(hex, 16));
+            j += 6;
+            continue;
+          }
+          throw parseErr('bad escape "\\' + e + '"', j);
+        }
+        toks.push({ k: 'str', v: buf, p: p });
+        i = j;
+        continue;
+      }
+      if (DIGIT.test(c)) {
+        j = i;
+        while (j < src.length && DIGIT.test(src.charAt(j))) j++;
+        if (src.charAt(j) === '.') {
+          j++;
+          while (j < src.length && DIGIT.test(src.charAt(j))) j++;
+        }
+        if (src.charAt(j) === 'e' || src.charAt(j) === 'E') {
+          j++;
+          if (src.charAt(j) === '+' || src.charAt(j) === '-') j++;
+          while (j < src.length && DIGIT.test(src.charAt(j))) j++;
+        }
+        toks.push({ k: 'num', v: +src.slice(i, j), p: p });
+        i = j;
+        continue;
+      }
+      if (c === '.' && IDENT_HEAD.test(src.charAt(i + 1))) {
+        j = i + 1;
+        while (j < src.length && IDENT_TAIL.test(src.charAt(j))) j++;
+        toks.push({ k: 'field', v: src.slice(i + 1, j), p: p });
+        i = j;
+        continue;
+      }
+      if (IDENT_HEAD.test(c)) {
+        j = i;
+        while (j < src.length && IDENT_TAIL.test(src.charAt(j))) j++;
+        name = src.slice(i, j);
+        toks.push(name === 'and' || name === 'or'
+          ? { k: 'op', v: name, p: p } : { k: 'ident', v: name, p: p });
+        i = j;
+        continue;
+      }
+      if (c === '$' || c === '@') {
+        j = i + 1;
+        while (j < src.length && IDENT_TAIL.test(src.charAt(j))) j++;
+        toks.push({ k: c === '$' ? 'var' : 'format', v: src.slice(i, j), p: p });
+        i = j;
+        continue;
+      }
+      for (j = 0; j < OPS.length; j++) {
+        if (src.substr(i, OPS[j].length) === OPS[j]) break;
+      }
+      if (j === OPS.length) throw parseErr('unexpected "' + c + '"', p);
+      toks.push({ k: 'op', v: OPS[j], p: p });
+      i += OPS[j].length;
+    }
+    toks.push({ k: 'eof', v: '', p: src.length });
+    return toks;
+  }
+  var BINOPS = [
+    { ops: ['|'], right: true },
+    { ops: [','] },
+    { ops: ['//'] },
+    { ops: ['or'] },
+    { ops: ['and'] },
+    { ops: ['==', '!=', '<', '<=', '>', '>='] },
+    { ops: ['+', '-'] },
+    { ops: ['*', '/', '%'] }
+  ];
+  var OBJ_VALUE_LEVEL = 2;
+  var MISSING = {
+    '=': 'assignment is not supported',
+    '|=': 'assignment is not supported',
+    '+=': 'assignment is not supported',
+    '-=': 'assignment is not supported',
+    '*=': 'assignment is not supported',
+    '/=': 'assignment is not supported',
+    '%=': 'assignment is not supported',
+    '?//': 'destructuring is not supported',
+    'as': 'variables are not supported',
+    'def': 'function definitions are not supported',
+    'reduce': 'reduce is not supported',
+    'foreach': 'foreach is not supported',
+    'try': 'try/catch is not supported, but a trailing "?" is',
+    'catch': 'try/catch is not supported, but a trailing "?" is',
+    'label': 'labels are not supported',
+    'import': 'imports are not supported',
+    'include': 'imports are not supported'
+  };
+  function orList(ns) {
+    var sorted = ns.slice().sort(function (a, b) { return a - b; });
+    if (sorted.length < 2) return String(sorted[0]);
+    return sorted.slice(0, -1).join(', ') + ' or ' + sorted[sorted.length - 1];
+  }
+  var arityCache = null;
+  function arities() {
+    if (!arityCache) {
+      arityCache = {};
+      for (var key in builtins) {
+        var cut = key.lastIndexOf('/');
+        var name = key.slice(0, cut);
+        if (!arityCache[name]) arityCache[name] = [];
+        arityCache[name].push(+key.slice(cut + 1));
+      }
+    }
+    return arityCache;
+  }
+  function parse(src) {
+    var toks = lex(src), at = 0;
+    function peek() { return toks[at]; }
+    function isOp(v) { return toks[at].k === 'op' && toks[at].v === v; }
+    function isWord(v) { return toks[at].k === 'ident' && toks[at].v === v; }
+    function eat(v) { return isOp(v) ? (at++, true) : false; }
+    function want(v) {
+      if (!eat(v)) reject(peek(), 'expected "' + v + '"');
+    }
+    function wantWord(v) {
+      if (!isWord(v)) reject(peek(), 'expected "' + v + '"');
+      at++;
+    }
+    function reject(t, fallback) {
+      if (t.k === 'var') throw parseErr('variables are not supported', t.p);
+      if (t.k === 'format') throw parseErr('format strings are not supported', t.p);
+      if ((t.k === 'op' || t.k === 'ident') && MISSING[t.v]) {
+        throw parseErr(MISSING[t.v], t.p);
+      }
+      if (fallback) throw parseErr(fallback, t.p);
+      if (t.k === 'eof') throw parseErr('query ends early', t.p);
+      throw parseErr('unexpected "' + t.v + '"', t.p);
+    }
+    function expr(level) {
+      if (level === undefined) level = 0;
+      if (level >= BINOPS.length) return unary();
+      var lhs = expr(level + 1), lv = BINOPS[level], t;
+      for (;;) {
+        t = peek();
+        if (t.k !== 'op' || lv.ops.indexOf(t.v) < 0) return lhs;
+        at++;
+        lhs = { op: t.v, l: lhs, r: lv.right ? expr(level) : expr(level + 1), p: t.p };
+        if (lv.right) return lhs;
+      }
+    }
+    function unary() {
+      if (isOp('-')) {
+        var p = peek().p;
+        at++;
+        return { op: 'neg', e: unary(), p: p };
+      }
+      return postfix(primary());
+    }
+    function postfix(src) {
+      var t, next;
+      for (;;) {
+        t = peek();
+        next = toks[at + 1];
+        if (t.k === 'field') {
+          at++;
+          src = { op: 'field', src: src, name: t.v, p: t.p };
+        } else if (t.k === 'op' && t.v === '.' && next.k === 'str') {
+          at += 2;
+          src = { op: 'field', src: src, name: next.v, p: t.p };
+        } else if (t.k === 'op' && t.v === '.' && next.k === 'op' && next.v === '[') {
+          at++;
+        } else if (t.k === 'op' && t.v === '[') {
+          src = brackets(src);
+        } else if (t.k === 'op' && t.v === '?') {
+          at++;
+          src = { op: 'opt', e: src, p: t.p };
+        } else {
+          return src;
+        }
+      }
+    }
+    function brackets(src) {
+      var p = peek().p, first, to;
+      at++;
+      if (eat(']')) return { op: 'iterate', src: src, p: p };
+      if (eat(':')) {
+        to = expr();
+        want(']');
+        return { op: 'slice', src: src, from: null, to: to, p: p };
+      }
+      first = expr();
+      if (eat(':')) {
+        to = isOp(']') ? null : expr();
+        want(']');
+        return { op: 'slice', src: src, from: first, to: to, p: p };
+      }
+      want(']');
+      return { op: 'index', src: src, e: first, p: p };
+    }
+    function primary() {
+      var t = peek(), e, args, key;
+      if (t.k === 'num' || t.k === 'str') {
+        at++;
+        return { op: 'lit', n: leafOf(t.v), p: t.p };
+      }
+      if (t.k === 'field') return { op: '.', p: t.p };
+      if (t.k === 'op' && t.v === '.') {
+        var after = toks[at + 1];
+        if (!(after.k === 'str' || (after.k === 'op' && after.v === '['))) at++;
+        return { op: '.', p: t.p };
+      }
+      if (t.k === 'op' && t.v === '..') { at++; return { op: 'recurse', p: t.p }; }
+      if (t.k === 'op' && t.v === '(') {
+        at++;
+        e = expr();
+        want(')');
+        return e;
+      }
+      if (t.k === 'op' && t.v === '[') {
+        at++;
+        if (eat(']')) return { op: 'array', e: null, p: t.p };
+        e = expr();
+        want(']');
+        return { op: 'array', e: e, p: t.p };
+      }
+      if (t.k === 'op' && t.v === '{') { at++; return object(t.p); }
+      if (t.k === 'ident' && !MISSING[t.v]) {
+        if (t.v === 'if') return conditional();
+        if (t.v === 'true' || t.v === 'false' || t.v === 'null') {
+          at++;
+          return { op: 'lit', n: t.v === 'null' ? NULL : t.v === 'true' ? TRUE : FALSE, p: t.p };
+        }
+        at++;
+        args = [];
+        if (eat('(')) {
+          for (;;) {
+            args.push(expr());
+            if (!eat(';')) break;
+          }
+          want(')');
+        }
+        key = t.v + '/' + args.length;
+        if (!builtins[key]) {
+          var counts = arities()[t.v];
+          if (!counts) throw parseErr(t.v + ' is not a supported filter', t.p);
+          throw parseErr(t.v + ' takes ' + orList(counts) +
+            (counts.length === 1 && counts[0] === 1 ? ' argument, not ' : ' arguments, not ') +
+            args.length, t.p);
+        }
+        return { op: 'call', key: key, args: args, p: t.p };
+      }
+      return reject(t);
+    }
+    function conditional() {
+      var p = peek().p, cond, yes, no;
+      at++;
+      cond = expr();
+      wantWord('then');
+      yes = expr();
+      if (isWord('elif')) return { op: 'if', c: cond, t: yes, f: conditional(), p: p };
+      if (isWord('else')) { at++; no = expr(); } else { no = { op: '.', p: p }; }
+      wantWord('end');
+      return { op: 'if', c: cond, t: yes, f: no, p: p };
+    }
+    function object(p) {
+      var entries = [], t, key, val;
+      if (eat('}')) return { op: 'object', entries: entries, p: p };
+      for (;;) {
+        t = peek();
+        if (t.k === 'ident' || t.k === 'str') {
+          at++;
+          key = { op: 'lit', n: leafOf(t.v), p: t.p };
+        } else if (t.k === 'op' && t.v === '(') {
+          at++;
+          key = expr();
+          want(')');
+        } else {
+          return reject(t);
+        }
+        if (eat(':')) {
+          val = expr(OBJ_VALUE_LEVEL);
+        } else if (t.k === 'ident' || t.k === 'str') {
+          val = { op: 'field', src: { op: '.', p: t.p }, name: t.v, p: t.p };
+        } else {
+          throw parseErr('expected ":"', peek().p);
+        }
+        entries.push({ k: key, v: val });
+        if (!eat(',')) break;
+      }
+      want('}');
+      return { op: 'object', entries: entries, p: p };
+    }
+    if (peek().k === 'eof') throw parseErr('empty query', 0);
+    var ast = expr();
+    if (peek().k !== 'eof') reject(peek());
+    return ast;
+  }
+  function pathSegs(a) {
+    var base, v;
+    if (a.op === '.') return [];
+    if (a.op === 'field') {
+      base = pathSegs(a.src);
+      return base && base.concat([{ key: a.name }]);
+    }
+    if (a.op === 'index') {
+      v = constant(a.e);
+      base = v && pathSegs(a.src);
+      if (!base) return null;
+      if (typeof v.r === 'string') return base.concat([{ key: v.r }]);
+      if (typeof v.r === 'number' && v.r % 1 === 0) return base.concat([{ index: v.r }]);
+    }
+    return null;
+  }
+  function constant(a) {
+    if (a.op === 'lit') return a.n;
+    if (a.op === 'neg' && a.e.op === 'lit' && typeof a.e.n.r === 'number') {
+      return leafOf(-a.e.n.r);
+    }
+    return null;
+  }
+  function tick() {
+    if (++steps > STEP_LIMIT) throw runErr('query produced too much work');
+  }
+  function push(out, list) {
+    for (var i = 0; i < list.length; i++) out.push(list[i]);
+  }
+  var COMPARE = {
+    '==': function (c) { return c === 0; },
+    '!=': function (c) { return c !== 0; },
+    '<': function (c) { return c < 0; },
+    '<=': function (c) { return c <= 0; },
+    '>': function (c) { return c > 0; },
+    '>=': function (c) { return c >= 0; }
+  };
+  var ARITH = { '+': add2, '-': sub2, '*': mul2, '/': div2, '%': mod2 };
+  function ev(a, x) {
+    tick();
+    var out, vals, i, j, k, from, to, test;
+    switch (a.op) {
+      case '.':
+        return [x];
+      case 'lit':
+        return [a.n];
+      case 'recurse':
+        out = [];
+        descend(x, out);
+        return out;
+      case '|':
+        out = [];
+        vals = ev(a.l, x);
+        for (i = 0; i < vals.length; i++) push(out, ev(a.r, vals[i]));
+        return out;
+      case ',':
+        return ev(a.l, x).concat(ev(a.r, x));
+      case '//':
+        return alternative(a, x);
+      case 'and':
+      case 'or':
+        return logical(a, x);
+      case '==': case '!=': case '<': case '<=': case '>': case '>=':
+        test = COMPARE[a.op];
+        return pair(a, x, function (l, r) { return test(cmp(l, r)) ? TRUE : FALSE; });
+      case '+': case '-': case '*': case '/': case '%':
+        return pair(a, x, ARITH[a.op]);
+      case 'neg':
+        out = [];
+        vals = ev(a.e, x);
+        for (i = 0; i < vals.length; i++) {
+          out.push(leafOf(-num(vals[i], 'negation')));
+        }
+        return out;
+      case 'opt':
+        try {
+          return ev(a.e, x);
+        } catch (e) {
+          if (e.jq === 'run') return [];
+          throw e;
+        }
+      case 'field':
+        out = [];
+        vals = ev(a.src, x);
+        for (i = 0; i < vals.length; i++) out.push(field(vals[i], a.name));
+        return out;
+      case 'index':
+        out = [];
+        vals = ev(a.src, x);
+        to = ev(a.e, x);
+        for (i = 0; i < vals.length; i++) {
+          for (j = 0; j < to.length; j++) out.push(lookup(vals[i], to[j]));
+        }
+        return out;
+      case 'slice':
+        out = [];
+        vals = ev(a.src, x);
+        from = a.from ? ev(a.from, x) : [null];
+        to = a.to ? ev(a.to, x) : [null];
+        for (i = 0; i < vals.length; i++) {
+          for (j = 0; j < from.length; j++) {
+            for (k = 0; k < to.length; k++) out.push(slice(vals[i], from[j], to[k]));
+          }
+        }
+        return out;
+      case 'iterate':
+        out = [];
+        vals = ev(a.src, x);
+        for (i = 0; i < vals.length; i++) push(out, iterate(vals[i]));
+        return out;
+      case 'array':
+        return [arrayOf(a.e ? ev(a.e, x) : [])];
+      case 'object':
+        out = [];
+        buildObject(a.entries, 0, [], [], x, out);
+        return out;
+      case 'if':
+        out = [];
+        vals = ev(a.c, x);
+        for (i = 0; i < vals.length; i++) push(out, ev(truthy(vals[i]) ? a.t : a.f, x));
+        return out;
+      case 'call':
+        return builtins[a.key](x, a.args);
+    }
+    throw runErr('cannot evaluate ' + a.op);
+  }
+  function pair(a, x, f) {
+    var l = ev(a.l, x), r = ev(a.r, x), out = [], i, j;
+    for (i = 0; i < r.length; i++) {
+      for (j = 0; j < l.length; j++) out.push(f(l[j], r[i]));
+    }
+    return out;
+  }
+  function alternative(a, x) {
+    var out = [], vals, i;
+    try {
+      vals = ev(a.l, x);
+      for (i = 0; i < vals.length; i++) if (truthy(vals[i])) out.push(vals[i]);
+    } catch (e) {
+      if (e.jq !== 'run') throw e;
+    }
+    return out.length ? out : ev(a.r, x);
+  }
+  function logical(a, x) {
+    var vals = ev(a.l, x), decided = a.op === 'or', out = [], rest, i, j;
+    for (i = 0; i < vals.length; i++) {
+      if (truthy(vals[i]) === decided) {
+        out.push(decided ? TRUE : FALSE);
+        continue;
+      }
+      rest = ev(a.r, x);
+      for (j = 0; j < rest.length; j++) out.push(truthy(rest[j]) ? TRUE : FALSE);
+    }
+    return out;
+  }
+  function buildObject(entries, i, keys, vals, x, out) {
+    if (i === entries.length) {
+      out.push(distinct(objectOf(keys.slice(), vals.slice())));
+      return;
+    }
+    var ks = ev(entries[i].k, x), vs, j, m;
+    for (j = 0; j < ks.length; j++) {
+      if (typeOf(ks[j]) !== 'string') {
+        throw runErr('an object key must be a string, not ' + typeOf(ks[j]));
+      }
+      vs = ev(entries[i].v, x);
+      for (m = 0; m < vs.length; m++) {
+        keys.push(ks[j].r);
+        vals.push(vs[m]);
+        buildObject(entries, i + 1, keys, vals, x, out);
+        keys.pop();
+        vals.pop();
+      }
+    }
+  }
+  function wantType(n, t, name) {
+    if (typeOf(n) !== t) throw runErr(name + ' needs ' + t + ', not ' + typeOf(n));
+    return n;
+  }
+  function num(n, name) {
+    if (typeOf(n) !== 'number') throw runErr(name + ' needs a number, not ' + typeOf(n));
+    return n.r;
+  }
+  function overArg(arg, x, f) {
+    var vals = ev(arg, x), out = [], i;
+    for (i = 0; i < vals.length; i++) out.push(f(vals[i]));
+    return out;
+  }
+  function distinct(n) {
+    var m = members(n);
+    return objectOf(m.k, m.v);
+  }
+  function keysOf(n, sorted) {
+    var out = [], i;
+    if (n.t === 'a') {
+      for (i = 0; i < n.v.length; i++) out.push(leafOf(i));
+      return arrayOf(out);
+    }
+    if (n.t === 'o') {
+      var k = members(n).k.slice();
+      if (sorted) k.sort();
+      return arrayOf(k.map(leafOf));
+    }
+    throw runErr(typeOf(n) + ' has no keys');
+  }
+  function hasKey(container, key) {
+    if (container.t === 'o') {
+      return typeOf(key) === 'string' && members(container).k.indexOf(key.r) >= 0;
+    }
+    if (container.t === 'a') {
+      var i = num(key, 'has');
+      return i >= 0 && i < container.v.length;
+    }
+    throw runErr('cannot check whether ' + typeOf(container) + ' has a key');
+  }
+  function keyed(list, arg) {
+    var pairs = list.map(function (n) { return { n: n, k: arrayOf(ev(arg, n)) }; });
+    pairs.sort(function (p, q) { return cmp(p.k, q.k); });
+    return pairs;
+  }
+  function runsOf(pairs) {
+    var out = [], i;
+    for (i = 0; i < pairs.length; i++) {
+      if (i && cmp(pairs[i - 1].k, pairs[i].k) === 0) out[out.length - 1].push(pairs[i].n);
+      else out.push([pairs[i].n]);
+    }
+    return out;
+  }
+  function flattenInto(list, depth, out) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].t === 'a' && depth > 0) flattenInto(list[i].v, depth - 1, out);
+      else out.push(list[i]);
+    }
+  }
+  function rangeOf(froms, tos, bys) {
+    var out = [], i, j, k, from, to, by, v;
+    for (i = 0; i < froms.length; i++) {
+      for (j = 0; j < tos.length; j++) {
+        for (k = 0; k < bys.length; k++) {
+          from = num(froms[i], 'range');
+          to = num(tos[j], 'range');
+          by = num(bys[k], 'range');
+          if (by === 0) continue;
+          for (v = from; by > 0 ? v < to : v > to; v += by) {
+            tick();
+            out.push(leafOf(v));
+          }
+        }
+      }
+    }
+    return out;
+  }
+  var RE_FLAGS = 'gimsuy';
+  function regex(pattern, flags) {
+    var i;
+    for (i = 0; i < flags.length; i++) {
+      if (RE_FLAGS.indexOf(flags.charAt(i)) < 0) {
+        throw runErr('unsupported regex flag "' + flags.charAt(i) + '"');
+      }
+    }
+    try {
+      return new RegExp(pattern, flags);
+    } catch (e) {
+      throw runErr('bad regular expression: ' + e.message);
+    }
+  }
+  function containsIn(a, b) {
+    var ta = typeOf(a), tb = typeOf(b), i, j, ok, mb;
+    if (ta === 'object' && tb === 'object') {
+      mb = members(b);
+      for (i = 0; i < mb.k.length; i++) {
+        if (!containsIn(field(a, mb.k[i]), mb.v[i])) return false;
+      }
+      return true;
+    }
+    if (ta === 'array' && tb === 'array') {
+      for (i = 0; i < b.v.length; i++) {
+        ok = false;
+        for (j = 0; j < a.v.length && !ok; j++) ok = containsIn(a.v[j], b.v[i]);
+        if (!ok) return false;
+      }
+      return true;
+    }
+    if (ta === 'string' && tb === 'string') return a.r.indexOf(b.r) >= 0;
+    if (ta !== tb) throw runErr(ta + ' and ' + tb + ' cannot be checked for containment');
+    return equal(a, b);
+  }
+  function indicesOf(x, want) {
+    var tx = typeOf(x), tw = typeOf(want), out = [], cs, ws, i, j;
+    if (tx === 'null') return NULL;
+    if (tx === 'string') {
+      if (tw !== 'string') throw runErr('cannot look for ' + tw + ' in a string');
+      ws = chars(want.r);
+      cs = chars(x.r);
+      for (i = 0; ws.length && i + ws.length <= cs.length; i++) {
+        for (j = 0; j < ws.length && cs[i + j] === ws[j]; j++) {  }
+        if (j === ws.length) out.push(leafOf(i));
+      }
+      return arrayOf(out);
+    }
+    if (tx !== 'array') throw runErr('cannot look inside ' + tx);
+    if (tw === 'array') {
+      for (i = 0; want.v.length && i + want.v.length <= x.v.length; i++) {
+        for (j = 0; j < want.v.length && equal(x.v[i + j], want.v[j]); j++) {  }
+        if (j === want.v.length) out.push(leafOf(i));
+      }
+      return arrayOf(out);
+    }
+    for (i = 0; i < x.v.length; i++) if (equal(x.v[i], want)) out.push(leafOf(i));
+    return arrayOf(out);
+  }
+  function endIndex(found, last) {
+    if (found.t !== 'a' || !found.v.length) return NULL;
+    return last ? found.v[found.v.length - 1] : found.v[0];
+  }
+  var ENTRY_KEYS = ['name', 'Name', 'key', 'Key'];
+  var ENTRY_VALUES = ['value', 'Value'];
+  function entryKey(e) {
+    var at, i;
+    for (i = 0; i < ENTRY_KEYS.length; i++) {
+      at = e.k.lastIndexOf(ENTRY_KEYS[i]);
+      if (at >= 0 && truthy(e.v[at])) return e.v[at];
+    }
+    return NULL;
+  }
+  function entryValue(e) {
+    var at, i;
+    for (i = 0; i < ENTRY_VALUES.length; i++) {
+      at = e.k.lastIndexOf(ENTRY_VALUES[i]);
+      if (at >= 0) return e.v[at];
+    }
+    return NULL;
+  }
+  function typeFilter(t) {
+    return function (x) { return typeOf(x) === t ? [x] : []; };
+  }
+  function mathFilter(f) {
+    return function (x) { return [leafOf(f(num(x, 'a number filter')))]; };
+  }
+  var builtins = {
+    'empty/0': function () { return []; },
+    'not/0': function (x) { return [truthy(x) ? FALSE : TRUE]; },
+    'type/0': function (x) { return [leafOf(typeOf(x))]; },
+    'select/1': function (x, args) {
+      var vals = ev(args[0], x), out = [], i;
+      for (i = 0; i < vals.length; i++) if (truthy(vals[i])) out.push(x);
+      return out;
+    },
+    'recurse/0': function (x) {
+      var out = [];
+      descend(x, out);
+      return out;
+    },
+    'recurse/1': function (x, args) {
+      var out = [], stack = [x], next, i;
+      while (stack.length) {
+        tick();
+        next = stack.pop();
+        out.push(next);
+        next = ev(args[0], next);
+        for (i = next.length - 1; i >= 0; i--) stack.push(next[i]);
+      }
+      return out;
+    },
+    'map/1': function (x, args) {
+      var vals = iterate(x), out = [], i;
+      for (i = 0; i < vals.length; i++) push(out, ev(args[0], vals[i]));
+      return [arrayOf(out)];
+    },
+    'map_values/1': function (x, args) {
+      var keys = [], vals = [], r, i, m;
+      if (x.t === 'a') {
+        for (i = 0; i < x.v.length; i++) {
+          r = ev(args[0], x.v[i]);
+          if (r.length) vals.push(r[0]);
+        }
+        return [arrayOf(vals)];
+      }
+      m = members(wantType(x, 'object', 'map_values'));
+      for (i = 0; i < m.k.length; i++) {
+        r = ev(args[0], m.v[i]);
+        if (r.length) {
+          keys.push(m.k[i]);
+          vals.push(r[0]);
+        }
+      }
+      return [objectOf(keys, vals)];
+    },
+    'length/0': function (x) {
+      var t = typeOf(x);
+      if (t === 'null') return [leafOf(0)];
+      if (t === 'boolean') throw runErr('boolean has no length');
+      if (t === 'number') return [leafOf(Math.abs(x.r))];
+      if (t === 'string') return [leafOf(chars(x.r).length)];
+      return [leafOf(t === 'object' ? members(x).k.length : x.v.length)];
+    },
+    'keys/0': function (x) { return [keysOf(x, true)]; },
+    'keys_unsorted/0': function (x) { return [keysOf(x, false)]; },
+    'has/1': function (x, args) {
+      return overArg(args[0], x, function (k) { return hasKey(x, k) ? TRUE : FALSE; });
+    },
+    'in/1': function (x, args) {
+      return overArg(args[0], x, function (c) { return hasKey(c, x) ? TRUE : FALSE; });
+    },
+    'indices/1': function (x, args) {
+      return overArg(args[0], x, function (w) { return indicesOf(x, w); });
+    },
+    'index/1': function (x, args) {
+      return overArg(args[0], x, function (w) { return endIndex(indicesOf(x, w), false); });
+    },
+    'rindex/1': function (x, args) {
+      return overArg(args[0], x, function (w) { return endIndex(indicesOf(x, w), true); });
+    },
+    'contains/1': function (x, args) {
+      return overArg(args[0], x, function (b) { return containsIn(x, b) ? TRUE : FALSE; });
+    },
+    'inside/1': function (x, args) {
+      return overArg(args[0], x, function (b) { return containsIn(b, x) ? TRUE : FALSE; });
+    },
+    'to_entries/0': function (x) {
+      var m = members(wantType(x, 'object', 'to_entries')), out = [], i;
+      for (i = 0; i < m.k.length; i++) {
+        out.push(objectOf(['key', 'value'], [leafOf(m.k[i]), m.v[i]]));
+      }
+      return [arrayOf(out)];
+    },
+    'from_entries/0': function (x) {
+      var list = wantType(x, 'array', 'from_entries').v;
+      var keys = [], vals = [], e, k, i;
+      for (i = 0; i < list.length; i++) {
+        e = list[i];
+        k = e.t === 'o' ? entryKey(e) : e;
+        vals.push(e.t === 'o' ? entryValue(e) : NULL);
+        keys.push(typeOf(k) === 'string' ? k.r : stringify(k));
+      }
+      return [distinct(objectOf(keys, vals))];
+    },
+    'with_entries/1': function (x, args) {
+      var entries = builtins['to_entries/0'](x)[0], out = [], i;
+      for (i = 0; i < entries.v.length; i++) push(out, ev(args[0], entries.v[i]));
+      return builtins['from_entries/0'](arrayOf(out));
+    },
+    'add/0': function (x) {
+      var vals = iterate(x), acc = NULL, i;
+      for (i = 0; i < vals.length; i++) acc = add2(acc, vals[i]);
+      return [acc];
+    },
+    'any/0': function (x) {
+      var vals = iterate(x), i;
+      for (i = 0; i < vals.length; i++) if (truthy(vals[i])) return [TRUE];
+      return [FALSE];
+    },
+    'all/0': function (x) {
+      var vals = iterate(x), i;
+      for (i = 0; i < vals.length; i++) if (!truthy(vals[i])) return [FALSE];
+      return [TRUE];
+    },
+    'any/1': function (x, args) {
+      var vals = iterate(x), r, i, j;
+      for (i = 0; i < vals.length; i++) {
+        r = ev(args[0], vals[i]);
+        for (j = 0; j < r.length; j++) if (truthy(r[j])) return [TRUE];
+      }
+      return [FALSE];
+    },
+    'all/1': function (x, args) {
+      var vals = iterate(x), r, i, j;
+      for (i = 0; i < vals.length; i++) {
+        r = ev(args[0], vals[i]);
+        for (j = 0; j < r.length; j++) if (!truthy(r[j])) return [FALSE];
+      }
+      return [TRUE];
+    },
+    'min/0': function (x) { return [pick(wantType(x, 'array', 'min').v, null, -1)]; },
+    'max/0': function (x) { return [pick(wantType(x, 'array', 'max').v, null, 1)]; },
+    'min_by/1': function (x, args) { return [pick(wantType(x, 'array', 'min_by').v, args[0], -1)]; },
+    'max_by/1': function (x, args) { return [pick(wantType(x, 'array', 'max_by').v, args[0], 1)]; },
+    'sort/0': function (x) {
+      return [arrayOf(wantType(x, 'array', 'sort').v.slice().sort(cmp))];
+    },
+    'sort_by/1': function (x, args) {
+      var pairs = keyed(wantType(x, 'array', 'sort_by').v, args[0]);
+      return [arrayOf(pairs.map(function (p) { return p.n; }))];
+    },
+    'group_by/1': function (x, args) {
+      var runs = runsOf(keyed(wantType(x, 'array', 'group_by').v, args[0]));
+      return [arrayOf(runs.map(arrayOf))];
+    },
+    'unique/0': function (x) {
+      var sorted = wantType(x, 'array', 'unique').v.slice().sort(cmp), out = [], i;
+      for (i = 0; i < sorted.length; i++) {
+        if (!i || cmp(sorted[i - 1], sorted[i]) !== 0) out.push(sorted[i]);
+      }
+      return [arrayOf(out)];
+    },
+    'unique_by/1': function (x, args) {
+      var runs = runsOf(keyed(wantType(x, 'array', 'unique_by').v, args[0]));
+      return [arrayOf(runs.map(function (r) { return r[0]; }))];
+    },
+    'reverse/0': function (x) {
+      if (typeOf(x) === 'string') return [leafOf(chars(x.r).reverse().join(''))];
+      if (typeOf(x) === 'null') return [arrayOf([])];
+      return [arrayOf(wantType(x, 'array', 'reverse').v.slice().reverse())];
+    },
+    'flatten/0': function (x) {
+      var out = [];
+      flattenInto(wantType(x, 'array', 'flatten').v, Infinity, out);
+      return [arrayOf(out)];
+    },
+    'flatten/1': function (x, args) {
+      return overArg(args[0], x, function (d) {
+        var depth = num(d, 'flatten'), out = [];
+        if (depth < 0) throw runErr('flatten needs a depth of 0 or more');
+        flattenInto(wantType(x, 'array', 'flatten').v, depth, out);
+        return arrayOf(out);
+      });
+    },
+    'first/0': function (x) { return [elem(wantType(x, 'array', 'first'), 0)]; },
+    'last/0': function (x) { return [elem(wantType(x, 'array', 'last'), -1)]; },
+    'first/1': function (x, args) {
+      var vals = ev(args[0], x);
+      return vals.length ? [vals[0]] : [];
+    },
+    'last/1': function (x, args) {
+      var vals = ev(args[0], x);
+      return vals.length ? [vals[vals.length - 1]] : [];
+    },
+    'limit/2': function (x, args) {
+      var out = [], counts = ev(args[0], x), vals, n, i;
+      for (i = 0; i < counts.length; i++) {
+        n = Math.floor(num(counts[i], 'limit'));
+        if (n <= 0) continue;
+        vals = ev(args[1], x);
+        push(out, vals.slice(0, n));
+      }
+      return out;
+    },
+    'range/1': function (x, args) { return rangeOf([leafOf(0)], ev(args[0], x), [leafOf(1)]); },
+    'range/2': function (x, args) { return rangeOf(ev(args[0], x), ev(args[1], x), [leafOf(1)]); },
+    'range/3': function (x, args) { return rangeOf(ev(args[0], x), ev(args[1], x), ev(args[2], x)); },
+    'join/1': function (x, args) {
+      var list = wantType(x, 'array', 'join').v;
+      return overArg(args[0], x, function (sep) {
+        var parts = [], t, i;
+        for (i = 0; i < list.length; i++) {
+          t = typeOf(list[i]);
+          if (t === 'null') parts.push('');
+          else if (t === 'string') parts.push(list[i].r);
+          else if (t === 'number' || t === 'boolean') parts.push(stringify(list[i]));
+          else throw runErr('cannot join ' + t + ' elements');
+        }
+        return leafOf(parts.join(typeOf(sep) === 'string' ? sep.r : stringify(sep)));
+      });
+    },
+    'split/1': function (x, args) {
+      var s = wantType(x, 'string', 'split').r;
+      return overArg(args[0], x, function (sep) {
+        return arrayOf(s.split(wantType(sep, 'string', 'split').r).map(leafOf));
+      });
+    },
+    'test/1': function (x, args) { return match(x, args[0], null); },
+    'test/2': function (x, args) { return match(x, args[0], args[1]); },
+    'startswith/1': function (x, args) {
+      var s = wantType(x, 'string', 'startswith').r;
+      return overArg(args[0], x, function (p) {
+        return s.lastIndexOf(wantType(p, 'string', 'startswith').r, 0) === 0 ? TRUE : FALSE;
+      });
+    },
+    'endswith/1': function (x, args) {
+      var s = wantType(x, 'string', 'endswith').r;
+      return overArg(args[0], x, function (p) {
+        var t = wantType(p, 'string', 'endswith').r;
+        return s.length >= t.length && s.indexOf(t, s.length - t.length) >= 0 ? TRUE : FALSE;
+      });
+    },
+    'ltrimstr/1': function (x, args) {
+      return overArg(args[0], x, function (p) {
+        if (typeOf(x) !== 'string' || typeOf(p) !== 'string') return x;
+        return x.r.lastIndexOf(p.r, 0) === 0 ? leafOf(x.r.slice(p.r.length)) : x;
+      });
+    },
+    'rtrimstr/1': function (x, args) {
+      return overArg(args[0], x, function (p) {
+        if (typeOf(x) !== 'string' || typeOf(p) !== 'string') return x;
+        var at = x.r.length - p.r.length;
+        return at >= 0 && x.r.indexOf(p.r, at) === at ? leafOf(x.r.slice(0, at)) : x;
+      });
+    },
+    'ascii_downcase/0': function (x) {
+      return [leafOf(wantType(x, 'string', 'ascii_downcase').r.replace(/[A-Z]/g, lower))];
+    },
+    'ascii_upcase/0': function (x) {
+      return [leafOf(wantType(x, 'string', 'ascii_upcase').r.replace(/[a-z]/g, upper))];
+    },
+    'tostring/0': function (x) {
+      return [typeOf(x) === 'string' ? x : leafOf(stringify(x))];
+    },
+    'tonumber/0': function (x) {
+      if (typeOf(x) === 'number') return [x];
+      var n = +wantType(x, 'string', 'tonumber').r;
+      if (x.r.trim() === '' || isNaN(n)) throw runErr('cannot parse "' + x.r + '" as a number');
+      return [leafOf(n)];
+    },
+    'tojson/0': function (x) { return [leafOf(stringify(x))]; },
+    'fromjson/0': function (x) {
+      var s = wantType(x, 'string', 'fromjson').r;
+      try {
+        JSON.parse(s);
+      } catch (e) {
+        throw runErr('cannot parse "' + s + '" as JSON');
+      }
+      return [core.parseJSON(s)];
+    },
+    'floor/0': mathFilter(Math.floor),
+    'ceil/0': mathFilter(Math.ceil),
+    'round/0': mathFilter(Math.round),
+    'fabs/0': mathFilter(Math.abs),
+    'sqrt/0': mathFilter(Math.sqrt),
+    'arrays/0': typeFilter('array'),
+    'objects/0': typeFilter('object'),
+    'booleans/0': typeFilter('boolean'),
+    'numbers/0': typeFilter('number'),
+    'strings/0': typeFilter('string'),
+    'nulls/0': typeFilter('null'),
+    'iterables/0': function (x) { return x.t === 'a' || x.t === 'o' ? [x] : []; },
+    'scalars/0': function (x) { return x.t === 'l' ? [x] : []; },
+    'values/0': function (x) { return x.t === 'l' && x.r === null ? [] : [x]; }
+  };
+  function lower(c) { return c.toLowerCase(); }
+  function upper(c) { return c.toUpperCase(); }
+  function pick(list, arg, want) {
+    var best = null, bestKey = null, key, c, i;
+    for (i = 0; i < list.length; i++) {
+      key = arg ? arrayOf(ev(arg, list[i])) : list[i];
+      if (best === null) {
+        best = list[i];
+        bestKey = key;
+        continue;
+      }
+      c = cmp(key, bestKey);
+      if (want > 0 ? c >= 0 : c < 0) {
+        best = list[i];
+        bestKey = key;
+      }
+    }
+    return best === null ? NULL : best;
+  }
+  function match(x, patArg, flagArg) {
+    var s = wantType(x, 'string', 'test').r;
+    var pats = ev(patArg, x), flags = flagArg ? ev(flagArg, x) : [leafOf('')];
+    var out = [], i, j;
+    for (i = 0; i < flags.length; i++) {
+      for (j = 0; j < pats.length; j++) {
+        out.push(regex(wantType(pats[j], 'string', 'test').r,
+          wantType(flags[i], 'string', 'test').r).test(s) ? TRUE : FALSE);
+      }
+    }
+    return out;
+  }
+  function compile(src) {
+    var ast = parse(src);
+    return {
+      path: pathSegs(ast),
+      run: function (input) {
+        steps = 0;
+        return ev(ast, input);
+      }
+    };
+  }
+  return { compile: compile };
+})();
+if (typeof module === 'object' && module.exports) module.exports = jqjs;
+var jqsuggest = (function () {
+  'use strict';
+  var core = typeof jqweb !== 'undefined' ? jqweb : require('./core.js');
+  var pathText = core.pathText, stringify = core.stringify;
+  var MAX_PIVOTS = 6;
+  var MAX_LITERAL = 60;
+  function nodeAt(doc, segs) {
+    var n = doc, at, i;
+    for (i = 0; i < segs.length && n; i++) {
+      if (segs[i].index !== undefined) {
+        n = n.t === 'a' ? n.v[segs[i].index] : null;
+      } else {
+        at = n.t === 'o' ? n.k.lastIndexOf(segs[i].key) : -1;
+        n = at < 0 ? null : n.v[at];
+      }
+    }
+    return n || null;
+  }
+  function suffix(segs) {
+    return segs.length ? pathText(segs).replace(/^\.\[/, '[') : '';
+  }
+  function condition(subject, test, literal, inArray) {
+    var path = subject + suffix(test) + (test.length ? '?' : '');
+    if (literal === null) return path + ' != null';
+    if (!inArray) return (path || '.') + ' == ' + literal;
+    return path ? path + ' | index(' + literal + ')?' : 'index(' + literal + ')?';
+  }
+  function depths(n) {
+    var out = [], d;
+    for (d = 0; d < n && d < MAX_PIVOTS; d++) out.push(d);
+    if (n > 0 && out[out.length - 1] !== n - 1) out.push(n - 1);
+    return out;
+  }
+  var RANK = { pivot: 1, anyKey: 2, anywhere: 3, line: 4, unnamed: 1 };
+  function suggest(doc, segs) {
+    var out = [], seen = {}, value = nodeAt(doc, segs);
+    if (!value) return out;
+    var literal = stringify(value);
+    if (literal.length > MAX_LITERAL) literal = null;
+    var inArray = literal !== null &&
+      segs.length > 0 && segs[segs.length - 1].index !== undefined;
+    var below = inArray ? segs.slice(0, -1) : segs;
+    function add(q, why, shape, rank) {
+      if (!q || seen[q]) return null;
+      seen[q] = true;
+      var c = { q: q, why: why, shape: shape, rank: rank };
+      out.push(c);
+      return c;
+    }
+    depths(segs.length).forEach(function (d) {
+      var pivot = nodeAt(doc, segs.slice(0, d));
+      if (!pivot || pivot.t === 'l') return;
+      var at = pathText(segs.slice(0, d));
+      var test = below.slice(d + 1);
+      if (literal === null && !test.length) return;
+      var where = at === '.' ? 'across the document' : 'in ' + at;
+      var holds = inArray && d < below.length;
+      var unnamed = at === '.' ? RANK.unnamed : 0;
+      if (pivot.t === 'o') {
+        add((at === '.' ? '' : at + ' | ') +
+          'with_entries(select(' + condition('.value', test, literal, holds) + '))',
+        where, 'keys', RANK.pivot + unnamed);
+      } else {
+        add((at === '.' ? '.[]' : at + '[]') +
+          ' | select(' + condition('', test, literal, holds) + ')',
+        where, 'results', RANK.pivot + unnamed);
+      }
+      if (test.length > (literal === null ? 1 : 0)) {
+        add((at === '.' ? '.[]' : at + '[]') + ' | .[]? | select(' +
+          condition('', test.slice(1), literal, holds) + ')',
+        where + ', any key', 'results', RANK.anyKey + unnamed);
+      }
+    });
+    var key = null;
+    for (var i = below.length - 1; i >= 0; i--) {
+      if (below[i].key !== undefined) { key = below[i].key; break; }
+    }
+    add(key === null ? '.. | select(. == ' + literal + ')'
+      : '.. | objects | select(' + condition('', [{ key: key }], literal, inArray) + ')',
+    'anywhere', 'results', RANK.anywhere);
+    var line = add(pathText(segs), 'this line', 'results', RANK.line);
+    if (line) line.plain = true;
+    return out;
+  }
+  return { suggest: suggest };
+})();
+if (typeof module === 'object' && module.exports) module.exports = jqsuggest;
+var jqui = function (page) {
+  'use strict';
+  var renderTree = jqweb.renderTree, esc = jqweb.esc;
+  var tree = document.getElementById('tree');
+  var results = document.getElementById('results');
+  var input = document.getElementById('q');
+  var mode = document.getElementById('mode');
+  var stats = document.getElementById('stats');
+  mode.hidden = false;
+  input.placeholder = 'Text to find, a path, or a jq query such as .items[] | select(.n > 3)';
+  mode.addEventListener('change', function () { input.focus(); page.rerun(); });
+  var QUERY_START = '.[($|';
+  var CALL = /^[a-z_][a-z0-9_]*\s*\(/;
+  function wants(raw) {
+    if (mode.value === 'jq') return true;
+    if (mode.value !== 'auto') return false;
+    return QUERY_START.indexOf(raw.charAt(0)) >= 0 || CALL.test(raw);
+  }
+  function run(raw) {
+    var query, out;
+    clearFault();
+    showDocument();
+    try {
+      query = jqjs.compile(raw);
+    } catch (e) {
+      fault(e.message, e.pos);
+      return;
+    }
+    if (query.path) { page.showFound(page.resolve(query.path), query.path.length); return; }
+    try {
+      out = query.run(page.value);
+    } catch (e) {
+      fault(e.message);
+      return;
+    }
+    showResults(out);
+  }
+  function fault(message, pos) {
+    input.classList.add('bad');
+    stats.textContent = '';
+    faultBox.textContent = pos === undefined ? message : message + ' (at ' + (pos + 1) + ')';
+    faultBox.hidden = false;
+    hide();
+  }
+  function clearFault() {
+    input.classList.remove('bad');
+    faultBox.hidden = true;
+    faultBox.textContent = '';
+  }
+  var RESULT_CAP = 500;
+  function showResults(out) {
+    var shown = Math.min(out.length, RESULT_CAP), parts = [], i;
+    for (i = 0; i < shown; i++) {
+      parts.push('<div class="result" data-n="' + i + '">' + renderTree(out[i]) + '</div>');
+    }
+    results.innerHTML = parts.join('');
+    results.classList.toggle('one', out.length === 1);
+    results.hidden = false;
+    tree.hidden = true;
+    stats.textContent = shown < out.length
+      ? 'first ' + shown + ' of ' + plural(out.length, 'result')
+      : describe(out);
+  }
+  function describe(out) {
+    if (out.length !== 1) return plural(out.length, 'result');
+    if (out[0].t === 'o') return '1 result, ' + plural(out[0].k.length, 'key');
+    if (out[0].t === 'a') return '1 result, ' + plural(out[0].v.length, 'item');
+    return '1 result';
+  }
+  function plural(n, noun) { return n + ' ' + noun + (n === 1 ? '' : 's'); }
+  function showDocument() {
+    if (results.hidden) return;
+    results.hidden = true;
+    results.innerHTML = '';
+    tree.hidden = false;
+  }
+  var suggestions = document.getElementById('suggest');
+  var faultBox = document.getElementById('fault');
+  var rows = [];
+  var COUNT_BUDGET_MS = 300;
+  function filter(node) {
+    var segs = page.segsOf(node);
+    var deadline = Date.now() + COUNT_BUDGET_MS;
+    rows = jqsuggest.suggest(page.value, segs).map(function (c) {
+      c.count = Date.now() > deadline ? null : count(c);
+      return c;
+    }).filter(function (c) {
+      return c.count !== 0;
+    });
+    rows.sort(function (a, b) {
+      var an = a.count === null ? -1 : a.count, bn = b.count === null ? -1 : b.count;
+      return an === bn ? a.rank - b.rank : bn - an;
+    });
+    var narrows = false, i;
+    for (i = 0; i < rows.length; i++) if (rows[i].count > 1) narrows = true;
+    if (!narrows) {
+      for (i = 1; i < rows.length; i++) {
+        if (rows[i].plain) {
+          rows.unshift(rows.splice(i, 1)[0]);
+          break;
+        }
+      }
+    }
+    draw();
+    if (rows.length) pick(0);
+    show();
+  }
+  function count(c) {
+    var out;
+    try {
+      out = jqjs.compile(c.q).run(page.value);
+    } catch (e) {
+      if (e.jq) return 0;
+      throw e;
+    }
+    if (c.shape !== 'keys') return out.length;
+    return out.length && out[0].t === 'o' ? out[0].k.length : 0;
+  }
+  function label(c) {
+    return c.count === null ? '' : plural(c.count, c.shape === 'keys' ? 'key' : 'result');
+  }
+  function draw() {
+    var parts = [], i;
+    for (i = 0; i < rows.length; i++) {
+      parts.push('<div class="sg"><button class="sgq" type="button">' +
+        '<span class="sgt">' + esc(rows[i].q) + '</span>' +
+        '<span class="sgn">' + esc(label(rows[i])) + '</span></button>' +
+        '<button class="sgc" type="button" title="Copy this query">&#x29C9;</button></div>');
+    }
+    suggestions.innerHTML = parts.join('');
+  }
+  function mark(at) {
+    var kids = suggestions.children, i;
+    for (i = 0; i < kids.length; i++) kids[i].classList.toggle('on', i === at);
+  }
+  function show() {
+    if (rows.length && faultBox.hidden) suggestions.hidden = false;
+  }
+  function hide() { suggestions.hidden = true; }
+  function forget() {
+    rows = [];
+    suggestions.innerHTML = '';
+    hide();
+  }
+  function pick(i) {
+    input.value = rows[i].q;
+    mark(i);
+    run(rows[i].q);
+  }
+  suggestions.addEventListener('click', function (e) {
+    var row = e.target.closest('.sg');
+    if (!row) return;
+    var i = Array.prototype.indexOf.call(suggestions.children, row);
+    if (e.target.closest('.sgc')) { page.copy(rows[i].q, e.target.closest('.sgc')); return; }
+    pick(i);
+    input.focus();
+  });
+  input.addEventListener('focus', show);
+  input.addEventListener('input', function () {
+    forget();
+  });
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !suggestions.hidden) {
+      hide();
+      e.stopPropagation();
+      return;
+    }
+    if (suggestions.hidden || !rows.length) return;
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    var at = -1, i;
+    for (i = 0; i < rows.length; i++) if (rows[i].q === input.value.trim()) at = i;
+    at = e.key === 'ArrowDown' ? Math.min(at + 1, rows.length - 1) : Math.max(at - 1, 0);
+    pick(at);
+  });
+  document.addEventListener('mousedown', function (e) {
+    if (!suggestions.contains(e.target) && e.target !== input) hide();
+  });
+  return {
+    wants: wants,
+    run: run,
+    filter: filter,
+    clearFault: clearFault,
+    showDocument: showDocument
+  };
+};
+(function () {
+  'use strict';
+  var tree = document.getElementById('tree');
+  var input = document.getElementById('q');
+  var stats = document.getElementById('stats');
+  var parseJSON = jqweb.parseJSON, renderTree = jqweb.renderTree, parsePath = jqweb.parsePath;
+  var rootValue = parseJSON(document.getElementById('data').textContent);
+  tree.innerHTML = renderTree(rootValue, typeof jqui !== 'undefined');
+  var rootNode = tree.querySelector(':scope > .node');
+  var query = typeof jqui === 'undefined' ? null : jqui({
+    value: rootValue,
+    resolve: resolvePath,
+    showFound: showFound,
+    segsOf: segsOf,
+    copy: copy,
+    rerun: run
+  });
+  var GLYPH = { auto: '\u25D0', light: '\u2600', dark: '\u263E' };
+  var themeButton = document.getElementById('theme');
+  themeButton.addEventListener('click', function () { showTheme(jqtheme.cycle()); });
+  showTheme(jqtheme.current());
+  function showTheme(pref) {
+    themeButton.textContent = GLYPH[pref];
+    themeButton.title = 'Theme: ' + pref;
+  }
+  document.querySelector('main').addEventListener('click', function (e) {
+    var cp = e.target.closest('.cp');
+    if (cp) { copy(pathOf(cp.closest('.node')), cp); return; }
+    var fq = e.target.closest('.fq');
+    if (fq) { if (query) query.filter(fq.closest('.node')); return; }
+    var tg = e.target.closest('.toggle');
+    if (tg) { tg.closest('.node').classList.toggle('collapsed'); return; }
+    var fold = e.target.closest('.fold');
+    if (fold) { fold.closest('.node').classList.remove('collapsed'); }
+  });
+  var foldButton = document.getElementById('fold');
+  var folded = false;
+  foldButton.addEventListener('click', function () {
+    folded = !folded;
+    each('.node.branch', function (n) {
+      if (!folded) n.classList.remove('collapsed');
+      else if (n !== rootNode) n.classList.add('collapsed');
+    });
+    foldButton.textContent = folded ? 'Expand all' : 'Collapse all';
+  });
+  function each(sel, fn) {
+    Array.prototype.forEach.call(document.querySelectorAll('main ' + sel), fn);
+  }
+  function segsOf(node) {
+    var segs = [], n = node;
+    while (n) {
+      if (n.dataset.index !== undefined) {
+        segs.unshift({ index: +n.dataset.index });
+      } else if (n.dataset.key !== undefined) {
+        segs.unshift({ key: n.dataset.key });
+      }
+      n = n.parentElement && n.parentElement.closest('.node');
+    }
+    return segs;
+  }
+  function pathOf(node) {
+    return jqweb.pathText(segsOf(node));
+  }
+  function copy(text, btn) {
+    copyText(text, function (ok) { flash(btn, ok); });
+  }
+  function copyText(t, done) {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(t).then(
+        function () { done(true); },
+        function () { done(legacyCopy(t)); });
+    } else {
+      done(legacyCopy(t));
+    }
+  }
+  function legacyCopy(t) {
+    var ta = document.createElement('textarea');
+    ta.value = t;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    ta.remove();
+    return ok;
+  }
+  function flash(btn, ok) {
+    btn.classList.add(ok ? 'ok' : 'fail');
+    btn.textContent = ok ? '✓' : '✗';
+    setTimeout(function () {
+      btn.classList.remove('ok', 'fail');
+      btn.textContent = '⧉';
+    }, 900);
+  }
+  var timer = null;
+  input.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(run, 120);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === '/' && e.target !== input) { e.preventDefault(); input.focus(); }
+    if (e.key === 'Escape' && e.target === input) { input.value = ''; run(); }
+  });
+  function run() {
+    var raw = input.value.trim();
+    if (query) query.clearFault();
+    if (!raw) { reset(); return; }
+    if (!query) { runPath(raw); return; }
+    if (query.wants(raw)) { query.run(raw); return; }
+    query.showDocument();
+    textFilter(raw.toLowerCase());
+  }
+  function runPath(raw) {
+    if (/[.[]/.test(raw)) {
+      var segs = parsePath(raw);
+      if (segs) {
+        var found = resolvePath(segs);
+        if (found.depth === segs.length || raw.charAt(0) === '.') {
+          showFound(found, segs.length);
+          return;
+        }
+      }
+    }
+    textFilter(raw.toLowerCase());
+  }
+  function showFound(found, want) {
+    if (found.depth === want) {
+      showPath(found.node, true);
+      stats.textContent = pathOf(found.node);
+      return;
+    }
+    showPath(found.node, found.depth > 0);
+    stats.textContent = found.depth ? 'no path past ' + pathOf(found.node) : 'no such path';
+  }
+  function reset() {
+    if (query) query.showDocument();
+    each('.node', function (n) { n.classList.remove('hidden', 'hit'); });
+    stats.textContent = '';
+  }
   function resolvePath(segs) {
     var node = rootNode, i = 0;
     for (; i < segs.length; i++) {
@@ -391,7 +2056,6 @@ main { padding: 10px 14px 60px; }
     }
     return { node: node, depth: i };
   }
-
   function childMatching(node, seg) {
     var kids = node.querySelectorAll(':scope > .kids > .node'), i;
     if (seg.key !== undefined) {
@@ -403,8 +2067,6 @@ main { padding: 10px 14px 60px; }
     i = seg.index < 0 ? kids.length + seg.index : seg.index;
     return kids[i] && kids[i].dataset.index === String(i) ? kids[i] : null;
   }
-
-  /* Shows target with its whole subtree, plus the ancestors leading to it. */
   function showPath(target, mark) {
     each('.node', function (n) { n.classList.add('hidden'); n.classList.remove('hit'); });
     for (var n = target; n; n = n.parentElement && n.parentElement.closest('.node')) {
@@ -416,10 +2078,6 @@ main { padding: 10px 14px 60px; }
     });
     target.scrollIntoView({ block: 'center' });
   }
-
-  /* ---- text filter ---- */
-
-  /* Lowercased key + leaf value text for one node, cached on the element. */
   function ownText(n) {
     if (n._q === undefined) {
       var s = '';
@@ -430,11 +2088,8 @@ main { padding: 10px 14px 60px; }
     }
     return n._q;
   }
-
   function textFilter(needle) {
     var hits = 0;
-    /* Returns whether this subtree contains a match. "forced" keeps the whole
-       subtree of a matching node visible without counting it as a match. */
     function walk(node, forced) {
       var own = ownText(node).indexOf(needle) !== -1;
       if (own) hits++;

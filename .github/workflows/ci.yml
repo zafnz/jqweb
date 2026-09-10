@@ -1,12 +1,27 @@
 name: ci
 
+# A branch with an open pull request matches both events, so pushing to one
+# used to run everything here twice. Each event now covers only what the other
+# cannot: pull_request tests a branch, and against the merge commit rather than
+# the branch alone, so it catches what only breaks once merged; push covers
+# main, which is where merges and any direct commits land.
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
+  # A branch with no pull request open gets no CI of its own, so this is how to
+  # ask for a run by hand.
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+# Superseded runs on a pull request are worth nothing once another push has
+# landed. Runs on main are left to finish, so every commit there keeps a result
+# rather than a gap where it was cancelled.
+concurrency:
+  group: ci-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   go:

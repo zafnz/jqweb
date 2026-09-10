@@ -1,6 +1,7 @@
 /* Pure helpers shared by the page: parsing the embedded document, rendering
-   it to HTML, and reading a jq-style path. Nothing here touches the DOM, so
-   it can be exercised outside a browser (see core.test.js). */
+   it to HTML and back to JSON, and reading a jq-style path. Nothing here
+   touches the DOM, so it can be exercised outside a browser (see
+   core.test.js). */
 var jqweb = (function () {
   'use strict';
 
@@ -9,7 +10,11 @@ var jqweb = (function () {
   /* The embedded document is compact JSON, parsed here rather than with
      JSON.parse because the tree shows object keys in document order and
      numbers exactly as written, neither of which survives JSON.parse. A node
-     is {t:'o',k:keys,v:children}, {t:'a',v:children} or {t:'l',h:leafHTML}.
+     is {t:'o',k:keys,v:children}, {t:'a',v:children} or a leaf,
+     {t:'l',r:value,h:leafHTML}, where r is the scalar itself -- what the jq
+     evaluator compares and computes with -- and h is the rendered markup. A
+     number leaf also carries n, its text as written, which is what stringify
+     writes back out.
 
      This is a recursive-descent scanner over src. The read position i lives
      here, and the three helpers below close over it: each one advances i as a
@@ -75,7 +80,10 @@ var jqweb = (function () {
         }
         return { t: 'a', v: vals };
       }
-      if (c === '"') return { t: 'l', h: span('str', esc(quote(str()))) };
+      if (c === '"') {
+        lit = str();
+        return { t: 'l', r: lit, h: span('str', esc(quote(lit))) };
+      }
       /* Anything else is a number or one of the three literals. Read up to
          whatever ends it -- a delimiter or whitespace -- and keep the text
          exactly as written, since that is the point of not using JSON.parse.
@@ -83,7 +91,9 @@ var jqweb = (function () {
       start = i;
       while (i < src.length && ',]}'.indexOf(src.charAt(i)) < 0 && src.charCodeAt(i) > 32) i++;
       lit = src.slice(start, i);
-      return { t: 'l', h: span(lit === 'null' ? 'null' : lit === 'true' || lit === 'false' ? 'bool' : 'num', lit) };
+      if (lit === 'null') return { t: 'l', r: null, h: span('null', lit) };
+      if (lit === 'true' || lit === 'false') return { t: 'l', r: lit === 'true', h: span('bool', lit) };
+      return { t: 'l', r: +lit, n: lit, h: span('num', lit) };
     }
 
     return value();
@@ -107,17 +117,73 @@ var jqweb = (function () {
   var escMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&#34;', "'": '&#39;' };
   function esc(s) { return s.replace(/[&<>"']/g, function (c) { return escMap[c]; }); }
 
+  /* ---- values ---- */
+
+  /* Builds a leaf node for a scalar that was computed rather than read from
+     the document, which is where every result of arithmetic, length, keys and
+     the rest comes from. A number has no text as written, so it is rendered
+     the way JavaScript prints it. */
+  function leafOf(v) {
+    if (v === null) return { t: 'l', r: null, h: span('null', 'null') };
+    if (v === true || v === false) return { t: 'l', r: v, h: span('bool', String(v)) };
+    if (typeof v === 'number') {
+      /* JSON has no way to write a NaN or an infinity, so they become null,
+         which is what JSON.stringify does with them too. */
+      if (!isFinite(v)) return { t: 'l', r: null, h: span('null', 'null') };
+      return { t: 'l', r: v, n: String(v), h: span('num', String(v)) };
+    }
+    return { t: 'l', r: v, h: span('str', esc(quote(v))) };
+  }
+
+  /* Writes a node back out as JSON text. With indent -- a string such as two
+     spaces -- containers are broken across lines; without it the result is
+     compact. A number is written from the text it was read with, so a value
+     that has not been computed with comes back exactly as the document had
+     it. */
+  function stringify(node, indent) {
+    var out = [];
+    write(node, '');
+    return out.join('');
+
+    function write(n, pad) {
+      if (n.t === 'l') {
+        out.push(typeof n.r === 'string' ? quote(n.r)
+          : typeof n.r === 'number' ? (n.n !== undefined ? n.n : String(n.r))
+            : String(n.r));
+        return;
+      }
+      var obj = n.t === 'o';
+      if (!n.v.length) { out.push(obj ? '{}' : '[]'); return; }
+      var inner = pad + (indent || '');
+      var nl = indent ? '\n' : '';
+      out.push((obj ? '{' : '[') + nl);
+      for (var i = 0; i < n.v.length; i++) {
+        out.push(inner);
+        if (obj) out.push(quote(n.k[i]) + (indent ? ': ' : ':'));
+        write(n.v[i], inner);
+        out.push(i < n.v.length - 1 ? ',' + nl : nl);
+      }
+      out.push(pad + (obj ? '}' : ']'));
+    }
+  }
+
   /* ---- render ---- */
 
-  /* The copy-path button, identical on every line. */
+  /* The buttons at the end of every line. The second one only goes into a page
+     that can act on it -- it opens a list of queries built from the line, which
+     needs the query engine -- so renderTree is told whether to emit it, and the
+     pair is worked out once per tree rather than once per line. */
   var CP = '<button class="cp" title="Copy path">&#x29C9;</button>';
+  var FQ = '<button class="fq" title="Filter on this value">&#x2261;</button>';
+  var buttons = CP;
 
   /* Renders a parsed document as the markup for the whole tree. The caller
      assigns it to innerHTML in one go: for a large document that is around
      twice as fast as building the same nodes with createElement, and it keeps
      this file free of the DOM. */
-  function renderTree(root) {
+  function renderTree(root, withFilter) {
     var out = [];
+    buttons = withFilter ? CP + FQ : CP;
     emit(out, root, null, -1, false);
     return out.join('');
   }
@@ -138,9 +204,9 @@ var jqweb = (function () {
       : idx >= 0 ? ' data-index="' + idx + '"' : '';
     /* A member's copy button sits right after its key; an array element or
        the root has no key to sit after, so its button goes at the end. */
-    var keyPart = '', endBtn = CP;   /* unkeyed nodes get the button at the end of the line */
+    var keyPart = '', endBtn = buttons;   /* unkeyed nodes get the buttons at the end of the line */
     if (key !== null) {
-      keyPart = '<span class="key">' + esc(quote(key)) + '</span>' + CP +
+      keyPart = '<span class="key">' + esc(quote(key)) + '</span>' + buttons +
         '<span class="pn">: </span>';
       endBtn = '';
     }
@@ -187,6 +253,22 @@ var jqweb = (function () {
   /* What may appear unquoted in a path segment: anything that is not a
      separator, a quote or whitespace. */
   var pathChar = /[^.[\]"'\s]/;
+
+  /* A key that can be written as .name rather than ["name"]. */
+  var identRe = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+  /* Writes segments back out as a jq-style path -- the inverse of parsePath,
+     and what a copied path looks like. */
+  function pathText(segs) {
+    var out = '', s, i;
+    for (i = 0; i < segs.length; i++) {
+      s = segs[i];
+      out += s.index !== undefined ? '[' + s.index + ']'
+        : identRe.test(s.key) ? '.' + s.key : '[' + JSON.stringify(s.key) + ']';
+    }
+    if (!out) return '.';                       /* the root itself */
+    return out.charAt(0) === '[' ? '.' + out : out;   /* jq writes .[0], not [0] */
+  }
 
   /* parsePath splits a jq-style path such as .a.b[3]["x y"] into key and index
      segments. The leading dot is optional. Returns null for text that is not a
@@ -252,8 +334,11 @@ var jqweb = (function () {
 
   return {
     parseJSON: parseJSON,
+    leafOf: leafOf,
+    stringify: stringify,
     renderTree: renderTree,
     parsePath: parsePath,
+    pathText: pathText,
     quote: quote,
     esc: esc
   };

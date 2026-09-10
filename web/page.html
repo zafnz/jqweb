@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-pref="{{PREF}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,16 +7,31 @@
 <style>
 {{STYLE}}
 </style>
+<script>
+{{HEAD}}
+</script>
 </head>
 <body>
 <header>
   <span class="name">jqweb &middot; {{TITLE}}</span>
-  <button id="expand" type="button">Expand all</button>
-  <button id="collapse" type="button">Collapse all</button>
-  <input id="q" type="search" placeholder="Filter keys and values, or paste a path (press /)" autocomplete="off" spellcheck="false">
+  <select id="mode" title="How to read what you type" hidden>
+    <option value="auto">Auto</option>
+    <option value="filter">Text</option>
+    <option value="jq">jq</option>
+  </select>
+  <div class="qwrap">
+    <input id="q" type="search" placeholder="Text to find, or paste a path (press /)" autocomplete="off" spellcheck="false">
+    <div id="suggest" hidden></div>
+    <div id="fault" hidden></div>
+  </div>
   <span id="stats"></span>
+  <button id="fold" type="button">Collapse all</button>
+  <button id="theme" type="button"></button>
 </header>
-<main id="tree"></main>
+<main>
+  <div id="tree"></div>
+  <div id="results" hidden></div>
+</main>
 <script id="data" type="application/json">{{DATA}}</script>
 <script>
 {{SCRIPT}}

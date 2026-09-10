@@ -1,7 +1,11 @@
 /* The interactive half of the page: builds the tree from the embedded
    document, then wires up expanding and collapsing, copying a path, and the
    search box. Everything here needs the DOM; the parsing, rendering and path
-   reading it calls live in core.js. */
+   reading it calls live in core.js.
+
+   Reading the box as a jq query lives in query.js, which every page has unless
+   --simple left it out. This file is in every page either way, so it works
+   without it. */
 (function () {
   'use strict';
   var tree = document.getElementById('tree');
@@ -11,70 +15,106 @@
 
   /* Build the whole tree in one write. The document is served inside the page
      as JSON rather than as markup, which keeps the file smaller and lets the
-     tree be rendered here where the collapsing state lives. */
-  tree.innerHTML = renderTree(parseJSON(document.getElementById('data').textContent));
+     tree be rendered here where the collapsing state lives. The parsed
+     document is kept as well, because a query runs against it. */
+  var rootValue = parseJSON(document.getElementById('data').textContent);
+  tree.innerHTML = renderTree(rootValue, typeof jqui !== 'undefined');
   var rootNode = tree.querySelector(':scope > .node');
 
-  /* One delegated listener for every line in the tree, however many there
+  /* The query half, or null in a page built with --simple. It reads the search
+     box, so it needs the document to run against and the two path helpers
+     below, which walk the rendered tree rather than the value. */
+  var query = typeof jqui === 'undefined' ? null : jqui({
+    value: rootValue,
+    resolve: resolvePath,
+    showFound: showFound,
+    segsOf: segsOf,
+    copy: copy,
+    rerun: run
+  });
+
+  /* The toolbar's theme button reports what is in force and cycles when
+     clicked; the palette itself was settled by theme.js before the body was
+     parsed. */
+  var GLYPH = { auto: '\u25D0', light: '\u2600', dark: '\u263E' };
+  var themeButton = document.getElementById('theme');
+  themeButton.addEventListener('click', function () { showTheme(jqtheme.cycle()); });
+  showTheme(jqtheme.current());
+
+  function showTheme(pref) {
+    themeButton.textContent = GLYPH[pref];
+    themeButton.title = 'Theme: ' + pref;
+  }
+
+  /* One delegated listener for every line in either view, however many there
      are: a click either hits a copy button, a toggle, or the collapsed
      summary, which expands the node it belongs to. */
-  tree.addEventListener('click', function (e) {
+  document.querySelector('main').addEventListener('click', function (e) {
     var cp = e.target.closest('.cp');
-    if (cp) { copyPath(cp); return; }
+    if (cp) { copy(pathOf(cp.closest('.node')), cp); return; }
+    var fq = e.target.closest('.fq');
+    if (fq) { if (query) query.filter(fq.closest('.node')); return; }
     var tg = e.target.closest('.toggle');
     if (tg) { tg.closest('.node').classList.toggle('collapsed'); return; }
     var fold = e.target.closest('.fold');
     if (fold) { fold.closest('.node').classList.remove('collapsed'); }
   });
 
-  /* Collapse all leaves the root expanded, so the document is still readable
-     rather than a single line. */
-  document.getElementById('expand').addEventListener('click', function () {
-    each('.node.branch', function (n) { n.classList.remove('collapsed'); });
-  });
-  document.getElementById('collapse').addEventListener('click', function () {
-    each('.node.branch', function (n) { if (n !== rootNode) n.classList.add('collapsed'); });
+  /* One button for both, saying what the next click will do. Collapsing leaves
+     the root expanded, so the document is still readable rather than a single
+     line.
+
+     Folding a branch by hand does not change what the button says. It reports
+     the last thing it did rather than the state of the tree, which would mean
+     walking every node to answer a question nobody asked. */
+  var foldButton = document.getElementById('fold');
+  var folded = false;
+  foldButton.addEventListener('click', function () {
+    folded = !folded;
+    each('.node.branch', function (n) {
+      if (!folded) n.classList.remove('collapsed');
+      else if (n !== rootNode) n.classList.add('collapsed');
+    });
+    foldButton.textContent = folded ? 'Expand all' : 'Collapse all';
   });
 
-  /* Runs fn over every node in the tree matching sel. querySelectorAll gives
-     a NodeList, which in older browsers has no forEach of its own. */
+  /* Runs fn over every node in either view matching sel. querySelectorAll
+     gives a NodeList, which in older browsers has no forEach of its own. */
   function each(sel, fn) {
-    Array.prototype.forEach.call(tree.querySelectorAll(sel), fn);
+    Array.prototype.forEach.call(document.querySelectorAll('main ' + sel), fn);
   }
 
   /* ---- copy path ---- */
 
-  /* A key that can be written as .name rather than ["name"]. */
-  var identRe = /^[A-Za-z_][A-Za-z0-9_]*$/;
+  /* Where a node sits, as the segments parsePath produces, read back off the
+     data attributes emit() wrote by walking up its ancestors.
 
-  /* Builds the jq-style path of a node by walking up its ancestors and
-     reading back the data attributes emit() wrote, prepending each segment as
-     it goes. The result is what parsePath() reads, so a copied path can be
-     pasted straight into the search box. */
-  function pathOf(node) {
-    var segs = [];
-    var n = node;
+     The walk stops at whichever tree the node is in, so in the result view the
+     segments are relative to the result the node sits in rather than to the
+     document. */
+  function segsOf(node) {
+    var segs = [], n = node;
     while (n) {
       if (n.dataset.index !== undefined) {
-        segs.unshift('[' + n.dataset.index + ']');
+        segs.unshift({ index: +n.dataset.index });
       } else if (n.dataset.key !== undefined) {
-        var k = n.dataset.key;
-        segs.unshift(identRe.test(k) ? '.' + k : '[' + JSON.stringify(k) + ']');
+        segs.unshift({ key: n.dataset.key });
       }
       /* Skip the .kids wrapper between a node and its parent node. */
       n = n.parentElement && n.parentElement.closest('.node');
     }
-    var p = segs.join('');
-    if (!p) return '.';                       /* the root itself */
-    if (p.charAt(0) === '[') p = '.' + p;     /* jq writes .[0], not [0] */
-    return p;
+    return segs;
   }
 
-  /* Copies the path of the line a copy button belongs to, and reports the
-     outcome on the button itself. */
-  function copyPath(btn) {
-    var path = pathOf(btn.closest('.node'));
-    copyText(path, function (ok) { flash(btn, ok); });
+  /* The jq-style path of a node, which is what parsePath() reads, so a copied
+     path can be pasted straight back into the search box. */
+  function pathOf(node) {
+    return jqweb.pathText(segsOf(node));
+  }
+
+  /* Copies text, reporting the outcome on the button that asked for it. */
+  function copy(text, btn) {
+    copyText(text, function (ok) { flash(btn, ok); });
   }
 
   /* Copies text, calling done(ok) when it settles. The clipboard API needs a
@@ -131,27 +171,31 @@
     if (e.key === 'Escape' && e.target === input) { input.value = ''; run(); }
   });
 
-  /* Text containing "." or "[" may be a path such as .a.b[3].c, so it is tried
-     as one first; a bare word is always a text filter. A path that does not
-     resolve falls back to text filtering unless it was written with a leading
-     dot, which takes it as a path regardless. */
+  /* Runs whatever is in the box. Without query.js that is text to find or a
+     path, as it has always been; with it, the mode decides. */
   function run() {
     var raw = input.value.trim();
+    if (query) query.clearFault();
     if (!raw) { reset(); return; }
+    if (!query) { runPath(raw); return; }
+    if (query.wants(raw)) { query.run(raw); return; }
+    query.showDocument();
+    textFilter(raw.toLowerCase());
+  }
+
+  /* What a page built with --simple does, and what every page did before the
+     engine existed: text
+     containing "." or "[" may be a path such as .a.b[3].c, so it is tried as
+     one first, and a bare word is always a text filter. A path that does not
+     resolve falls back to text filtering unless it was written with a leading
+     dot, which takes it as a path regardless. */
+  function runPath(raw) {
     if (/[.[]/.test(raw)) {
       var segs = parsePath(raw);
       if (segs) {
         var found = resolvePath(segs);
-        if (found.depth === segs.length) {
-          showPath(found.node, true);
-          stats.textContent = pathOf(found.node);
-          return;
-        }
-        /* A leading dot means the text was meant as a path, so say where it
-           stopped resolving rather than silently filtering instead. */
-        if (raw.charAt(0) === '.') {
-          showPath(found.node, found.depth > 0);
-          stats.textContent = found.depth ? 'no path past ' + pathOf(found.node) : 'no such path';
+        if (found.depth === segs.length || raw.charAt(0) === '.') {
+          showFound(found, segs.length);
           return;
         }
       }
@@ -159,9 +203,22 @@
     textFilter(raw.toLowerCase());
   }
 
+  /* Reveals the node a path led to, or says how far it got. A partial match is
+     still worth showing, since it says where the path stopped resolving. */
+  function showFound(found, want) {
+    if (found.depth === want) {
+      showPath(found.node, true);
+      stats.textContent = pathOf(found.node);
+      return;
+    }
+    showPath(found.node, found.depth > 0);
+    stats.textContent = found.depth ? 'no path past ' + pathOf(found.node) : 'no such path';
+  }
+
   /* Clears any filtering and shows the whole document again. Collapsed state
      is left alone: it is the reader's, not the search's. */
   function reset() {
+    if (query) query.showDocument();
     each('.node', function (n) { n.classList.remove('hidden', 'hit'); });
     stats.textContent = '';
   }

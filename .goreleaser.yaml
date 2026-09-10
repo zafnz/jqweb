@@ -115,9 +115,10 @@ release:
     message worse in a binary built with it.
 
 changelog:
-  # No sort: git order, so the list reads as the work happened rather than
-  # alphabetically by whatever word a subject starts with.
-  sort:
+  # The empty string is git order, which reads as the work happened; "asc" is
+  # alphabetical by whatever word a subject starts with. Spelled out rather
+  # than left off, so that it reads as a choice.
+  sort: ""
   # The commit list sits under the notes above, so it wants to be readable
   # rather than complete: a full SHA on every line is 40 characters of nothing
   # anyone reads, and a merge commit says only that a branch arrived.

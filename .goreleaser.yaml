@@ -5,6 +5,8 @@ project_name: jqweb
 before:
   hooks:
     - go mod tidy
+    # A tagged release should not ship what CI would have rejected.
+    - go test ./...
 
 builds:
   - id: jqweb

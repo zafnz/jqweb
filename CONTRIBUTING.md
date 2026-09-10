@@ -97,6 +97,11 @@ default. The file name sets the page title, so keep it:
     curl -s 'https://en.wikipedia.org/api/rest_v1/?spec' > wikipedia-reset-spec.json
     go build -o jqweb . && ./jqweb -o docs/index.html wikipedia-reset-spec.json
 
+## Wanted, not written
+
+`TODO.md` holds the things that are wanted but not being worked on. Add to it
+rather than leaving a comment in the code for a change nobody has scheduled.
+
 ## Releases
 
 Tagging `v*` runs GoReleaser, which builds for macOS, Linux and Windows, signs

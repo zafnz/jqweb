@@ -31,14 +31,6 @@ const repo = path.resolve(here, '..', '..');
    docs, takes a few seconds. */
 const TIMEOUT_MS = 45000;
 
-/* Chrome hangs before it loads anything about one start in forty, with
-   several of them going at once and each on a profile it has never seen
-   before. It is not particular to any driver -- the same one passes on its
-   own every time -- and it dumps nothing at all rather than something
-   partial, so a start that produces no DOM is worth making again before it is
-   called a failure. */
-const ATTEMPTS = 3;
-
 /* Virtual time lets the page's timers -- the 120ms the search box waits for a
    pause in typing, the 900ms a copy button stays ticked -- fire as fast as
    the renderer can get to them. The budget is a ceiling, not a wait: Chrome
@@ -141,38 +133,65 @@ function chromeArgs(profile, size, url) {
   ];
 }
 
-/* Loads one page and gives back the DOM Chrome dumped for it.
+/* Whether the dump in fd is finished, which is the only thing that says the
+   page is done: Chrome writes the whole document in one go and "</html>" is
+   the last thing in it. Reading the tail rather than the file keeps this
+   cheap enough to poll. */
+function dumped(fd) {
+  try {
+    const size = fs.fstatSync(fd).size;
+    if (size < 16) return false;
+    const tail = Buffer.alloc(32);
+    fs.readSync(fd, tail, 0, 32, size - 32);
+    return tail.toString('utf8').includes('</html>');
+  } catch (e) {
+    return false;
+  }
+}
 
-   The dump is the whole document written to stdout in one go, so the run is
-   over as soon as "</html>" arrives and Chrome is killed there rather than
-   waited on. It does not reliably exit by itself: a profile it has not seen
-   before leaves it running after the dump, and on macOS it starts an updater
-   that inherits the pipes, so waiting for either the process or stdout to end
-   means waiting out the timeout on a page that finished in a second. */
-function loadPage(chrome, profile, size, file) {
+/* Loads one page, with Chrome writing the DOM into domFile.
+
+   It has to be a file and not a pipe. Chrome stops writing at exactly 128KiB
+   into a pipe about one start in forty, leaving a dump cut off mid-element
+   and a browser that then sits there until it is killed. It is a race in
+   Chrome rather than anything about the page -- a page whose dump is under
+   128KiB never hits it, the same page written to a file never hits it, and
+   the cut is at the same byte every time. Reading the dump through a pipe
+   failed one run of this suite in three.
+
+   Chrome is killed once the dump is complete rather than waited on. It does
+   not reliably exit by itself: a profile it has not seen before leaves it
+   running afterwards, and on macOS it starts an updater that inherits the
+   handles it was given. */
+function loadPage(chrome, profile, size, file, domFile) {
   return new Promise((resolve) => {
-    let out = '', errOut = '', done = false;
+    const fd = fs.openSync(domFile, 'w+');
+    let errOut = '', done = false;
+
     const child = spawn(chrome, chromeArgs(profile, size, 'file://' + file),
-      { stdio: ['ignore', 'pipe', 'pipe'] });
+      { stdio: ['ignore', fd, 'pipe'] });
+    child.stderr.on('data', (b) => { errOut += b; });
 
     const finish = (err) => {
       if (done) return;
       done = true;
+      clearInterval(poll);
       clearTimeout(timer);
       child.kill('SIGKILL');
-      resolve({ err: err, stdout: out, stderr: errOut });
+      const bytes = fs.fstatSync(fd).size;
+      fs.closeSync(fd);
+      resolve({ err: err, bytes: bytes, stderr: errOut });
     };
-    const timer = setTimeout(
-      () => finish(new Error('no dump within ' + (TIMEOUT_MS / 1000) + 's, after ' +
-        out.length + ' bytes')), TIMEOUT_MS);
 
-    child.stdout.on('data', (b) => {
-      out += b;
-      if (out.includes('</html>')) finish(null);
-    });
-    child.stderr.on('data', (b) => { errOut += b; });
+    const poll = setInterval(() => { if (dumped(fd)) finish(null); }, 50);
+    const timer = setTimeout(() => finish(new Error('no dump within ' +
+      (TIMEOUT_MS / 1000) + 's, after ' + fs.fstatSync(fd).size + ' bytes')), TIMEOUT_MS);
+
     child.on('error', (e) => finish(e));
-    child.on('exit', () => finish(out.includes('</html>') ? null : new Error('Chrome exited without a dump')));
+    /* Chrome exiting on its own is not the signal, but it does mean nothing
+       more is coming; the beat is for the last of the write to land. */
+    child.on('exit', () => setTimeout(() =>
+      finish(dumped(fd) ? null : new Error('Chrome exited without a dump')), 50));
   });
 }
 
@@ -240,8 +259,7 @@ function main() {
     for (const run of runs) {
       if (!run.report) {
         broken++;
-        console.log(RED + 'FAIL' + OFF + '  ' + pad(run.name) + '  no report in ' +
-          run.tries + ' attempts' +
+        console.log(RED + 'FAIL' + OFF + '  ' + pad(run.name) + '  no report' +
           (run.err ? ' (' + run.err.message.split('\n')[0] + ')' : ''));
         console.log(DIM + '        page: ' + run.file + OFF);
         for (const line of chromeComplaints(run.stderr)) console.log(DIM + '        ' + line + OFF);
@@ -251,11 +269,8 @@ function main() {
       checks += run.report.checks.length;
       failed += bad.length;
       const tag = bad.length ? RED + 'FAIL' + OFF : GREEN + 'ok  ' + OFF;
-      /* A start that had to be made again is said so rather than absorbed:
-         the rate it happens at is the thing worth watching. */
       console.log(tag + '  ' + pad(run.name) + '  ' +
-        (run.report.checks.length - bad.length) + '/' + run.report.checks.length +
-        (run.tries > 1 ? DIM + '  (Chrome started ' + run.tries + ' times)' + OFF : ''));
+        (run.report.checks.length - bad.length) + '/' + run.report.checks.length);
       for (const c of bad) {
         console.log('        ' + RED + 'x' + OFF + ' ' + c.name + (c.detail ? ' -- ' + c.detail : ''));
       }
@@ -321,20 +336,19 @@ async function runAll(chrome, work, harness, sources, pages) {
       fs.writeFileSync(file,
         inject(fs.readFileSync(pages[pageOf(job.src)], 'utf8'), harness, job.src));
 
-      let got = null, tries = 0;
-      while (!got || (!got.report && tries < ATTEMPTS)) {
-        /* A profile of its own for each attempt, rather than one per lane.
-           Every page here is a file:// URL and they all count as one origin,
-           so a shared profile hands one driver the theme the last one stored.
-           It also has to be a profile no Chrome has held before: these are
-           killed as soon as they have dumped, and the next start on a profile
-           left locked by a killed process waits rather than loading. */
-        const profile = path.join(work, 'profile-' + job.name + '-' + tries);
-        tries++;
-        const out = await loadPage(chrome, profile, windowOf(job.src), file);
-        got = { err: out.err, stderr: out.stderr, report: readReport(out.stdout) };
-      }
-      runs.push({ name: job.name, file: file, tries: tries, ...got });
+      /* A profile of its own for each driver. Every page here is a file://
+         URL and they all count as one origin, so a shared profile hands one
+         driver the theme the last one stored. It also has to be a profile no
+         Chrome has held before: these are killed as soon as they have dumped,
+         and the next start on a profile left locked by a killed process waits
+         rather than loading anything. */
+      const profile = path.join(work, 'profile-' + job.name);
+      const dom = path.join(work, job.name + '.dom.html');
+      const out = await loadPage(chrome, profile, windowOf(job.src), file, dom);
+      runs.push({
+        name: job.name, file: file, err: out.err, stderr: out.stderr,
+        report: out.bytes ? readReport(fs.readFileSync(dom, 'utf8')) : null
+      });
     }
   }
 

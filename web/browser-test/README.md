@@ -83,13 +83,23 @@ seconds per driver on a page that had finished in one.
 The findings travel out of the page as base64 because `--dump-dom` serialises
 the page as HTML, and a failure message is free to contain angle brackets.
 
-About one Chrome start in forty hangs before loading anything, with four of
-them going at once and each on a profile it has never seen before. It is not
-particular to any driver, and it dumps nothing at all rather than something
-partial, so a start that produces no DOM is made again up to three times
-before it is called a failure. A driver that needed more than one says so in
-the output; if that starts happening often, the number to look at is there
-rather than hidden.
+Chrome writes the dump into a file rather than down a pipe, and `run.js` polls
+the end of that file for `</html>`. This is not a preference. Reading the dump
+through a pipe failed one run of this suite in three: about one start in forty
+Chrome stops writing at exactly 128KiB, leaving a dump cut off mid-element and
+a browser that sits there until it is killed.
+
+Measured over 750 starts, four at a time:
+
+| page | dump | through a pipe | to a file |
+|---|---|---|---|
+| a page with nothing in it | 91 bytes | 0/200 | |
+| the fixture page | 146KiB | 9/350 | 0/200 |
+
+A dump smaller than 128KiB never hits it, the same page written to a file
+never hits it, and the cut is at the same byte every time. Nothing about the
+page is involved, and retrying the start would have hidden that rather than
+answered it.
 
 ## When one fails
 

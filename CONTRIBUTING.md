@@ -5,7 +5,7 @@
     go build .                # a jqweb binary in the working directory
     go test ./...             # Go: argument handling, input validation, page assembly
     node --test               # JavaScript: web/core.test.js, web/jq.test.js
-    node web/browser/run.js   # the page in a browser (needs Chrome)
+    node web/browser-test/run.js   # the page in a browser (needs Chrome)
 
 No dependencies, either side: `go.mod` requires nothing, there is no
 `package.json`, and the JavaScript tests use the test runner built into Node
@@ -18,22 +18,13 @@ through Playwright or Puppeteer.
 CI runs the same four commands on every push, with the Go job against both
 the `go.mod` floor and the current release. The two have disagreed before:
 Go 1.27 changed `json.Decoder.More()` at the end of a truncated document,
-which changed the error message a user sees. The browser job needs no install
-step: the GitHub runner image ships Chrome.
+which changed the error message a user sees.
 
 ## Colours
 
 Every colour is a custom property on `:root` in `web/page.css`, defined twice:
 once for dark and once under `:root[data-theme="light"]`. Adding a colour means
 adding it to both, and using a literal anywhere means one theme gets it wrong.
-
-The buttons on each line go through three steps, because at rest they have to
-be findable without competing with the value beside them. `--icon` is the
-resting colour, about 3:1 against the background; hovering the line brings them
-to `--muted`; hovering one puts it on `--icon-chip` in `--fg`, which is also
-what makes the click target visible. Dimming a grey with `opacity` instead gave
-1.6:1 in light, which is no button at all, so it is worth checking the ratio
-rather than the look on one screen.
 
 `web/theme.js` runs in the head, before the body is parsed, so a page never
 paints in one theme and swaps to the other. It reads `data-pref` -- which
@@ -49,75 +40,13 @@ value containing `</script` cannot close the element holding it — rather than
 comparing against a stored copy of a rendered page, which would need
 regenerating for every change to the styling.
 
-Neither those nor the Node tests run the page in a browser. That is what
-`web/browser` is for.
+The Go and Node tests do not run the page in a browser. The drivers that do
+are in `web/browser-test` and are documented there. CI runs them on every
+push.
 
-## The browser drivers
-
-    node web/browser/run.js                # every driver
-    node web/browser/run.js suggest theme  # just those two
-    node web/browser/run.js --keep         # leave the pages that ran behind
-
-`run.js` builds jqweb, renders the pages the drivers ask for, injects
-`harness.js` and one driver into each, loads it in headless Chrome with
-`--dump-dom`, and reads the findings back out of the `<pre id="report">` the
-harness leaves in the page. Chrome comes from `$CHROME` or from the usual
-places on macOS and Linux.
-
-A driver is one file in `web/browser/drivers`, named for the area it covers,
-and its opening comment says which page it wants:
-
-    /* page: simple, window: 460x800 */
-    T.run(async (t) => {
-      t.eq('the mode select stays hidden', t.$('#mode').hidden, true);
-    });
-
-The pages are `default` (the fixture document, built the default way),
-`simple` (`--simple`), `light` (`--theme light`) and `docs`
-(`docs/index.html` as committed). The fixture is `web/browser/testdata/doc.json`:
-ten records with repeated fields, so a suggestion has something to pivot on,
-and long enough to scroll. `window:` is optional and only the toolbar drivers
-use it, since what a toolbar does without room cannot be driven in a window
-that has room.
-
-The harness gives a driver `check`/`eq`/`atLeast`/`near` for recording,
-`$`/`$$`/`at`/`shown` for finding things, `click`/`type`/`press`/`mode` for
-driving them, and `contrast`/`ratio`/`paint` for the palettes. `t.at('.a.b[0]')`
-walks the rendered tree by the data attributes `emit()` wrote, which is how a
-driver names a line without depending on where it sits in the markup.
-
-Three things about the way it runs are load-bearing:
-
-Chrome is given `--virtual-time-budget`, so the page's own waits — the 120ms
-the search box waits for a pause in typing, the 900ms a copy button stays
-ticked — cost nothing, and the whole suite runs in under ten seconds. Virtual
-time stops while a network fetch is outstanding, which is why the flags turn
-off everything Chrome would otherwise go looking for on a profile it has not
-seen before.
-
-Each driver gets a profile of its own. Every page here is a `file://` URL and
-they all count as one origin, so a shared profile hands one driver the theme
-the last one stored.
-
-Chrome is killed as soon as `</html>` arrives rather than waited on. It does
-not reliably exit after a dump, and on macOS it starts an updater that
-inherits the pipes.
-
-Assert the property that matters rather than a particular pixel. Several
-drivers failed first because the expectation was wrong and not the code: the
-toolbar centres what is on a row, so items of different heights have different
-tops and counting tops says every one of them wrapped; hiding what did not
-match shortens the document, so a text search that scrolls nowhere still ends
-up at a smaller `scrollY` than it started at.
-
-`--keep` leaves each page behind as one file — the document, the harness and
-the driver — so a failing check can be opened in a browser and watched. CI
-uploads those as an artifact when the job fails.
-
-The drivers check the properties someone thought to write down. For a change
-to the scripts that should not have altered the rendering at all, diffing the
-whole tree against a build from `main` covers what no assertion was written
-for:
+A driver only checks what it was written to check. For a change to the scripts
+that should not have altered the rendering at all, diffing the whole tree
+against a build from `main` covers the rest:
 
     go build -o /tmp/jqweb-new .
     git stash && go build -o /tmp/jqweb-old . && git stash pop

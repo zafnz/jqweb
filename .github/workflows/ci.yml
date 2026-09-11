@@ -92,7 +92,7 @@ jobs:
       # should say so here rather than inside the runner.
       - run: google-chrome --version
 
-      - run: node web/browser/run.js --keep=${{ runner.temp }}/pages
+      - run: node web/browser-test/run.js --keep=${{ runner.temp }}/pages
 
       # A kept page is the document, the harness and one driver in one file,
       # so a failure can be opened in a browser and watched.

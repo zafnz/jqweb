@@ -59,9 +59,9 @@ it out. `script()` and `style()` in `main.go` pick the file list, and
 | `query.js` | default only | search box as a query, results view, suggestion list |
 | `query.css` | default only | mode select, suggestion list, error box, results |
 
-`web/browser` ships in nothing. It is the drivers, the harness they are written
-against and the runner that loads them, and no rendered page has ever seen any
-of it.
+`web/browser-test` ships in nothing. It is the drivers, the harness they are
+written against and the runner that loads them, and no rendered page has ever
+seen any of it.
 
 `page.js` must work with the other three absent. It calls `jqui()` when
 `query.js` is there and falls back to path lookup when it is not. Anything that
@@ -152,14 +152,11 @@ of `jq.js`. When jq's behaviour is in question, run `jq` and find out — guessi
 has been wrong about operator stream order, `"ab" * 0`, `max_by` ties and
 `from_entries` key spellings.
 
-**The browser drivers are in `web/browser`, and CI runs them.** `node
-web/browser/run.js` renders the pages, injects `harness.js` and one driver from
-`web/browser/drivers` into each, loads it in headless Chrome with `--dump-dom`,
-and reads the findings out of the `<pre id="report">` the harness leaves behind.
-441 checks, under ten seconds, no npm packages. `CONTRIBUTING.md` has how to
-write one; `--keep` leaves each page behind as one openable file, and
-`--screenshot=out.png` in place of `--dump-dom` is still the way to look at one
-by hand.
+**The browser drivers are in `web/browser-test`, and CI runs them.** `node
+web/browser-test/run.js` is the whole suite, 441 checks in about 8 seconds.
+`web/browser-test/README.md` is how it works and how to write one; read it
+before adding a driver. `--screenshot=out.png` in place of `--dump-dom` is
+still the way to look at a page by hand.
 
 **Anything that only reproduces in a browser needs a driver before a fix.**
 Three bugs this way were each different from what they looked like: typing `.`

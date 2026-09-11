@@ -3,10 +3,10 @@
    driver into each, loads it in headless Chrome with --dump-dom, and reads
    the findings back out of <pre id="report">.
 
-       node web/browser/run.js                # every driver
-       node web/browser/run.js suggest theme  # just those two
-       node web/browser/run.js --keep         # leave the built pages behind
-       node web/browser/run.js --keep=/tmp/p  # and put them somewhere named
+       node web/browser-test/run.js                # every driver
+       node web/browser-test/run.js suggest theme  # just those two
+       node web/browser-test/run.js --keep         # leave the built pages behind
+       node web/browser-test/run.js --keep=/tmp/p  # and put them somewhere named
 
    A kept page is the whole thing that ran -- the rendered document, the
    harness and one driver -- so opening it in a browser is how to watch a
@@ -27,8 +27,17 @@ const repo = path.resolve(here, '..', '..');
 
 /* How long one driver gets before it is killed. Virtual time makes the page's
    own waits free, so anything approaching this is a driver that hung rather
-   than one with a lot to do. */
-const TIMEOUT_MS = 90000;
+   than one with a lot to do: the slowest of them, against the 700KB page in
+   docs, takes a few seconds. */
+const TIMEOUT_MS = 45000;
+
+/* Chrome hangs before it loads anything about one start in forty, with
+   several of them going at once and each on a profile it has never seen
+   before. It is not particular to any driver -- the same one passes on its
+   own every time -- and it dumps nothing at all rather than something
+   partial, so a start that produces no DOM is worth making again before it is
+   called a failure. */
+const ATTEMPTS = 3;
 
 /* Virtual time lets the page's timers -- the 120ms the search box waits for a
    pause in typing, the 900ms a copy button stays ticked -- fire as fast as
@@ -154,7 +163,8 @@ function loadPage(chrome, profile, size, file) {
       resolve({ err: err, stdout: out, stderr: errOut });
     };
     const timer = setTimeout(
-      () => finish(new Error('no dump within ' + (TIMEOUT_MS / 1000) + 's')), TIMEOUT_MS);
+      () => finish(new Error('no dump within ' + (TIMEOUT_MS / 1000) + 's, after ' +
+        out.length + ' bytes')), TIMEOUT_MS);
 
     child.stdout.on('data', (b) => {
       out += b;
@@ -208,7 +218,7 @@ function main() {
   if (!drivers.length) {
     throw new Error(wanted.length
       ? 'no driver matches ' + wanted.join(', ')
-      : 'no drivers in web/browser/drivers');
+      : 'no drivers in web/browser-test/drivers');
   }
 
   const work = keepIn || fs.mkdtempSync(path.join(os.tmpdir(), 'jqweb-browser-'));
@@ -230,7 +240,8 @@ function main() {
     for (const run of runs) {
       if (!run.report) {
         broken++;
-        console.log(RED + 'FAIL' + OFF + '  ' + pad(run.name) + '  no report' +
+        console.log(RED + 'FAIL' + OFF + '  ' + pad(run.name) + '  no report in ' +
+          run.tries + ' attempts' +
           (run.err ? ' (' + run.err.message.split('\n')[0] + ')' : ''));
         console.log(DIM + '        page: ' + run.file + OFF);
         for (const line of chromeComplaints(run.stderr)) console.log(DIM + '        ' + line + OFF);
@@ -240,8 +251,11 @@ function main() {
       checks += run.report.checks.length;
       failed += bad.length;
       const tag = bad.length ? RED + 'FAIL' + OFF : GREEN + 'ok  ' + OFF;
+      /* A start that had to be made again is said so rather than absorbed:
+         the rate it happens at is the thing worth watching. */
       console.log(tag + '  ' + pad(run.name) + '  ' +
-        (run.report.checks.length - bad.length) + '/' + run.report.checks.length);
+        (run.report.checks.length - bad.length) + '/' + run.report.checks.length +
+        (run.tries > 1 ? DIM + '  (Chrome started ' + run.tries + ' times)' + OFF : ''));
       for (const c of bad) {
         console.log('        ' + RED + 'x' + OFF + ' ' + c.name + (c.detail ? ' -- ' + c.detail : ''));
       }
@@ -306,18 +320,21 @@ async function runAll(chrome, work, harness, sources, pages) {
       const file = path.join(work, job.name + '.run.html');
       fs.writeFileSync(file,
         inject(fs.readFileSync(pages[pageOf(job.src)], 'utf8'), harness, job.src));
-      /* A profile of its own for each driver, rather than one per lane. Every
-         page here is a file:// URL and they all count as one origin, so a
-         shared profile hands one driver the theme the last one stored. It
-         also has to be a profile no Chrome has held before: these are killed
-         as soon as they have dumped, and the next start on a profile left
-         locked by a killed process waits rather than loading anything. */
-      const profile = path.join(work, 'profile-' + job.name);
-      const { err, stdout, stderr } = await loadPage(chrome, profile, windowOf(job.src), file);
-      runs.push({
-        name: job.name, file: file, err: err, stderr: stderr,
-        report: readReport(stdout)
-      });
+
+      let got = null, tries = 0;
+      while (!got || (!got.report && tries < ATTEMPTS)) {
+        /* A profile of its own for each attempt, rather than one per lane.
+           Every page here is a file:// URL and they all count as one origin,
+           so a shared profile hands one driver the theme the last one stored.
+           It also has to be a profile no Chrome has held before: these are
+           killed as soon as they have dumped, and the next start on a profile
+           left locked by a killed process waits rather than loading. */
+        const profile = path.join(work, 'profile-' + job.name + '-' + tries);
+        tries++;
+        const out = await loadPage(chrome, profile, windowOf(job.src), file);
+        got = { err: out.err, stderr: out.stderr, report: readReport(out.stdout) };
+      }
+      runs.push({ name: job.name, file: file, tries: tries, ...got });
     }
   }
 

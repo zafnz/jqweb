@@ -137,6 +137,15 @@ Changelog suggests. Writing the entry in the pull request that earns it is what
 keeps the notes on `main` before the tag is pushed, rather than costing a round
 trip through review of their own.
 
+Labels decide which pull requests have to carry one. `accessibility`, `bug`,
+`functionality` and `optimisation` require an entry, and `.github/workflows/pr.yml`
+fails a pull request without one; `no-changelog` overrides that, for a change
+those labels fit but a reader of the release notes would not. Nothing stops any
+other pull request carrying an entry, and a `toolchain` change that someone
+upgrading would notice should have one. Every pull request needs at least one
+label, which is what keeps a change that wants an entry from arriving
+unlabelled and unasked.
+
 Releasing renames `## [Unreleased]` to the version and the date, opens an empty
 `## [Unreleased]` above it, and updates the link definitions at the foot of the
 file. The release workflow extracts the section for the tag with awk and hands

@@ -1,0 +1,67 @@
+name: pr
+
+# Labels live on the pull request, not on a commit, so these run when a label
+# changes as well as when one is pushed: a check that only ran on a push would
+# go on showing the answer it gave before the label arrived.
+#
+# They are their own workflow rather than jobs in ci.yml because "labeled" in
+# that file would rebuild and retest on every label click. Nothing here checks
+# out the repository or builds anything; both jobs are API calls.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+permissions:
+  pull-requests: read
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # Without this, a change that wants an entry can arrive carrying no label at
+  # all, and the changelog job below would skip rather than ask for one.
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: The pull request carries a label
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ' ') }}
+        run: |
+          if [ -z "$LABELS" ]; then
+            echo "::error::This pull request has no labels. Add the one that describes it: accessibility, bug, documentation, functionality, optimisation or toolchain."
+            exit 1
+          fi
+          echo "labels: $LABELS"
+
+  # Skipped, rather than passed, when no label calls for an entry. A green tick
+  # would be claiming a check that never ran. GitHub reports a job skipped by
+  # its own condition as a success, so this can be required without ever
+  # leaving a pull request waiting on a result that is not coming.
+  changelog:
+    if: >-
+      !contains(github.event.pull_request.labels.*.name, 'no-changelog') &&
+      (contains(github.event.pull_request.labels.*.name, 'accessibility') ||
+      contains(github.event.pull_request.labels.*.name, 'bug') ||
+      contains(github.event.pull_request.labels.*.name, 'functionality') ||
+      contains(github.event.pull_request.labels.*.name, 'optimisation'))
+    runs-on: ubuntu-latest
+    steps:
+      # The files API reports what the whole pull request changes, so an entry
+      # written in any of its commits counts. It also gives the added-line
+      # count directly, which is what tells an entry from a deletion.
+      - name: The change has a CHANGELOG.md entry
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          added=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[] | select(.filename == "CHANGELOG.md") | .additions' | head -1)
+          if [ -z "$added" ]; then
+            added=0
+          fi
+          if [ "$added" -eq 0 ]; then
+            echo "::error file=CHANGELOG.md::This pull request is labelled for a change someone using jqweb sees, and adds nothing to CHANGELOG.md. Write the entry under '## [Unreleased]', or apply the no-changelog label if the labels fit but the release notes would not want it."
+            exit 1
+          fi
+          echo "CHANGELOG.md: $added added lines"

@@ -22,12 +22,6 @@ Enter runs the half-typed text, and a bare trailing dot offers every key
 instead of a syntax error. `.items[] | .na` completes against what flows into
 the pipe. Only the default build carries this; `--simple` is unchanged.
 
-### Go 1.24 builds jqweb
-
-The `go.mod` floor is 1.24 rather than 1.26, because 1.24 is the oldest release
-current distributions ship. The source builds and the tests pass on 1.21
-through 1.27.
-
 ## [0.6.0] - 2026-09-11
 
 ### Stop serving once the page has been fetched

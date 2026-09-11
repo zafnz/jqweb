@@ -1,3 +1,3 @@
 module github.com/zafnz/jqweb
 
-go 1.26
+go 1.24

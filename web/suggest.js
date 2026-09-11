@@ -1,13 +1,18 @@
-/* Turning a line of the document into the queries you might have meant.
+/* Turning what someone gave the search box into the queries they might have
+   meant: the readings of a clicked line, and the completions of a key name
+   still being typed.
 
    Clicking the filter button on ".paths[\"/page/\"].get.tags[0]" could mean
    half a dozen things, and which one is a judgement about the document, not
    something that can be read off the path: "find the other paths tagged this"
    pivots on .paths, while "find this exact tag" pivots on the array it sits
-   in. So this offers the whole ladder -- one query per ancestor the value
+   in. So suggest() offers the whole ladder -- one query per ancestor the value
    could be looked for across -- and the caller runs each and labels it with
    what it returns, which is what lets someone pick by outcome instead of by
    reasoning about jq.
+
+   splitPartial() and completions() are the other half: reading a query that
+   ends in a half-typed name, and the keys that could finish it.
 
    Everything here is text in, text out, over the node form core.js parses to.
    Nothing touches the DOM and nothing runs a query. */
@@ -176,7 +181,66 @@ var jqsuggest = (function () {
     return out;
   }
 
-  return { suggest: suggest };
+  /* ---- completing a half-typed key ---- */
+
+  /* Splits a query that ends in a field access still being typed:
+     ".items[].ki" is {lead: ".items[]", ctx: ".items[]", partial: "ki"}.
+     lead is the text a completed name goes onto the end of; ctx is the query
+     whose output holds the keys to offer. They differ when the name is the
+     first thing after a pipe -- ".items[] | .na" keeps ".items[] | " as its
+     lead, while the keys come from running ".items[]".
+
+     Null for text that does not end in a field access, which runs as
+     written. "." is a complete query, and a trailing ".." is recursion, not
+     a name with more to come. */
+  function splitPartial(raw) {
+    var m = /\.([A-Za-z_][A-Za-z0-9_]*)?$/.exec(raw);
+    if (!m) return null;
+    var lead = raw.slice(0, m.index);
+    if (lead.charAt(lead.length - 1) === '.') return null;
+    if (!lead && m[1] === undefined) return null;
+    var ctx = lead.replace(/\s+$/, '');
+    if (ctx.charAt(ctx.length - 1) === '|') ctx = ctx.slice(0, -1).replace(/\s+$/, '');
+    return { lead: lead, ctx: ctx || '.', partial: m[1] || '' };
+  }
+
+  /* Past this many completions the list stops being read and the partial is
+     what narrows it, so the rest are dropped. */
+  var MAX_COMPLETIONS = 200;
+
+  /* The keys that could finish a partial name, gathered from the objects in
+     the stream ctx produced: each key that starts with the partial and goes
+     beyond it, with how many of the objects carry it, most common first and
+     alphabetical between equals. exact says whether some object has the
+     partial as a whole key, which means the text runs as written.
+
+     The tally lives on a null-prototype object because the keys come from
+     the document, and "constructor" is a name someone's data will have. */
+  function completions(out, partial) {
+    var tally = Object.create(null), keys = [], objects = 0, exact = false;
+    var i, j, k, node;
+    for (i = 0; i < out.length; i++) {
+      node = out[i];
+      if (node.t !== 'o') continue;
+      objects++;
+      for (j = 0; j < node.k.length; j++) {
+        k = node.k[j];
+        if (partial && k === partial) { exact = true; continue; }
+        if (k.length <= partial.length || k.slice(0, partial.length) !== partial) continue;
+        if (tally[k] === undefined) { tally[k] = 0; keys.push(k); }
+        tally[k]++;
+      }
+    }
+    keys.sort(function (a, b) { return tally[b] - tally[a] || (a < b ? -1 : 1); });
+    if (keys.length > MAX_COMPLETIONS) keys.length = MAX_COMPLETIONS;
+    return {
+      exact: exact,
+      objects: objects,
+      keys: keys.map(function (key) { return { key: key, n: tally[key] }; })
+    };
+  }
+
+  return { suggest: suggest, splitPartial: splitPartial, completions: completions };
 })();
 
 /* Node loads this file directly to test it; browsers use the global above. */

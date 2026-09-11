@@ -2195,12 +2195,46 @@ var jqsuggest = (function () {
     if (line) line.plain = true;
     return out;
   }
-  return { suggest: suggest };
+  function splitPartial(raw) {
+    var m = /\.([A-Za-z_][A-Za-z0-9_]*)?$/.exec(raw);
+    if (!m) return null;
+    var lead = raw.slice(0, m.index);
+    if (lead.charAt(lead.length - 1) === '.') return null;
+    if (!lead && m[1] === undefined) return null;
+    var ctx = lead.replace(/\s+$/, '');
+    if (ctx.charAt(ctx.length - 1) === '|') ctx = ctx.slice(0, -1).replace(/\s+$/, '');
+    return { lead: lead, ctx: ctx || '.', partial: m[1] || '' };
+  }
+  var MAX_COMPLETIONS = 200;
+  function completions(out, partial) {
+    var tally = Object.create(null), keys = [], objects = 0, exact = false;
+    var i, j, k, node;
+    for (i = 0; i < out.length; i++) {
+      node = out[i];
+      if (node.t !== 'o') continue;
+      objects++;
+      for (j = 0; j < node.k.length; j++) {
+        k = node.k[j];
+        if (partial && k === partial) { exact = true; continue; }
+        if (k.length <= partial.length || k.slice(0, partial.length) !== partial) continue;
+        if (tally[k] === undefined) { tally[k] = 0; keys.push(k); }
+        tally[k]++;
+      }
+    }
+    keys.sort(function (a, b) { return tally[b] - tally[a] || (a < b ? -1 : 1); });
+    if (keys.length > MAX_COMPLETIONS) keys.length = MAX_COMPLETIONS;
+    return {
+      exact: exact,
+      objects: objects,
+      keys: keys.map(function (key) { return { key: key, n: tally[key] }; })
+    };
+  }
+  return { suggest: suggest, splitPartial: splitPartial, completions: completions };
 })();
 if (typeof module === 'object' && module.exports) module.exports = jqsuggest;
 var jqui = function (page) {
   'use strict';
-  var renderTree = jqweb.renderTree, esc = jqweb.esc;
+  var renderTree = jqweb.renderTree, esc = jqweb.esc, pathText = jqweb.pathText;
   var tree = document.getElementById('tree');
   var results = document.getElementById('results');
   var input = document.getElementById('q');
@@ -2216,9 +2250,11 @@ var jqui = function (page) {
     if (mode.value !== 'auto') return false;
     return QUERY_START.indexOf(raw.charAt(0)) >= 0 || CALL.test(raw);
   }
-  function run(raw) {
+  function run(raw, force) {
     var query, out;
     clearFault();
+    completing = !force && complete(raw);
+    if (completing) return;
     showDocument();
     try {
       query = jqjs.compile(raw);
@@ -2317,7 +2353,31 @@ var jqui = function (page) {
     return out.length && out[0].t === 'o' ? out[0].k.length : 0;
   }
   function label(c) {
+    if (c.label !== undefined) return c.label;
     return c.count === null ? '' : plural(c.count, c.shape === 'keys' ? 'key' : 'result');
+  }
+  var completing = false;
+  function complete(raw) {
+    var split = jqsuggest.splitPartial(raw), out, comp;
+    if (!split) return false;
+    try {
+      out = jqjs.compile(split.ctx).run(page.value);
+    } catch (e) {
+      return false;
+    }
+    comp = jqsuggest.completions(out, split.partial);
+    if (comp.exact || !comp.keys.length) return false;
+    rows = comp.keys.map(function (k) {
+      var seg = pathText([{ key: k.key }]);
+      return {
+        q: split.lead ? split.lead + seg.replace(/^\.\[/, '[') : seg,
+        label: k.n === comp.objects ? '' : 'on ' + k.n + ' of ' + comp.objects,
+        count: null
+      };
+    });
+    draw();
+    show();
+    return true;
   }
   function draw() {
     var parts = [], i;
@@ -2363,6 +2423,11 @@ var jqui = function (page) {
     if (e.key === 'Escape' && !suggestions.hidden) {
       hide();
       e.stopPropagation();
+      return;
+    }
+    if (e.key === 'Enter' && completing) {
+      hide();
+      run(input.value.trim(), true);
       return;
     }
     if (suggestions.hidden || !rows.length) return;

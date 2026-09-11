@@ -67,46 +67,23 @@ release:
   # Bump this marker along with the prose. Nothing else can tell whether the
   # notes below were written for the tag being released, so the release
   # workflow compares the two and refuses to publish when they disagree.
-  # notes-for: 0.5.0
+  # notes-for: 0.6.0
   header: |
-    ## More of jq
+    ## Stop serving once the page has been fetched
 
-    The search box understands about 105 filters, up from 62. The ones worth
-    knowing about:
+    `-C` (or `--close`) serves the page and exits once a browser has fetched
+    it, instead of holding the terminal until Ctrl-C. `-OC` does that and
+    opens the browser:
 
-    **Regular expressions** -- `match`, `capture`, `scan`, `splits`, `sub` and
-    `gsub`, alongside the `test` that was already there. A replacement is a
-    filter run against the match's named captures, so jq's own example works:
-    `gsub("(?<c>l)"; "[" + .c + "]")`.
+    ```
+    jqweb -OC deploy.json
+    ```
 
-    **Format strings**, written with an `@` as jq writes them: `@text`,
-    `@json`, `@csv`, `@tsv`, `@uri`, `@html`, `@sh`, `@base64` and `@base64d`.
-    `@base64d` is the one that makes a Kubernetes secret readable.
+    The wait is `--close-delay`, 1 second by default.
 
-    **`any(gen; cond)` and `all(gen; cond)`**, which take a stream rather than
-    the input's own members, so a test can reach anywhere in a subtree:
-    `.items[] | select(any(.. | objects; .containerPort? == 80))`.
-
-    **`paths`, `paths(f)` and `getpath`** for looking at the shape of a
-    document, and `walk`, `while`, `until`, `isempty`, `error` and
-    `recurse(f; cond)`.
-
-    **Dates** -- `now`, `todate`, `fromdate`, `gmtime`, `mktime` and
-    `strftime`, which is what a Kubernetes timestamp wants.
-
-    Also `explode`, `implode`, and `pow`, `log`, `log2`, `log10`, `exp`,
-    `exp2`, `exp10` and `trunc`.
-
-    Nothing here edits a document. `del`, `setpath` and the assignment
-    operators need path expressions, and the page is for reading a document
-    rather than changing one. Variables, `def`, `reduce`, `foreach`,
-    `try`/`catch` and string interpolation are still out, and a query using one
-    says so by name.
-
-    ## Page size
-
-    The engine is about 70KB in a page, up from about 53KB in 0.4.1. `--simple`
-    is unchanged, since none of this ships in one.
+    **Fixed:** the one-dash spellings of the long flags -- `-theme`, `-host`,
+    `-port` and `-output` -- could take the wrong value once the arguments
+    were reordered, and now behave as their two-dash forms do.
 
 changelog:
   # The empty string is git order, which reads as the work happened; "asc" is

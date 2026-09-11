@@ -31,6 +31,23 @@ When someone asks for something to be added to the TODO without saying where,
 ask whether they want an issue filed or just a note kept for the rest of the
 session.
 
+## Where the work happens
+
+Branch work is done in a git worktree under `.claude/worktrees/`, which is
+gitignored. The primary checkout `~/projects/jqweb` stays on `main` and stays
+usable while several branches are in flight. A worktree the `EnterWorktree` tool
+makes carries a `worktree-<name>` branch and is locked; one added by hand for an
+existing branch keeps that branch's own name.
+
+When asked to start a feature, a bugfix, or anything else that wants its own
+branch, ask whether it should go in a worktree before making any change. The
+usual answer is yes, so that is the one to offer first, but ask rather than
+assume: a one-line fix is sometimes wanted on `main` in the primary checkout.
+
+To move work already started on a branch in the primary checkout: commit it,
+switch that checkout back to `main`, `git worktree add .claude/worktrees/<branch>
+<branch>`, then work from that path.
+
 ## What it is
 
 A Go binary that turns a JSON document into one self-contained HTML page, and

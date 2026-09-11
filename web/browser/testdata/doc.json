@@ -1,0 +1,71 @@
+{
+  "kind": "List",
+  "apiVersion": "v1",
+  "items": [
+    {
+      "kind": "Pod",
+      "metadata": { "name": "web-0", "namespace": "default", "labels": { "app": "web", "tier": "front" } },
+      "spec": { "replicas": 2 },
+      "status": { "phase": "Running", "restarts": 0 }
+    },
+    {
+      "kind": "Pod",
+      "metadata": { "name": "web-1", "namespace": "default", "labels": { "app": "web", "tier": "front" } },
+      "spec": { "replicas": 2 },
+      "status": { "phase": "Running", "restarts": 1 }
+    },
+    {
+      "kind": "Pod",
+      "metadata": { "name": "api-0", "namespace": "default", "labels": { "app": "api", "tier": "back" } },
+      "spec": { "replicas": 3 },
+      "status": { "phase": "Running", "restarts": 0 }
+    },
+    {
+      "kind": "Pod",
+      "metadata": { "name": "api-1", "namespace": "default", "labels": { "app": "api", "tier": "back" } },
+      "spec": { "replicas": 3 },
+      "status": { "phase": "Pending", "restarts": 0 }
+    },
+    {
+      "kind": "Pod",
+      "metadata": { "name": "cron-0", "namespace": "batch", "labels": { "app": "cron", "tier": "back" } },
+      "spec": { "replicas": 1 },
+      "status": { "phase": "Succeeded", "restarts": 0 }
+    },
+    {
+      "kind": "Pod",
+      "metadata": { "name": "cron-1", "namespace": "batch", "labels": { "app": "cron", "tier": "back" } },
+      "spec": { "replicas": 1 },
+      "status": { "phase": "Failed", "restarts": 4 }
+    },
+    {
+      "kind": "Service",
+      "metadata": { "name": "web", "namespace": "default", "labels": { "app": "web", "tier": "front" } },
+      "spec": { "replicas": 0 },
+      "status": { "phase": "Running", "restarts": 0 }
+    },
+    {
+      "kind": "Service",
+      "metadata": { "name": "api", "namespace": "default", "labels": { "app": "api", "tier": "back" } },
+      "spec": { "replicas": 0 },
+      "status": { "phase": "Running", "restarts": 0 }
+    },
+    {
+      "kind": "Service",
+      "metadata": { "name": "cron", "namespace": "batch", "labels": { "app": "cron", "tier": "back" } },
+      "spec": { "replicas": 0 },
+      "status": { "phase": "Running", "restarts": 0 }
+    },
+    {
+      "kind": "Deployment",
+      "metadata": { "name": "web", "namespace": "default", "labels": { "app": "web", "tier": "front" } },
+      "spec": { "replicas": 2 },
+      "status": { "phase": "Running", "restarts": 0 }
+    }
+  ],
+  "counts": { "pods": 6, "services": 3, "ratio": 1.50, "scale": 1e3, "zero": -0.0 },
+  "notes": "a < b && c > d",
+  "empty": {},
+  "emptyList": [],
+  "mixed": [null, true, false, "tail"]
+}

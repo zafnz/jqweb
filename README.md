@@ -174,6 +174,15 @@ A value the size of a whole subtree is asked about by presence instead --
 `select(.value.get? != null)`, "which paths have a get at all" -- because
 pasting the subtree into the query would give a row nobody can read.
 
+## On a phone
+
+At 600px wide and below the page is the tree and the buttons to fold it:
+`Collapse all`, the arrow on each branch, and the theme button. The search box,
+the mode dropdown, the match count and the two buttons on each line are left
+off, since a phone has no room to write a query and the browser's own find in
+page covers text search. A wider window, or a phone turned on its side, gets
+the whole page back.
+
 ## Why?
 
 Sometimes it's easier to view it in your webbrowser then search through large json output to

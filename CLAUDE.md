@@ -119,6 +119,13 @@ short-circuits as a result, so no builtin may produce an endless stream.
 
 ## Rules that bite
 
+**The phone breakpoint is written twice.** `@media (max-width: 600px)` in
+`page.css` hides the search box and the line buttons, and `page.js` runs
+`matchMedia` on the same query to clear a search when the window crosses it.
+Change one and change the other. `phone.js` runs at 500px, the narrowest window
+headless Chrome opens, and `narrow.js` at 640px, so a breakpoint moved outside
+that range fails one of them.
+
 **Offline, always.** A rendered page is one file that has to work with no
 network: no CDN, no web fonts, no remote images. The GitHub mark in the toolbar
 is inline SVG for this reason. (The `--cdn` issue would change this on

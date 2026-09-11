@@ -172,6 +172,16 @@
     if (e.key === 'Escape' && e.target === input) { input.value = ''; run(); }
   });
 
+  /* A phone gets the tree and the fold button only: page.css hides the search
+     box, the mode select, the count and the line buttons at this same width.
+     A window narrowed to it with a search in the box would be left filtered,
+     or showing query results, with no box to clear them from, so the search
+     is cleared on the way in. */
+  var phone = window.matchMedia('(max-width: 600px)');
+  phone.addEventListener('change', function () {
+    if (phone.matches && input.value) { input.value = ''; run(); }
+  });
+
   /* Runs whatever is in the box. Without query.js that is text to find or a
      path, as it has always been; with it, the mode decides. */
   function run() {

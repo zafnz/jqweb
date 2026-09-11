@@ -82,7 +82,7 @@ it out. `script()` and `style()` in `page.go` pick the file list, and
 | `theme.js` | both | runs in `<head>`, picks the palette before the body parses |
 | `page.css` | both | the palette, both themes |
 | `jq.js` | default only | the jq engine |
-| `suggest.js` | default only | builds the queries a clicked line could mean. No DOM. |
+| `suggest.js` | default only | builds the queries a clicked line could mean, and the key completions of a half-typed one. No DOM. |
 | `query.js` | default only | search box as a query, results view, suggestion list |
 | `query.css` | default only | mode select, suggestion list, error box, results |
 

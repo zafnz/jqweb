@@ -105,6 +105,14 @@ anything starting with `.` `[` `(` `$` or `|` is a query and anything else is
 text to find, so typing a word still searches; `jq` forces a query, which is
 how to run a bare-word one such as `keys`.
 
+A query is completed as it is typed. jq reads a missing key as null, so
+`.items[].ki` run as written is one null per item while the `nd` of `kind` is
+still to come; instead, while the trailing name is a prefix of keys the query
+really reaches, the box drops down those keys, the view stays put, and nothing
+runs. A bare trailing dot lists every key. Click a completion or arrow down to
+it to run it, keep typing, or press Enter to run the half-typed text as
+written; a name that no key starts with runs as written too.
+
 This is a subset of jq, not all of it. Paths, `[]`, slices, `|`, `,`, `//`,
 `?`, comparisons, arithmetic, `if/then/elif/else/end`, array and object
 construction, and around 100 builtins:

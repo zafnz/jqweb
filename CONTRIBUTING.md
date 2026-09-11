@@ -2,9 +2,9 @@
 
 ## Building and testing
 
-    go build .                # a jqweb binary in the working directory
-    go test ./...             # Go: argument handling, input validation, page assembly
-    node --test               # JavaScript: web/core.test.js, web/jq.test.js
+    go build .                     # a jqweb binary in the working directory
+    go test ./...                  # Go: argument handling, input validation, page assembly
+    node --test                    # JavaScript: web/core.test.js, web/jq.test.js
     node web/browser-test/run.js   # the page in a browser (needs Chrome)
 
 No dependencies, either side: `go.mod` requires nothing, there is no

@@ -59,6 +59,10 @@ it out. `script()` and `style()` in `main.go` pick the file list, and
 | `query.js` | default only | search box as a query, results view, suggestion list |
 | `query.css` | default only | mode select, suggestion list, error box, results |
 
+`web/browser-test` ships in nothing. It is the drivers, the harness they are
+written against and the runner that loads them, and no rendered page has ever
+seen any of it.
+
 `page.js` must work with the other three absent. It calls `jqui()` when
 `query.js` is there and falls back to path lookup when it is not. Anything that
 reads the box as a query, or renders what a query produced, belongs in
@@ -148,29 +152,33 @@ of `jq.js`. When jq's behaviour is in question, run `jq` and find out — guessi
 has been wrong about operator stream order, `"ab" * 0`, `max_by` ties and
 `from_entries` key spellings.
 
-**Nothing in CI drives a browser, and no driver is kept in the repo.** The ones
-used so far were written per session and thrown away, so do not go looking for
-them. The page can be driven headlessly, and it is worth doing for anything that
-touches the DOM:
-
-    # inject a script that writes its findings into <pre id="report">
-    python3 -c "page=open('page.html').read(); d=open('driver.js').read();
-      open('run.html','w').write(page.replace('</body>','<script>'+d+'</script></body>'))"
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless \
-      --disable-gpu --window-size=1200,800 --virtual-time-budget=30000 \
-      --dump-dom "file:///tmp/run.html"
-
-`--screenshot=out.png` instead of `--dump-dom` for a look at it. This is how the
-scroll bug, the icon alignment and the contrast were all settled. Assert the
-property that matters, not a particular pixel: several drivers failed first
-because the expectation was wrong, not the code.
+**The browser drivers are in `web/browser-test`, and CI runs them.** `node
+web/browser-test/run.js` is the whole suite, 441 checks in about 8 seconds.
+`web/browser-test/README.md` is how it works and how to write one; read it
+before adding a driver. `--screenshot=out.png` in place of `--dump-dom` is
+still the way to look at a page by hand.
 
 **Anything that only reproduces in a browser needs a driver before a fix.**
 Three bugs this way were each different from what they looked like: typing `.`
 scrolled halfway down because `.` resolves to the root and centring an element
 taller than the window puts its middle in the middle; a suggestion beginning
 with a name was text-searched because auto mode read the first character; the
-line buttons were invisible in light mode at 1.6:1.
+line buttons were invisible in light mode at 1.6:1. All three have a driver on
+them now, and reintroducing the first one fails `scroll.js` with the node
+1803px off the top.
+
+**Assert the property that matters, not a particular pixel.** Several drivers
+failed first because the expectation was wrong and not the code. The toolbar
+centres what is on a row, so items of different heights have different tops and
+counting tops says every one of them wrapped. Hiding what did not match
+shortens the document, so a text search that scrolls nowhere still ends at a
+smaller `scrollY` than it started at.
+
+**The contrast bar the drivers hold to is not the one the palette meets.** Six
+colours land under 4.5:1 for words or 3:1 for shapes, and `contrast.js` holds
+each to what it reaches today so a change that dims one further still fails.
+The `BELOW` table in that file is what to delete as zafnz/jqweb#23 is worked
+through.
 
 ## Working habits that have paid off
 

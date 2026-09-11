@@ -2,17 +2,20 @@
 
 ## Building and testing
 
-    go build .        # a jqweb binary in the working directory
-    go test ./...     # Go: argument handling, input validation, page assembly
-    node --test       # JavaScript: web/core.test.js, web/jq.test.js
+    go build .                     # a jqweb binary in the working directory
+    go test ./...                  # Go: argument handling, input validation, page assembly
+    node --test                    # JavaScript: web/core.test.js, web/jq.test.js
+    node web/browser-test/run.js   # the page in a browser (needs Chrome)
 
 No dependencies, either side: `go.mod` requires nothing, there is no
 `package.json`, and the JavaScript tests use the test runner built into Node
 18 and later. Please keep it that way — `go install github.com/zafnz/jqweb@latest`
 runs the Go toolchain and nothing else, so anything that needs a build step
-would have to be committed as generated output.
+would have to be committed as generated output. The browser drivers hold to
+the same rule: they drive Chrome through its own command line rather than
+through Playwright or Puppeteer.
 
-CI runs the same three commands on every push, with the Go job against both
+CI runs the same four commands on every push, with the Go job against both
 the `go.mod` floor and the current release. The two have disagreed before:
 Go 1.27 changed `json.Decoder.More()` at the end of a truncated document,
 which changed the error message a user sees.
@@ -22,14 +25,6 @@ which changed the error message a user sees.
 Every colour is a custom property on `:root` in `web/page.css`, defined twice:
 once for dark and once under `:root[data-theme="light"]`. Adding a colour means
 adding it to both, and using a literal anywhere means one theme gets it wrong.
-
-The buttons on each line go through three steps, because at rest they have to
-be findable without competing with the value beside them. `--icon` is the
-resting colour, about 3:1 against the background; hovering the line brings them
-to `--muted`; hovering one puts it on `--icon-chip` in `--fg`, which is also
-what makes the click target visible. Dimming a grey with `opacity` instead gave
-1.6:1 in light, which is no button at all, so it is worth checking the ratio
-rather than the look on one screen.
 
 `web/theme.js` runs in the head, before the body is parsed, so a page never
 paints in one theme and swaps to the other. It reads `data-pref` -- which
@@ -45,9 +40,13 @@ value containing `</script` cannot close the element holding it — rather than
 comparing against a stored copy of a rendered page, which would need
 regenerating for every change to the styling.
 
-Neither those nor the Node tests run the page in a browser. When you change
-the scripts, it is worth rendering a document and diffing the resulting tree
-against a build from `main`:
+The Go and Node tests do not run the page in a browser. The drivers that do
+are in `web/browser-test` and are documented there. CI runs them on every
+push.
+
+A driver only checks what it was written to check. For a change to the scripts
+that should not have altered the rendering at all, diffing the whole tree
+against a build from `main` covers the rest:
 
     go build -o /tmp/jqweb-new .
     git stash && go build -o /tmp/jqweb-old . && git stash pop
@@ -57,10 +56,6 @@ against a build from `main`:
       chromium --headless --dump-dom "file:///tmp/page-$v.html" > /tmp/dom-$v.html
     done
     diff /tmp/dom-old.html /tmp/dom-new.html
-
-A static dump only covers rendering. Searching, filtering, collapsing and
-copy-path need driving, which means a browser automation tool; there is no
-such test in CI today.
 
 The stylesheets carry no comments, because only the scripts are stripped: CSS
 is inlined as written, so a comment in `page.css` or `query.css` ships in every

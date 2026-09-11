@@ -67,3 +67,37 @@ jobs:
       # web/core.js is the DOM-free half of the page script, so node runs its
       # tests directly; no package.json and no dependencies.
       - run: node --test
+
+  # The other half of the page only exists in a browser: the tree, the search
+  # box, the suggestion list, folding, scrolling, the toolbar and the two
+  # palettes. The drivers render a page, load it in the Chrome the runner
+  # image already carries, and read their findings back out of it. Nothing is
+  # installed for this, and there is no automation library behind it.
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # A page has to be rendered before it can be driven, and rendering one
+      # means building jqweb.
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Named rather than assumed: a runner image that stopped shipping Chrome
+      # should say so here rather than inside the runner.
+      - run: google-chrome --version
+
+      - run: node web/browser-test/run.js --keep=${{ runner.temp }}/pages
+
+      # A kept page is the document, the harness and one driver in one file,
+      # so a failure can be opened in a browser and watched.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-pages
+          path: ${{ runner.temp }}/pages/*.run.html

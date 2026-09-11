@@ -36,14 +36,24 @@ session.
 A Go binary that turns a JSON document into one self-contained HTML page, and
 either serves it or writes it to a file. Everything interesting is in the page.
 
-`main.go` does argument handling, validates the input, and assembles the page by
-substituting into a template built from `web/*`. The document goes in as compact
-JSON inside `<script id="data">`; the tree is built in the browser, not in Go.
-That is why `renderPage` is cheap on a 5MB document and why the page scripts are
-where the work is.
+The Go side is four files, all `package main`:
+
+| file | what it holds |
+|---|---|
+| `main.go` | the flag definitions, `reorderArgs`, and the flow of `main` |
+| `check.go` | `check` and the error messages it builds for input that is not one well-formed JSON document |
+| `serve.go` | the HTTP server, the `-C` close timer, and `openBrowser` |
+| `page.go` | the embedded `web/*` assets, template assembly, and the comment stripper |
+
+Each has a `_test.go` of its own along the same lines.
+
+`page.go` assembles the page by substituting into a template built from `web/*`.
+The document goes in as compact JSON inside `<script id="data">`; the tree is
+built in the browser, not in Go. That is why `renderPage` is cheap on a 5MB
+document and why the page scripts are where the work is.
 
 There are two page builds. The default carries the jq engine; `--simple` leaves
-it out. `script()` and `style()` in `main.go` pick the file list, and
+it out. `script()` and `style()` in `page.go` pick the file list, and
 `pageTemplate(jq)` caches one assembled template per state.
 
 ## The files in `web/`, and which build gets them

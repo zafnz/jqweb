@@ -60,40 +60,24 @@ checksum:
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
-release:
-  # Rewritten for each release: it is what this one changed, not what the tool
-  # does. GoReleaser puts it above the commit list on the release page.
-  #
-  # Bump this marker along with the prose. Nothing else can tell whether the
-  # notes below were written for the tag being released, so the release
-  # workflow compares the two and refuses to publish when they disagree.
-  # notes-for: 0.6.0
-  header: |
-    ## Stop serving once the page has been fetched
-
-    `-C` (or `--close`) serves the page and exits once a browser has fetched
-    it, instead of holding the terminal until Ctrl-C. `-OC` does that and
-    opens the browser:
-
-    ```
-    jqweb -OC deploy.json
-    ```
-
-    The wait is `--close-delay`, 1 second by default.
-
-    **Fixed:** the one-dash spellings of the long flags -- `-theme`, `-host`,
-    `-port` and `-output` -- could take the wrong value once the arguments
-    were reordered, and now behave as their two-dash forms do.
-
+# The prose above the commit list is the CHANGELOG.md section for the tag,
+# which the release workflow extracts and passes as --release-header. A header
+# set here as well would print above that one rather than replace it.
 changelog:
+  # The compare API rather than git log, so each line ends with the GitHub
+  # username of whoever wrote the commit. For a branch merged here that is the
+  # same list with a name on the end; it is for the commits that arrive from
+  # outside. With no previous tag to compare against, GoReleaser falls back to
+  # git log and the name is left off.
+  use: github
+  # Written out because the default format for any source other than git opens
+  # each line with the full SHA: 40 characters of nothing anyone reads.
+  format: "{{ .Message }}{{ with .AuthorUsername }} (@{{ . }}){{ end }}"
   # The empty string is git order, which reads as the work happened; "asc" is
   # alphabetical by whatever word a subject starts with. Spelled out rather
   # than left off, so that it reads as a choice.
   sort: ""
-  # The commit list sits under the notes above, so it wants to be readable
-  # rather than complete: a full SHA on every line is 40 characters of nothing
-  # anyone reads, and a merge commit says only that a branch arrived.
-  abbrev: -1
+  # A merge commit says only that a branch arrived.
   filters:
     exclude:
       - "^docs:"

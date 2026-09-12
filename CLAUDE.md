@@ -191,6 +191,11 @@ rendered, so regenerate it after any change under `web/`, with the command in
 and the `curl` in `README.md` fetches it from there. Examples that need a
 document use this one.
 
+**`demo.png` is generated and committed.** Regenerate it for every new release,
+after the example page is current, with `node web/browser-test/capture-demo.js`.
+The script drives `docs/k8s.json` into the screenshot query and draws the browser
+frame; do not replace it with a hand capture.
+
 **Other sample documents are gitignored** — `simple.json`, `large.json`,
 `wiki-rest.json`. They are scratch fixtures. A wide `git add` has swept one in
 before.

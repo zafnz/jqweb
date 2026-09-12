@@ -143,6 +143,12 @@ it at https://zafnz.github.io/jqweb/k8s.json, which is what the `curl` in
 `README.md` fetches, so changing the file changes both the example page and
 the first command a reader runs.
 
+Regenerate the README screenshot for every new release, after the example page
+is current. The script uses the same document, runs the example query, draws a
+browser frame around the page, and writes `demo.png`:
+
+    node web/browser-test/capture-demo.js
+
 ## Bugs and wanted features
 
 Both go in the issue tracker at https://github.com/zafnz/jqweb/issues. File one

@@ -39,6 +39,7 @@ wiki-rest.json
 wiki-rest.html
 k8s.html
 jqweb
+web/node_modules/
 # GoReleaser
-dist/
+/dist/
 .claude/worktrees

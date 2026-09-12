@@ -54,16 +54,16 @@ func TestRenderPageSubstitutesEveryPlaceholder(t *testing.T) {
 func TestRenderPageInlinesAssets(t *testing.T) {
 	page := renderPage([]byte(`{}`), "t", options{jq: false})
 	for _, want := range []string{
-		"<style>",       // the shell
-		"color-scheme",  // from page.css
-		"parseJSON",     // from core.js
-		"function run(", // from page.js
-		`id="tree"`,     // the mount point the script writes into
-		`id="results"`,  // where a query's output goes
-		`id="q"`,        // the search box
-		`id="suggest"`,  // the list of queries a line could mean
-		`id="mode"`,     // what the search box means
+		"<style>",      // the shell
+		"color-scheme", // from page.css
+		`id="tree"`,    // the mount point the script writes into
+		`id="results"`, // where a query's output goes
+		`id="q"`,       // the search box
+		`id="suggest"`, // the list of queries a line could mean
+		`id="mode"`,    // what the search box means
 		`id="stats"`,
+		inline("web/dist/theme.js"),
+		inline("web/dist/simple.js"),
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("page does not contain %q", want)
@@ -71,26 +71,25 @@ func TestRenderPageInlinesAssets(t *testing.T) {
 	}
 }
 
-// The query engine is the largest part of the script, and --simple is the only
-// thing that leaves it out.
-func TestRenderPageLeavesTheEngineOutOnlyForSimple(t *testing.T) {
+// The query engine is the largest part of the script, and the two committed
+// bundles keep it wholly out of a --simple page.
+func TestRenderPageSelectsTheCompiledScript(t *testing.T) {
 	full := renderPage([]byte(`{}`), "t", options{jq: true})
 	simple := renderPage([]byte(`{}`), "t", options{jq: false})
+	fullScript := inline("web/dist/full.js")
+	simpleScript := inline("web/dist/simple.js")
 
-	for _, want := range []string{
-		"var jqjs",          // the engine
-		"function compile(", // its entry point
-		"'sort_by/1'",       // its builtin table
-		"var jqsuggest",     // the queries it offers for a line
-		"var jqui",          // the search box wiring that drives both
-		"function showResults(",
-	} {
-		if !strings.Contains(full, want) {
-			t.Errorf("page does not contain %q", want)
-		}
-		if strings.Contains(simple, want) {
-			t.Errorf("--simple page contains %q", want)
-		}
+	if !strings.Contains(full, fullScript) {
+		t.Error("default page does not carry the full bundle")
+	}
+	if strings.Contains(full, simpleScript) {
+		t.Error("default page carries the simple bundle")
+	}
+	if !strings.Contains(simple, simpleScript) {
+		t.Error("--simple page does not carry the simple bundle")
+	}
+	if strings.Contains(simple, fullScript) {
+		t.Error("--simple page carries the full bundle")
 	}
 	if len(simple) >= len(full) {
 		t.Errorf("--simple page is %d bytes, no smaller than the %d without it",
@@ -192,53 +191,8 @@ func TestRenderPageStartsInTheThemeAskedFor(t *testing.T) {
 	}
 }
 
-func TestStripComments(t *testing.T) {
-	tests := []struct{ name, in, want string }{
-		{"whole line", "a();\n/* note */\nb();", "a();\nb();"},
-		{"trailing", "a(); /* note */", "a();"},
-		{"leading", "/* note */ a();", " a();"},
-		{"multi-line", "a();\n/* one\n   two */\nb();", "a();\nb();"},
-		{"code either side of a multi-line comment", "a(); /* one\n   two */ b();", "a();\n b();"},
-		{"two on one line", "a(); /* x */ b(); /* y */", "a();  b();"},
-		{"blank lines go too", "a();\n\n\nb();", "a();\nb();"},
-		{"nothing to do", "a();\nb();", "a();\nb();"},
-
-		// A "/*" that is not a comment must survive.
-		{"in a single-quoted string", `var s = '/* not a comment */';`, `var s = '/* not a comment */';`},
-		{"in a double-quoted string", `var s = "/* no */";`, `var s = "/* no */";`},
-		{"in a template literal", "var s = `/* no */`;", "var s = `/* no */`;"},
-		{"after an escaped quote", `var s = 'it\'s /* no */';`, `var s = 'it\'s /* no */';`},
-		{"a real comment after a string", `var s = 'x'; /* note */`, `var s = 'x';`},
-
-		// Lines the reader gives up on are emitted exactly as written.
-		{"regular expression", `var re = /[/*]/;`, `var re = /[/*]/;`},
-		{"regular expression with a comment", `var re = /a/; /* note */`, `var re = /a/; /* note */`},
-		{"division", `var x = a / b; /* note */`, `var x = a / b; /* note */`},
-		{"unterminated template literal", "var s = `open; /* note */", "var s = `open; /* note */"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := stripComments(tt.in); got != tt.want {
-				t.Errorf("stripComments(%q)\n got %q\nwant %q", tt.in, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestStripCommentsIsIdempotent(t *testing.T) {
-	for _, name := range []string{"web/theme.js", "web/core.js", "web/jq.js", "web/suggest.js", "web/query.js", "web/page.js"} {
-		once := stripComments(asset(name))
-		if twice := stripComments(once); twice != once {
-			t.Errorf("%s: stripping twice differs from stripping once", name)
-		}
-	}
-}
-
-// stripComments gives up on any line where a "/" turns up outside a string
-// without a "*" after it, and emits that line as written -- comment and all.
-// A regular expression or a division in the scripts can trip that, so no page
-// should carry a comment opener at all. The stylesheet is inlined as written,
-// so this covers it too.
+// The compiled scripts and stylesheets are inlined as written, so neither may
+// carry a comment into every rendered page.
 func TestPageCarriesNoComments(t *testing.T) {
 	for _, jq := range []bool{false, true} {
 		page := renderPage([]byte(`{"a":1}`), "t", options{jq: jq})
@@ -249,27 +203,10 @@ func TestPageCarriesNoComments(t *testing.T) {
 	}
 }
 
-// The comments go, the code stays.
-func TestPageShipsWithoutComments(t *testing.T) {
-	page := renderPage([]byte(`{"a":1}`), "t", options{jq: false})
-	for _, gone := range []string{
-		"Pure helpers shared by the page", // core.js file comment
-		"recursive-descent scanner",       // inside parseJSON
-		"the reader's, not the search's",  // inside page.js
-	} {
-		if strings.Contains(page, gone) {
-			t.Errorf("page still contains the comment %q", gone)
-		}
-	}
-	for _, want := range []string{
-		"function parseJSON(src)",
-		"return segs.length ? segs : null;",
-		`var escMap = { '&': '&amp;',`,
-		"function textFilter(needle)",
-		`var pathChar = /[^.[\]"'\s]/;`, // a line the stripper leaves alone
-	} {
-		if !strings.Contains(page, want) {
-			t.Errorf("page is missing the code %q", want)
+func TestCompiledScriptsCannotCloseTheirElements(t *testing.T) {
+	for _, name := range []string{"web/dist/theme.js", "web/dist/simple.js", "web/dist/full.js"} {
+		if strings.Contains(strings.ToLower(asset(name)), "</script") {
+			t.Errorf("%s contains a closing script tag", name)
 		}
 	}
 }

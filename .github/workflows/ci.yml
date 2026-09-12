@@ -62,11 +62,20 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm --prefix web ci
+      - run: npm --prefix web run check
+      - run: npm --prefix web run build
+
+      - name: The compiled scripts are committed and current
+        run: git diff --exit-code -- web/dist
 
       # web/core.js is the DOM-free half of the page script, so node runs its
-      # tests directly; no package.json and no dependencies.
-      - run: node --test
+      # tests directly.
+      - run: npm --prefix web test
 
   # The other half of the page only exists in a browser: the tree, the search
   # box, the suggestion list, folding, scrolling, the toolbar and the two
@@ -86,11 +95,17 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
 
       # Named rather than assumed: a runner image that stopped shipping Chrome
       # should say so here rather than inside the runner.
       - run: google-chrome --version
+
+      - name: The example page is built from the current assets
+        run: |
+          go build -o "${RUNNER_TEMP}/jqweb" .
+          "${RUNNER_TEMP}/jqweb" -o "${RUNNER_TEMP}/index.html" docs/k8s.json
+          cmp docs/index.html "${RUNNER_TEMP}/index.html"
 
       - run: node web/browser-test/run.js --keep=${{ runner.temp }}/pages
 

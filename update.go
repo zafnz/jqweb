@@ -30,6 +30,13 @@ const (
 	// the run that makes the check is the run that prints.
 	updateInterval = 24 * time.Hour
 
+	// How long a tag has to have been known before it is mentioned. Package
+	// managers lag a release by up to a day, so a notice sent the moment a tag
+	// appears points at something the reader cannot install yet. It is measured
+	// from when jqweb first saw the tag, which is at or after publication, so a
+	// tag this old has been published at least this long.
+	minTagAge = 24 * time.Hour
+
 	// A check that has not answered by then is abandoned.
 	updateTimeout = 2 * time.Second
 
@@ -40,9 +47,12 @@ const (
 )
 
 // updateState is what a check leaves behind for the runs that follow it: when
-// github.com was last asked.
+// github.com was last asked, the tag it answered with, and when that tag was
+// first seen.
 type updateState struct {
 	CheckedAt time.Time `json:"checked_at"`
+	Latest    string    `json:"latest"`
+	FirstSeen time.Time `json:"first_seen"`
 }
 
 // updater is one update check. The fields are what the check reaches outside
@@ -113,7 +123,7 @@ func wantUpdateCheck(version string, stderrIsTTY bool, getenv func(string) strin
 }
 
 // notice is the line to print, or "" when the running version is the latest
-// one or the check could not be made.
+// one, the tag is too new to mention, or the check could not be made.
 //
 // Only the run that asks github.com prints. A run inside updateInterval of the
 // last check leaves the notice to the run that made it, so a release is
@@ -122,15 +132,30 @@ func wantUpdateCheck(version string, stderrIsTTY bool, getenv func(string) strin
 // Every failure along the way is silent: a version check is not what anyone
 // ran jqweb for.
 func (u *updater) notice() string {
-	if u.now().Sub(u.readState().CheckedAt) < updateInterval {
+	state := u.readState()
+	if u.now().Sub(state.CheckedAt) < updateInterval {
 		return ""
 	}
 	latest, err := u.latestVersion()
 	if err != nil {
+		// The day is spent whether or not the answer came. Leaving CheckedAt
+		// alone would mean a request on every run for as long as github.com is
+		// unreachable, which is more than a version notice is worth; the cost
+		// is that a run of failures delays the notice by a day each.
+		state.CheckedAt = u.now()
+		u.writeState(state)
 		return ""
 	}
-	u.writeState(updateState{CheckedAt: u.now()})
+	if latest != state.Latest {
+		state.Latest, state.FirstSeen = latest, u.now()
+	}
+	state.CheckedAt = u.now()
+	u.writeState(state)
+
 	if !newerVersion(u.version, latest) {
+		return ""
+	}
+	if u.now().Sub(state.FirstSeen) < minTagAge {
 		return ""
 	}
 	return fmt.Sprintf("jqweb: %s is available (running %s): %s",

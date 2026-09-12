@@ -12,7 +12,8 @@ above the commit list GoReleaser generates.
 ### Update checker
 
 Added update checker to notify user if they are running an old version. The
-notice appears at most once a day.
+notice appears at most once a day, and a release is not mentioned until a day
+after jqweb first sees it.
 
 ## [0.7.0] - 2026-09-12
 

@@ -232,7 +232,14 @@ func TestUpgradeHintMatchesASymlinkedGoBin(t *testing.T) {
 
 func TestNoticeReportsANewerRelease(t *testing.T) {
 	srv, hits := releaseServer(t, "v0.9.0")
-	u, _ := newTestUpdater(t, "0.7.0", srv.URL+"/releases/latest")
+	u, clock := newTestUpdater(t, "0.7.0", srv.URL+"/releases/latest")
+
+	// The first sight of a tag is recorded and nothing is said. The notice
+	// comes on the check after minTagAge has passed.
+	if line := u.notice(); line != "" {
+		t.Fatalf("notice = %q on first sight of 0.9.0, want nothing", line)
+	}
+	*clock = clock.Add(minTagAge)
 
 	line := u.notice()
 	if !strings.Contains(line, "0.9.0") || !strings.Contains(line, "0.7.0") {
@@ -247,8 +254,8 @@ func TestNoticeReportsANewerRelease(t *testing.T) {
 	if strings.Contains(line, "\n") {
 		t.Errorf("notice = %q, want one line", line)
 	}
-	if n := hits.Load(); n != 1 {
-		t.Errorf("asked github.com %d times, want 1", n)
+	if n := hits.Load(); n != 2 {
+		t.Errorf("asked github.com %d times, want 2: once on first sight and once a day later", n)
 	}
 }
 
@@ -267,9 +274,13 @@ func TestNoticeAppearsAtMostOnceADay(t *testing.T) {
 	srv, hits := releaseServer(t, "v0.9.0")
 	u, clock := newTestUpdater(t, "0.7.0", srv.URL+"/releases/latest")
 
+	if line := u.notice(); line != "" {
+		t.Fatalf("notice = %q on first sight of the tag, want nothing", line)
+	}
+	*clock = clock.Add(minTagAge)
 	first := u.notice()
 	if first == "" {
-		t.Fatal("no notice for 0.9.0 against 0.7.0")
+		t.Fatal("no notice for 0.9.0 against 0.7.0 a day after the tag was first seen")
 	}
 
 	var state updateState
@@ -280,52 +291,57 @@ func TestNoticeAppearsAtMostOnceADay(t *testing.T) {
 	if err := json.Unmarshal(b, &state); err != nil {
 		t.Fatalf("the state file is not JSON: %v", err)
 	}
-	if !state.CheckedAt.Equal(u.now()) {
-		t.Errorf("state = %+v, want the check recorded at %s", state, u.now())
+	if !state.CheckedAt.Equal(u.now()) || state.Latest != "0.9.0" {
+		t.Errorf("state = %+v, want 0.9.0 checked at %s", state, u.now())
 	}
 
 	*clock = clock.Add(updateInterval - time.Minute)
 	if again := u.notice(); again != "" {
 		t.Errorf("notice %q just under a day after the last one, want nothing", again)
 	}
-	if n := hits.Load(); n != 1 {
-		t.Errorf("asked github.com %d times within the day, want 1", n)
+	if n := hits.Load(); n != 2 {
+		t.Errorf("asked github.com %d times within the day, want 2", n)
 	}
 
 	*clock = clock.Add(2 * time.Minute)
 	if again := u.notice(); again != first {
 		t.Errorf("notice a day later = %q, want %q", again, first)
 	}
-	if n := hits.Load(); n != 2 {
-		t.Errorf("asked github.com %d times over a day and a bit, want 2", n)
+	if n := hits.Load(); n != 3 {
+		t.Errorf("asked github.com %d times over two days and a bit, want 3", n)
 	}
 }
 
-// A release that lands while the state file still holds the old answer is
-// announced on the next check rather than remembered wrongly for ever.
-func TestNoticeFollowsANewReleaseAfterADay(t *testing.T) {
+// A tag that replaces the one in the state file starts its own day, whatever
+// was known about the tag before it.
+func TestNoticeFollowsANewRelease(t *testing.T) {
 	tag := "v0.8.0"
-	var hits atomic.Int64
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hits.Add(1)
 		http.Redirect(w, r, "/releases/tag/"+tag, http.StatusFound)
 	}))
 	defer srv.Close()
 
 	u, clock := newTestUpdater(t, "0.7.0", srv.URL+"/releases/latest")
+	u.notice()
+	*clock = clock.Add(minTagAge)
 	if line := u.notice(); !strings.Contains(line, "0.8.0") {
-		t.Fatalf("notice = %q, want 0.8.0", line)
+		t.Fatalf("notice = %q a day after 0.8.0 was first seen, want 0.8.0", line)
 	}
+
 	tag = "v0.9.0"
 	*clock = clock.Add(updateInterval)
+	if line := u.notice(); line != "" {
+		t.Errorf("notice = %q on first sight of 0.9.0, want nothing", line)
+	}
+	*clock = clock.Add(minTagAge)
 	if line := u.notice(); !strings.Contains(line, "0.9.0") {
-		t.Errorf("notice after a day = %q, want 0.9.0", line)
+		t.Errorf("notice = %q a day after 0.9.0 appeared, want 0.9.0", line)
 	}
 }
 
 func TestNoticeSurvivesAGarbledStateFile(t *testing.T) {
 	srv, hits := releaseServer(t, "v0.9.0")
-	u, _ := newTestUpdater(t, "0.7.0", srv.URL+"/releases/latest")
+	u, clock := newTestUpdater(t, "0.7.0", srv.URL+"/releases/latest")
 	if err := os.MkdirAll(filepath.Dir(u.stateFile), 0o755); err != nil {
 		t.Fatalf("making the state directory: %v", err)
 	}
@@ -333,17 +349,23 @@ func TestNoticeSurvivesAGarbledStateFile(t *testing.T) {
 		t.Fatalf("writing the state file: %v", err)
 	}
 
-	if line := u.notice(); !strings.Contains(line, "0.9.0") {
-		t.Errorf("notice = %q, want 0.9.0: a state file that will not parse has to read as no check", line)
+	// A state file that will not parse reads as no check at all, so the tag is
+	// asked for and recorded rather than the file being trusted.
+	if line := u.notice(); line != "" {
+		t.Errorf("notice = %q on first sight of the tag, want nothing", line)
 	}
 	if n := hits.Load(); n != 1 {
 		t.Errorf("asked github.com %d times, want 1", n)
 	}
+	*clock = clock.Add(minTagAge)
+	if line := u.notice(); !strings.Contains(line, "0.9.0") {
+		t.Errorf("notice = %q, want 0.9.0", line)
+	}
 }
 
 // Nothing about jqweb depends on the check, so an unreachable github.com is
-// silent and leaves no state behind, which lets the next run try again.
-func TestNoticeSaysNothingWhenGitHubIsUnreachable(t *testing.T) {
+// silent. The attempt is still recorded, and records no tag.
+func TestNoticeSurvivesAnUnreachableGitHub(t *testing.T) {
 	srv, _ := releaseServer(t, "v0.9.0")
 	url := srv.URL + "/releases/latest"
 	srv.Close()
@@ -352,8 +374,46 @@ func TestNoticeSaysNothingWhenGitHubIsUnreachable(t *testing.T) {
 	if line := u.notice(); line != "" {
 		t.Errorf("notice = %q with github.com unreachable, want nothing", line)
 	}
-	if _, err := os.Stat(u.stateFile); !os.IsNotExist(err) {
-		t.Errorf("a failed check wrote a state file, which would hold off the retry for a day")
+	state := u.readState()
+	if !state.CheckedAt.Equal(u.now()) {
+		t.Errorf("state = %+v, want the failed check recorded at %s", state, u.now())
+	}
+	if state.Latest != "" {
+		t.Errorf("state = %+v, want no tag from a check that did not answer", state)
+	}
+}
+
+// A check that fails spends the day like any other. Asking again on every run
+// would mean a request per run for as long as github.com is unreachable, and
+// the notice is not worth that; a run of failures costs a day each instead.
+func TestNoticeFailedCheckSpendsTheDay(t *testing.T) {
+	var hits atomic.Int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	u, clock := newTestUpdater(t, "0.7.0", srv.URL+"/releases/latest")
+	if line := u.notice(); line != "" {
+		t.Fatalf("notice = %q from a failed check, want nothing", line)
+	}
+	if n := hits.Load(); n != 1 {
+		t.Fatalf("asked github.com %d times, want 1", n)
+	}
+
+	*clock = clock.Add(updateInterval - time.Minute)
+	if line := u.notice(); line != "" {
+		t.Errorf("notice = %q, want nothing", line)
+	}
+	if n := hits.Load(); n != 1 {
+		t.Errorf("asked github.com %d times inside the day after a failure, want 1", n)
+	}
+
+	*clock = clock.Add(2 * time.Minute)
+	u.notice()
+	if n := hits.Load(); n != 2 {
+		t.Errorf("asked github.com %d times after the day was up, want 2", n)
 	}
 }
 

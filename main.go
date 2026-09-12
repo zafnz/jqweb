@@ -4,6 +4,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -33,10 +34,13 @@ func releaseVersion() string {
 }
 
 func usage() {
-	fmt.Fprint(os.Stderr, `usage: jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [<input-file>]
+	fmt.Fprint(os.Stderr, `usage: jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [<query>] [<input-file>]
 
 Reads JSON from <input-file> ("-" or absent: stdin) and renders it as a
-self-contained interactive HTML page.
+self-contained interactive HTML page, which opens with <query> in its search
+box. A single argument is the input file if a file by that name exists, and
+the query otherwise: "jqweb <query> -" reads stdin, and "jqweb . <input-file>"
+reads the file, since "." is no query.
 
   -p, --port <port>    serve the page on http://<host>:<port>/
       --host <ip>      bind address for -p (default 127.0.0.1)
@@ -145,14 +149,11 @@ func main() {
 		os.Exit(2)
 	}
 
-	if len(opt.args) > 1 {
-		fmt.Fprintln(os.Stderr, "jqweb: at most one input file")
+	query, inName, err := inputArgs(opt.args, isFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
 		usage()
 		os.Exit(2)
-	}
-	inName := "-"
-	if len(opt.args) == 1 {
-		inName = opt.args[0]
 	}
 
 	// Started once the command line is known to be good and before the
@@ -163,7 +164,14 @@ func main() {
 	var data []byte
 	if inName == "-" {
 		if isTTY(os.Stdin) {
-			fmt.Fprintln(os.Stderr, "jqweb: no input file and stdin is a terminal")
+			// A lone argument naming no file was taken for a query, but with
+			// nothing on stdin to run it on it is as likely a mistyped file
+			// name, so the message has to make sense read either way.
+			if len(opt.args) == 1 && query != "" {
+				fmt.Fprintf(os.Stderr, "jqweb: no file named %q, and stdin is a terminal\n", query)
+			} else {
+				fmt.Fprintln(os.Stderr, "jqweb: no input file and stdin is a terminal")
+			}
 			usage()
 			os.Exit(2)
 		}
@@ -195,7 +203,7 @@ func main() {
 
 	// The page assembly asks for what to put in rather than what to leave out,
 	// so the flag is turned round here and nowhere else.
-	page := []byte(renderPage(data, title, options{jq: !simple, theme: theme}))
+	page := []byte(renderPage(data, title, options{jq: !simple, theme: theme, query: query}))
 
 	if outSet {
 		if output == "-" {
@@ -291,4 +299,39 @@ func flagName(a string) string {
 func isTTY(f *os.File) bool {
 	fi, err := f.Stat()
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+}
+
+// inputArgs splits the positional arguments into a query and the name of the
+// input file, "-" meaning stdin. With two arguments the first is the query.
+// With one, it is the input file if isFile reports a file by that name, and
+// the query otherwise; "jqweb <query> -" and "jqweb . <file>" are the ways to
+// say which without that test. A query of "." applies no filter, so it comes
+// back as no query at all.
+func inputArgs(args []string, isFile func(string) bool) (query, inName string, err error) {
+	switch len(args) {
+	case 0:
+		inName = "-"
+	case 1:
+		if args[0] == "-" || isFile(args[0]) {
+			inName = args[0]
+		} else {
+			query, inName = args[0], "-"
+		}
+	case 2:
+		query, inName = args[0], args[1]
+	default:
+		return "", "", errors.New("at most one query and one input file")
+	}
+	if strings.TrimSpace(query) == "." {
+		query = ""
+	}
+	return query, inName, nil
+}
+
+// isFile reports whether name is something to read input from: anything that
+// exists and is not a directory. A named pipe or /dev/stdin counts, and "."
+// and ".." are queries rather than directories.
+func isFile(name string) bool {
+	fi, err := os.Stat(name)
+	return err == nil && !fi.IsDir()
 }

@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"io"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -213,5 +215,74 @@ func TestParseFlagsRejects(t *testing.T) {
 				t.Errorf("parseFlags(%q) was accepted, want an error", args)
 			}
 		})
+	}
+}
+
+func TestInputArgs(t *testing.T) {
+	// A stand-in for the file system, so the cases do not depend on what is
+	// in the working directory.
+	isFile := func(name string) bool { return name == "data.json" }
+	tests := []struct {
+		name   string
+		args   []string
+		query  string
+		inName string
+	}{
+		{"nothing", nil, "", "-"},
+		{"stdin", []string{"-"}, "", "-"},
+		{"a file", []string{"data.json"}, "", "data.json"},
+		{"a query", []string{".items[]"}, ".items[]", "-"},
+		{"a name with no file is a query", []string{"missing.json"}, "missing.json", "-"},
+		{"query and file", []string{".items[]", "data.json"}, ".items[]", "data.json"},
+		{"query and stdin", []string{".items[]", "-"}, ".items[]", "-"},
+		{"a query named like a file, on stdin", []string{"data.json", "-"}, "data.json", "-"},
+		{"dot and file", []string{".", "data.json"}, "", "data.json"},
+		{"dot and stdin", []string{".", "-"}, "", "-"},
+		{"dot alone", []string{"."}, "", "-"},
+		{"dot with spaces round it", []string{" . ", "data.json"}, "", "data.json"},
+		{"an empty query", []string{"", "data.json"}, "", "data.json"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			query, inName, err := inputArgs(tt.args, isFile)
+			if err != nil {
+				t.Fatalf("inputArgs(%q): %v", tt.args, err)
+			}
+			if query != tt.query || inName != tt.inName {
+				t.Errorf("inputArgs(%q) = %q, %q; want %q, %q",
+					tt.args, query, inName, tt.query, tt.inName)
+			}
+		})
+	}
+}
+
+func TestInputArgsRejectsMoreThanTwo(t *testing.T) {
+	always := func(string) bool { return true }
+	if _, _, err := inputArgs([]string{".", "a.json", "b.json"}, always); err == nil {
+		t.Error("three arguments were accepted, want an error")
+	}
+}
+
+// A directory is never input, which is what makes "jqweb ." a query rather
+// than an attempt to read the working directory.
+func TestIsFile(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "data.json")
+	if err := os.WriteFile(file, []byte(`{}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		name string
+		want bool
+	}{
+		{file, true},
+		{dir, false},
+		{".", false},
+		{"..", false},
+		{filepath.Join(dir, "missing.json"), false},
+	} {
+		if got := isFile(tt.name); got != tt.want {
+			t.Errorf("isFile(%q) = %v, want %v", tt.name, got, tt.want)
+		}
 	}
 }

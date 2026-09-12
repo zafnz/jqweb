@@ -42,6 +42,13 @@ var jqui = function (page) {
     return QUERY_START.indexOf(raw.charAt(0)) >= 0 || CALL.test(raw);
   }
 
+  /* The box starts with something in it only when a query was given on the
+     command line or in the page's address, and either is a jq query. One that
+     auto reads as text, such as keys, starts the select on jq so that it runs
+     as one. */
+  var start = input.value.trim();
+  if (start && !wants(start)) mode.value = 'jq';
+
   /* Compiles and runs the box as a query. One that only walks down the
      document is shown in place, as a pasted path always has been; anything
      else produces values that are not in the document, so its output replaces

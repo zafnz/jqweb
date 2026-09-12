@@ -238,7 +238,7 @@ var jqtheme = (function () {
     <option value="jq">jq</option>
   </select>
   <div class="qwrap">
-    <input id="q" type="search" placeholder="Text to find, or paste a path (press /)" autocomplete="off" spellcheck="false">
+    <input id="q" type="search" value="" placeholder="Text to find, or paste a path (press /)" autocomplete="off" spellcheck="false">
     <div id="suggest" hidden></div>
     <div id="fault" hidden></div>
   </div>
@@ -2254,6 +2254,8 @@ var jqui = function (page) {
     if (mode.value !== 'auto') return false;
     return QUERY_START.indexOf(raw.charAt(0)) >= 0 || CALL.test(raw);
   }
+  var start = input.value.trim();
+  if (start && !wants(start)) mode.value = 'jq';
   function run(raw, force) {
     var query, out;
     clearFault();
@@ -2463,6 +2465,8 @@ var jqui = function (page) {
   var rootValue = parseJSON(document.getElementById('data').textContent);
   tree.innerHTML = renderTree(rootValue, typeof jqui !== 'undefined');
   var rootNode = tree.querySelector(':scope > .node');
+  var asked = new URLSearchParams(location.search).get('q');
+  if (asked !== null) input.value = asked;
   var query = typeof jqui === 'undefined' ? null : jqui({
     value: rootValue,
     resolve: resolvePath,
@@ -2562,12 +2566,12 @@ var jqui = function (page) {
   phone.addEventListener('change', function () {
     if (phone.matches && input.value) { input.value = ''; run(); }
   });
-  function run() {
+  function run(force) {
     var raw = input.value.trim();
     if (query) query.clearFault();
     if (!raw) { reset(); return; }
     if (!query) { runPath(raw); return; }
-    if (query.wants(raw)) { query.run(raw); return; }
+    if (query.wants(raw)) { query.run(raw, force); return; }
     query.showDocument();
     textFilter(raw.toLowerCase());
   }
@@ -2668,6 +2672,7 @@ var jqui = function (page) {
     walk(rootNode, false);
     stats.textContent = hits === 1 ? '1 match' : hits + ' matches';
   }
+  if (input.value.trim()) run(true);
 })();
 </script>
 </body>

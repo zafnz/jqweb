@@ -60,10 +60,14 @@ $ kubectl get pods -o json | jqweb -o k8s.html
 ```
 
 ## Usage
-usage: `jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [-O|--open] [-C|--close] [--simple] [--theme <name>] [<input-file>]`
+usage: `jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [-O|--open] [-C|--close] [--simple] [--theme <name>] [<query>] [<input-file>]`
 
 Reads JSON from <input-file> ("-" or absent: stdin) and renders it as a
-self-contained interactive HTML page, served on a random port or written to file
+self-contained interactive HTML page, served on a random port or written to file.
+
+A single argument is the input file if a file by that name exists, and the
+query otherwise. `jqweb <query> -` always reads stdin, and `jqweb . <input-file>`
+always reads the file, since `.` is no query.
 ```
   -p, --port <port>    serve the page on http://<host>:<port>/
       --host <ip>      bind address for -p (default 127.0.0.1)

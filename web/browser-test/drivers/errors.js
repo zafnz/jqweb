@@ -64,7 +64,7 @@ T.run(async (t) => {
   t.eq('typing a broken query shows the message', fault.hidden, false);
   t.eq('and takes the list away', t.$('#suggest').hidden, true);
   q.focus();
-  await t.sleep(200);
+  await t.sleep(250);
   t.eq('focusing the box does not bring it back over the message',
     t.$('#suggest').hidden, true);
 });

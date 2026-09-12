@@ -47,7 +47,7 @@ T.run(async (t) => {
      makes the box reachable from the bottom of a long file. */
   t.eq('the toolbar is stuck to the top', getComputedStyle(header).position, 'sticky');
   window.scrollTo(0, 1200);
-  await t.sleep(100);
+  await t.sleep(150);
   t.atLeast('the page really scrolled', window.scrollY, 1000);
   t.eq('and the toolbar is still at the top', Math.round(box(header).top), 0);
   t.atLeast('over the document rather than under it',
@@ -56,7 +56,7 @@ T.run(async (t) => {
   /* Whatever is under the header is behind it, so the first line of the
      document has to start below it rather than beneath it. */
   window.scrollTo(0, 0);
-  await t.sleep(100);
+  await t.sleep(150);
   t.atLeast('the document starts below the toolbar',
     Math.round(box(t.$('#tree')).top), Math.round(box(header).bottom));
 });

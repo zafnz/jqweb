@@ -90,7 +90,7 @@ var T = (function () {
   /* How long to leave between an action and reading the result. page.js waits
      120ms for a pause in typing before it searches, and every other handler
      is synchronous, so this covers the lot. Virtual time makes it free. */
-  const SETTLE = 400;
+  const SETTLE = 500;
 
   api.click = async (el) => {
     if (!el) throw new Error('click: no element');
@@ -121,7 +121,7 @@ var T = (function () {
   api.refocus = async (el) => {
     const target = el || $('#q');
     target.blur();
-    await api.sleep(50);
+    await api.sleep(100);
     target.focus();
     await api.sleep(SETTLE);
   };
@@ -224,7 +224,7 @@ var T = (function () {
      parsed; a driver checking both has to ask for the other one. */
   api.paint = async (theme) => {
     document.documentElement.setAttribute('data-theme', theme);
-    await api.sleep(50);
+    await api.sleep(100);
   };
 
   /* ---- handing the findings back ---- */

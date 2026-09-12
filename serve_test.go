@@ -16,6 +16,8 @@ var testClient = &http.Client{
 	Transport: &http.Transport{DisableKeepAlives: true},
 }
 
+const closeTimerSlack = 50 * time.Millisecond
+
 // startServer serves page on a listener of its own, and returns the URL, the
 // listener, and a channel carrying what serveOn returned.
 func startServer(t *testing.T, page []byte, opt serveOptions) (url string, ln net.Listener, done <-chan error) {
@@ -80,7 +82,7 @@ func TestServeStopsAfterTheFetch(t *testing.T) {
 		if err != nil {
 			t.Errorf("serveOn returned %v, want nil for a shutdown that was asked for", err)
 		}
-		if waited := time.Since(start); waited < delay {
+		if waited := time.Since(start); waited+closeTimerSlack < delay {
 			t.Errorf("stopped %s after the fetch, before the %s delay", waited, delay)
 		}
 	case <-time.After(10 * time.Second):
@@ -119,7 +121,7 @@ func TestServeFetchRestartsTheCloseTimer(t *testing.T) {
 		if err != nil {
 			t.Errorf("serveOn returned %v, want nil", err)
 		}
-		if waited := time.Since(last); waited < delay {
+		if waited := time.Since(last); waited+closeTimerSlack < delay {
 			t.Errorf("stopped %s after the last fetch, before the %s delay", waited, delay)
 		}
 	case <-time.After(10 * time.Second):

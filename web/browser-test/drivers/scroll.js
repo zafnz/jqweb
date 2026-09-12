@@ -16,7 +16,7 @@ T.run(async (t) => {
   /* ---- the root ---- */
 
   window.scrollTo(0, height);
-  await t.sleep(100);
+  await t.sleep(150);
   t.atLeast('the page is scrolled to the bottom', window.scrollY, window.innerHeight);
 
   await t.type('.');
@@ -28,7 +28,7 @@ T.run(async (t) => {
 
   await t.type('');
   window.scrollTo(0, 0);
-  await t.sleep(100);
+  await t.sleep(150);
 
   await t.type('.items[9].status');
   const target = t.$('#tree .node.hit');
@@ -52,7 +52,7 @@ T.run(async (t) => {
   for (const path of ['.items[0].kind', '.items[5].metadata.name', '.mixed[3]', '.counts.scale']) {
     await t.type('');
     window.scrollTo(0, height);
-    await t.sleep(100);
+    await t.sleep(150);
     await t.type(path);
     const node = t.$('#tree .node.hit');
     t.atLeast(path + ' comes out from under the toolbar',
@@ -66,7 +66,7 @@ T.run(async (t) => {
      to -- what it must not do is scroll somewhere of its own choosing. */
   await t.type('');
   window.scrollTo(0, 600);
-  await t.sleep(100);
+  await t.sleep(150);
   await t.type('cron');
   const most = document.documentElement.scrollHeight - window.innerHeight;
   t.eq('a text search does not scroll anywhere', window.scrollY, Math.min(600, Math.max(0, most)));

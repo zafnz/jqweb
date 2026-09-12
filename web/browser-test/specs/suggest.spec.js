@@ -184,19 +184,7 @@ test('Escape puts the list away', async ({ page }) => {
     'Escape hides the list').toBe(true);
 });
 
-/* query.js means Escape to put the list away and leave the box alone, so that
-   the reading it picked can still be edited. It stops the keystroke reaching
-   the document handler that would clear the box -- and Chrome empties the box
-   anyway, because #q is an input of type=search and clearing one on Escape is
-   the browser's own behaviour. The input event that follows drops the rows, so
-   focusing the box afterwards brings nothing back either.
-
-   The old driver dispatched a synthetic KeyboardEvent, which runs the page's
-   own listeners but none of the browser's editing behaviour, so it could not
-   see this. Tracked in zafnz/jqweb#61. This records the behaviour that was
-   meant, and starts failing on the day it is the behaviour there is. */
 test('Escape leaves the box as it was', async ({ page }) => {
-  test.fail();
   await openOn(page, DEEP);
   const before = await page.locator('#q').inputValue();
 

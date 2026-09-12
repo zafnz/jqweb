@@ -9,10 +9,12 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-12
+
 ### A query on the command line
 
 `jqweb '.items[] | .metadata.name' file.json` opens the page with that query
-already run. With only one argument supplied it auto-detects if its a file
+already run. With only one argument supplied it auto-detects if it's a file
 or query.
 
 ## [0.7.1] - 2026-09-12
@@ -204,7 +206,8 @@ The first release: a JSON document rendered as one self-contained HTML page,
 served or written to a file, with a flag to open a browser on it and a flag to
 report the version.
 
-[Unreleased]: https://github.com/zafnz/jqweb/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/zafnz/jqweb/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/zafnz/jqweb/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/zafnz/jqweb/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/zafnz/jqweb/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/zafnz/jqweb/compare/v0.5.0...v0.6.0

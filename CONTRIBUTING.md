@@ -20,6 +20,14 @@ the `go.mod` floor and the current release. The two have disagreed before:
 Go 1.27 changed `json.Decoder.More()` at the end of a truncated document,
 which changed the error message a user sees.
 
+### Proposals
+
+Significant rewrites or large features should be a proposal, written in
+proposals/ as a PR. They must have the `do-not-merge` label assigned.
+`.github/workflows/pr.yml` fails any pull request carrying that label, and any
+whose title contains `WIP` or `do not merge`, so a proposal cannot be merged
+until the label comes off.
+
 ## Colours
 
 Every colour is a custom property on `:root` in `web/page.css`, defined twice:

@@ -1,8 +1,9 @@
 name: pr
 
-# Labels live on the pull request, not on a commit, so these run when a label
-# changes as well as when one is pushed: a check that only ran on a push would
-# go on showing the answer it gave before the label arrived.
+# Labels and the title live on the pull request, not on a commit, so these run
+# when either changes as well as when a commit is pushed: a check that only ran
+# on a push would go on showing the answer it gave before the label arrived,
+# and a title reworded to drop "WIP" would never clear the job that read it.
 #
 # They are their own workflow rather than jobs in ci.yml because "labeled" in
 # that file would rebuild and retest on every label click. The label job reads
@@ -10,7 +11,7 @@ name: pr
 # out, and only runs when a label asks for an entry.
 on:
   pull_request:
-    types: [opened, reopened, synchronize, labeled, unlabeled]
+    types: [opened, reopened, synchronize, labeled, unlabeled, edited]
 
 permissions:
   contents: read
@@ -20,6 +21,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A proposal, an RFC or a branch still being written is held open on purpose,
+  # and this is the red X that holds it there. The `do-not-merge` label is the
+  # marker CONTRIBUTING.md asks proposals to carry; the title is read as well,
+  # because a pull request opened before it is ready usually says so there
+  # before anyone reaches for a label.
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: The pull request is not held back
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ' ') }}
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # A label is one word, so the list is matched a whole field at a time
+          # rather than as a substring.
+          case " $LABELS " in
+            *" do-not-merge "*)
+              echo "::error::This pull request carries the do-not-merge label. Remove the label when the work is ready to land."
+              exit 1
+              ;;
+          esac
+          # Bounded by non-alphanumerics at both ends, so "swipe" and "wiper"
+          # are not WIP.
+          if printf '%s\n' "$TITLE" | grep -Eiq '(^|[^[:alnum:]])(do[ -]not[ -]merge|wip)([^[:alnum:]]|$)'; then
+            echo "::error::The title holds this pull request back: \"$TITLE\". Reword it when the work is ready to land."
+            exit 1
+          fi
+          echo "no do-not-merge label, and the title does not hold it back"
+
   # Without this, a change that wants an entry can arrive carrying no label at
   # all, and the changelog job below would skip rather than ask for one.
   label:

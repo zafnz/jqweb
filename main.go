@@ -188,6 +188,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	finishUpdateCheck := func() {}
+	if outSet && !portSet {
+		finishUpdateCheck = startUpdateCheck(os.Stderr, true)
+	}
+
 	// The page assembly asks for what to put in rather than what to leave out,
 	// so the flag is turned round here and nowhere else.
 	page := []byte(renderPage(data, title, options{jq: !simple, theme: theme}))
@@ -215,6 +220,7 @@ func main() {
 			}
 		}
 	}
+	finishUpdateCheck()
 	if portSet {
 		err := serve(host, port, page, serveOptions{
 			open:       open,

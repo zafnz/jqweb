@@ -32,6 +32,7 @@ func serve(host string, port int, page []byte, opt serveOptions) error {
 		stops = fmt.Sprintf("stopping %s after the page is fetched", opt.closeDelay)
 	}
 	fmt.Fprintf(os.Stderr, "jqweb: serving on http://%s/ (%s)\n", ln.Addr(), stops)
+	startUpdateCheck(os.Stderr, false)
 	if opt.open {
 		if err := openBrowser(fmt.Sprintf("http://%s/", ln.Addr())); err != nil {
 			fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)

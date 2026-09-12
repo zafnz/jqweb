@@ -9,6 +9,13 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+### Update notices
+
+jqweb now checks GitHub at most once a day for a newer release when stderr is a
+terminal, and prints a one-line upgrade hint without delaying serving or
+writing the page. `JQWEB_NO_UPDATE_CHECK=1` turns the check off, and downstream
+packages can build with `-X main.updateCheck=off`.
+
 ## [0.7.0] - 2026-09-12
 
 ### Phone-width pages keep the tree in view

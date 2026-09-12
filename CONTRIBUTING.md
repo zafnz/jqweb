@@ -143,6 +143,13 @@ rather than leaving a comment in the code for a change nobody has scheduled.
 `TODO.md` holds the entries that were filed as issues and is not where new ones
 go.
 
+## Pull requests
+
+Before merging, read the pull request's commit list as part of the review. A
+merge commit is useful when the branch tells a coherent story, but fixup,
+squash or reword any "try again" commits before the merge so `main` keeps that
+story rather than the noise from getting there.
+
 ## Releases
 
 The release notes live in `CHANGELOG.md`, in the form described at

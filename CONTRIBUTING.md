@@ -188,6 +188,11 @@ spot when it does not, so a genuine build error is not repeated four times over
 half an hour. Set the `NOTARY_RETRY_DELAYS` repository variable to change the
 waits, or to shorten them while testing the retrying itself.
 
-Tagging `v*` runs GoReleaser, which builds for macOS, Linux and Windows, signs
-and notarizes the macOS binaries, and updates the Homebrew tap. Nothing else
-should need doing by hand.
+Tagging `v*` on a commit contained in `main` runs GoReleaser, which builds for
+macOS, Linux and Windows, signs and notarizes the macOS binaries, and updates
+the Homebrew tap. A release-looking tag on a branch may start the workflow, but
+the first step fails before GoReleaser can publish anything.
+
+The repository's `release tags` ruleset covers `refs/tags/v*`, so those names
+are the release namespace. Use some other tag name for local or branch-only
+markers.

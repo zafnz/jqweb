@@ -10,7 +10,15 @@
 
 const { test, expect, settle, type, clickAway } = require('../fixtures.js');
 
-test.use({ variant: 'docs' });
+/* The one page here with a real document behind it: 122,706 elements, against
+   about 1,500 on the fixture. A trace snapshots the DOM on every action, which
+   costs a millisecond there and two hundred here, so this spec keeps the action
+   log, the console and the screenshots and gives up the DOM timeline. Every
+   other spec keeps the lot. */
+test.use({
+  variant: 'docs',
+  trace: { mode: 'retain-on-failure', snapshots: false }
+});
 
 test('the committed example page is the page people are pointed at', async ({ page }) => {
   const got = await page.evaluate(() => ({

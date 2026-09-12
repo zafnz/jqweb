@@ -8,15 +8,16 @@
     npm --prefix web test          # JavaScript and TypeScript unit tests
     go build .                     # a jqweb binary in the working directory
     go test ./...                  # Go: argument handling, input validation, page assembly
-    node web/browser-test/run.js   # the page in a browser (needs Chrome)
+    npm --prefix web run test:browser   # the page in a browser (needs Chrome)
 
 `web/dist` holds the generated scripts embedded in the binary. They are
 committed so `go build` and `go install github.com/zafnz/jqweb@latest` still
 need only Go; do not edit them by hand. The build uses the development
 dependencies pinned in `web/package-lock.json`, while the JavaScript tests use
 Node's built-in runner. Node 24.12 or later runs erasable TypeScript tests
-directly; `tsc` still performs the type checking. The browser drivers still use
-Chrome's command line rather than an automation library.
+directly; `tsc` still performs the type checking. The browser suite is
+Playwright Test, driving the Chrome already installed rather than downloading
+one, so `npm --prefix web ci` is the whole install.
 
 CI runs the same commands on every push and fails when rebuilding `web/dist`
 changes it. The Go job runs against both the `go.mod` floor and the current
@@ -52,11 +53,10 @@ value containing `</script` cannot close the element holding it — rather than
 comparing against a stored copy of a rendered page, which would need
 regenerating for every change to the styling.
 
-The Go and Node tests do not run the page in a browser. The drivers that do
-are in `web/browser-test` and are documented there. CI runs them on every
-push.
+The Go and Node tests do not run the page in a browser. The specs that do are
+in `web/browser-test` and are documented there. CI runs them on every push.
 
-A driver only checks what it was written to check. For a change to the scripts
+A spec only checks what it was written to check. For a change to the scripts
 that should not have altered the rendering at all, diffing the whole tree
 against a build from `main` covers the rest:
 
@@ -86,10 +86,12 @@ script covers a window narrowed across the line with a search in the box: it
 clears the search, since the filtered tree or the query results would
 otherwise stay on screen with no box left to clear them from.
 
-The breakpoint is 600 rather than a phone's own width because headless Chrome
-will not open a window narrower than 500px, and a lower breakpoint could not be
-driven. `phone.js` runs at 500 and `narrow.js` at 640, either side of it.
-Phones in portrait are 430px and under.
+The breakpoint is 600 rather than a phone's own width because it was chosen
+when headless Chrome would not open a window narrower than 500px and a lower
+breakpoint could not be driven. `phone.spec.js` runs at 500 and
+`narrow.spec.js` at 640, either side of it. Phones in portrait are 430px and
+under; Playwright sets the viewport exactly, so a narrower one can be driven
+now if the breakpoint ever moves.
 
 ## The jq subset
 
@@ -153,7 +155,9 @@ the first command a reader runs.
 
 Regenerate the README screenshot for every new release, after the example page
 is current. The script uses the same document, runs the example query, draws a
-browser frame around the page, and writes `demo.png`:
+browser frame around the page, and writes `demo.png`. It drives the page with
+Playwright, so it needs `npm --prefix web ci` first; two runs of it produce the
+same bytes.
 
     node web/browser-test/capture-demo.js
 

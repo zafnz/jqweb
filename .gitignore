@@ -40,6 +40,9 @@ wiki-rest.html
 k8s.html
 jqweb
 web/node_modules/
+# The pages the browser suite renders, and the traces and reports it leaves
+# behind when one fails.
+web/browser-test/.out/
 # GoReleaser
 /dist/
 .claude/worktrees

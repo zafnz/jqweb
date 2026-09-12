@@ -5,17 +5,18 @@
     npm --prefix web ci            # install the pinned frontend build tools
     npm --prefix web run check     # type-check the frontend
     npm --prefix web run build     # rebuild the committed scripts
+    npm --prefix web test          # JavaScript and TypeScript unit tests
     go build .                     # a jqweb binary in the working directory
     go test ./...                  # Go: argument handling, input validation, page assembly
-    node --test                    # JavaScript: web/core.test.js, web/jq.test.js
     node web/browser-test/run.js   # the page in a browser (needs Chrome)
 
 `web/dist` holds the generated scripts embedded in the binary. They are
 committed so `go build` and `go install github.com/zafnz/jqweb@latest` still
 need only Go; do not edit them by hand. The build uses the development
 dependencies pinned in `web/package-lock.json`, while the JavaScript tests use
-Node's built-in runner. The browser drivers still use Chrome's command line
-rather than an automation library.
+Node's built-in runner. Node 24.12 or later runs erasable TypeScript tests
+directly; `tsc` still performs the type checking. The browser drivers still use
+Chrome's command line rather than an automation library.
 
 CI runs the same commands on every push and fails when rebuilding `web/dist`
 changes it. The Go job runs against both the `go.mod` floor and the current

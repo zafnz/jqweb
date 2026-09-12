@@ -2,11 +2,12 @@
   "name": "jqweb-web",
   "private": true,
   "engines": {
-    "node": ">=18"
+    "node": ">=24.12.0"
   },
   "scripts": {
     "build": "node build.mjs",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "node --test"
   },
   "devDependencies": {
     "esbuild": "0.28.2",

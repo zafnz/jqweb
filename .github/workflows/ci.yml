@@ -62,7 +62,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           cache: npm
           cache-dependency-path: web/package-lock.json
 
@@ -75,7 +75,7 @@ jobs:
 
       # web/core.js is the DOM-free half of the page script, so node runs its
       # tests directly.
-      - run: node --test
+      - run: npm --prefix web test
 
   # The other half of the page only exists in a browser: the tree, the search
   # box, the suggestion list, folding, scrolling, the toolbar and the two
@@ -95,7 +95,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
 
       # Named rather than assumed: a runner image that stopped shipping Chrome
       # should say so here rather than inside the runner.

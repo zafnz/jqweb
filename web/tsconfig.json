@@ -1,12 +1,15 @@
 {
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
     "allowJs": true,
     "checkJs": false,
+    "erasableSyntaxOnly": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "noEmit": true,
     "strict": true,
-    "target": "ES2015"
+    "target": "ES2015",
+    "verbatimModuleSyntax": true
   },
   "include": [
     "build.mjs",

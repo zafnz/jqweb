@@ -67,7 +67,7 @@ jobs:
       # itself, from its before hooks.
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           cache: npm
           cache-dependency-path: web/package-lock.json
 
@@ -78,7 +78,7 @@ jobs:
       - name: The compiled scripts are committed and current
         run: git diff --exit-code -- web/dist
 
-      - run: node --test
+      - run: npm --prefix web test
 
       - uses: goreleaser/goreleaser-action@v6
         with:

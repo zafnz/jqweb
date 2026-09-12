@@ -226,7 +226,7 @@ not answered by then is dropped. `wantUpdateCheck` is where the skips live.
 `go test ./...` and `node --test` are what CI runs. Beyond that:
 
 **The jq engine is checked against real jq.** `web/testdata/jq-corpus.json` holds
-147 queries with the output jq itself gave for each; `node
+queries with the output jq itself gave for each; `node
 web/testdata/regenerate.js` rewrites the answers and needs `jq` on the path. A
 builtin with no case in the corpus fails the test that reads the table back out
 of `jq.js`. When jq's behaviour is in question, run `jq` and find out — guessing

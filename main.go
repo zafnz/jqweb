@@ -155,6 +155,11 @@ func main() {
 		inName = opt.args[0]
 	}
 
+	// Started once the command line is known to be good and before the
+	// document is read, so the request runs alongside the work that follows.
+	// Only the exit below ever waits on it.
+	notice := checkForUpdate()
+
 	var data []byte
 	if inName == "-" {
 		if isTTY(os.Stdin) {
@@ -220,6 +225,7 @@ func main() {
 			open:       open,
 			closeOnGet: opt.closeOnGet,
 			closeDelay: opt.closeDelay,
+			notice:     notice,
 		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
@@ -230,6 +236,9 @@ func main() {
 	if !outSet {
 		os.Stdout.Write(page) // stdout is not a tty here
 	}
+	// Nothing follows but the exit, so this is the last chance to print an
+	// update notice, and the wait is what a check still in flight costs.
+	waitNotice(os.Stderr, notice, updateWait)
 }
 
 // valueFlags are the flags that take a value, by the name the flag package

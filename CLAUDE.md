@@ -59,7 +59,7 @@ keyword in the PR body too: `Closes #123`, `Fixes #223` or similar.
 A Go binary that turns a JSON document into one self-contained HTML page, and
 either serves it or writes it to a file. Everything interesting is in the page.
 
-The Go side is four files, all `package main`:
+The Go side is five files, all `package main`:
 
 | file | what it holds |
 |---|---|
@@ -67,6 +67,7 @@ The Go side is four files, all `package main`:
 | `check.go` | `check` and the error messages it builds for input that is not one well-formed JSON document |
 | `serve.go` | the HTTP server, the `-C` close timer, and `openBrowser` |
 | `page.go` | the embedded `web/*` assets, template assembly, and the comment stripper |
+| `update.go` | the once-a-day release check, its state file, and the upgrade command it names |
 
 Each has a `_test.go` of its own along the same lines.
 
@@ -179,6 +180,11 @@ are one entry.
 of a bundle, so the one combination worth writing as a bundle is registered
 under those two names and sets `open` and `closeOnGet` itself. No other pair
 works: `-vO` is rejected as an unknown flag.
+
+**The update check never delays anything.** `checkForUpdate` hands back a
+channel; `serve` prints from a goroutine of its own after the "serving on"
+line, and only the exit in `-o` mode waits, for `updateWait`. A check that has
+not answered by then is dropped. `wantUpdateCheck` is where the skips live.
 
 ## Testing
 

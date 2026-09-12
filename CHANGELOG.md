@@ -9,6 +9,11 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+### Update checker
+
+Added update checker to notify user if they are running an old version. The
+notice appears at most once a day.
+
 ## [0.7.0] - 2026-09-12
 
 ### Phone-width pages keep the tree in view

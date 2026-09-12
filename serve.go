@@ -20,6 +20,7 @@ type serveOptions struct {
 	open       bool          // open the page in the browser once listening
 	closeOnGet bool          // stop serving once the page has been fetched
 	closeDelay time.Duration // how long after the last fetch closeOnGet waits
+	notice     <-chan string // an update notice, printed whenever it arrives
 }
 
 func serve(host string, port int, page []byte, opt serveOptions) error {
@@ -32,6 +33,11 @@ func serve(host string, port int, page []byte, opt serveOptions) error {
 		stops = fmt.Sprintf("stopping %s after the page is fetched", opt.closeDelay)
 	}
 	fmt.Fprintf(os.Stderr, "jqweb: serving on http://%s/ (%s)\n", ln.Addr(), stops)
+	// After the serving line, and from a goroutine, so that a slow update
+	// check cannot hold up the server or the browser.
+	if opt.notice != nil {
+		printNotice(os.Stderr, opt.notice)
+	}
 	if opt.open {
 		if err := openBrowser(fmt.Sprintf("http://%s/", ln.Addr())); err != nil {
 			fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)

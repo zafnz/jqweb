@@ -120,6 +120,13 @@ committed rather than worked out while the tests run. A builtin with no case in
 the corpus fails the test that reads the table back out of `jq.js`, so adding
 one means adding a query for it.
 
+## The update check
+
+`update.go` asks github.com for the latest release once a day. Build with
+`-X main.updateCheck=off` to leave it out; `JQWEB_NO_UPDATE_CHECK`, `CI` or
+`SNAP` in the environment turns it off at runtime, as does a stderr that is not
+a terminal.
+
 ## The example page
 
 `docs/index.html` is a rendered page committed for GitHub Pages, and it does

@@ -5,17 +5,23 @@
 
 # jqweb
 
-Turn JSON into a self-contained interactive webpage with tree navigation,
-search, and jq-style queries. Large JSON documents are often easier to explore
-this way, especially when you do not already know the path to the value you
-need.
+jqweb turns any JSON into an interactive webpage with one pipe. Run
+`cat data.json | jqweb -O` and it opens locally in your browser as a navigable
+tree with instant text search and jq-style queries—no upload and no server to
+configure.
+
+```bash
+$ kubectl get pods -o json | jqweb -O
+```
+
+[Try the live demo](https://zafnz.github.io/jqweb/).
 
 ## Install
 
-    brew install zafnz/tap/jqweb              # macOS
+    brew install zafnz/tap/jqweb              # macOS, Linux
     go install github.com/zafnz/jqweb@latest  # with Go installed
 
-On Linux, or macOS without Homebrew, this puts the latest release in
+On Linux or macOS without Homebrew, this puts the latest release in
 `~/.local/bin`:
 
     curl -fsSL https://raw.githubusercontent.com/zafnz/jqweb/main/install.sh | sh
@@ -26,24 +32,16 @@ The macOS builds are signed and notarized.
 
 ## Example usage
 
-Pipe JSON into jqweb, then open the printed URL. See the screenshot below or
-[try the live demo](https://zafnz.github.io/jqweb/).
+Pipe JSON into jqweb with `-O` to open it immediately in your browser:
 
 ```
-$ curl -s https://zafnz.github.io/jqweb/k8s.json | jqweb
+$ curl -s https://zafnz.github.io/jqweb/k8s.json | jqweb -O
 jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)
 ```
 
 <img src="demo.png" alt="jqweb filtering running pods in a Kubernetes resource list" width="580">
 
 *Filtering running Kubernetes pods with a jq-style query.*
-
-Use `-O` (or `--open`) to open the page automatically in your default web
-browser:
-
-```
-jqweb -O < myfile.json
-```
 
 Add `-C` (or `--close`) and jqweb stops once the browser has the page, instead
 of serving until Ctrl-C. `-OC` does both:

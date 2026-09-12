@@ -9,6 +9,14 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+### Opening a page follows `$BROWSER`
+
+`-O` and `-OC` now use `$BROWSER` when it is set, before falling back to the
+platform opener. Remote development environments such as Codespaces and VS
+Code containers set that to a helper which opens the page on the local machine,
+so `jqweb -O file.json` works there without needing `xdg-open` inside the
+container.
+
 ### A half-typed key completes instead of running as nulls
 
 jq reads a missing key as null, so `.items[].ki` on the way to `.items[].kind`

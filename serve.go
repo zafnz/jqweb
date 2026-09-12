@@ -92,14 +92,19 @@ func serveOn(ln net.Listener, page []byte, opt serveOptions) error {
 }
 
 func openBrowser(url string) error {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		cmd = exec.Command("open", url)
-	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", "", url)
-	default:
-		cmd = exec.Command("xdg-open", url)
+	return browserCommand(os.Getenv("BROWSER"), runtime.GOOS, url).Start()
+}
+
+func browserCommand(browser, goos, url string) *exec.Cmd {
+	if browser != "" {
+		return exec.Command(browser, url)
 	}
-	return cmd.Start()
+	switch goos {
+	case "darwin":
+		return exec.Command("open", url)
+	case "windows":
+		return exec.Command("cmd", "/c", "start", "", url)
+	default:
+		return exec.Command("xdg-open", url)
+	}
 }

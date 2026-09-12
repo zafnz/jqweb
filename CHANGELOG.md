@@ -9,6 +9,8 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-12
+
 ### Phone-width pages keep the tree in view
 
 At 600px wide and below, the page hides the search box, mode selector, match
@@ -189,7 +191,8 @@ The first release: a JSON document rendered as one self-contained HTML page,
 served or written to a file, with a flag to open a browser on it and a flag to
 report the version.
 
-[Unreleased]: https://github.com/zafnz/jqweb/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/zafnz/jqweb/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/zafnz/jqweb/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/zafnz/jqweb/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/zafnz/jqweb/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/zafnz/jqweb/compare/v0.4.0...v0.4.1

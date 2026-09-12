@@ -127,9 +127,9 @@ edit them by hand; run `npm --prefix web run build` and commit the result. CI
 runs the same build and fails when it leaves a diff. Keeping them in the source
 tree is what lets a module fetched by `go install` build without Node.
 
-`web/browser-test` ships in nothing. It is the drivers, the harness they are
-written against and the runner that loads them, and no rendered page has ever
-seen any of it.
+`web/browser-test` ships in nothing. It is the Playwright suite: the specs, the
+in-page helpers they measure with, the fixtures that open a page and the setup
+that renders one. No rendered page has ever seen any of it.
 
 `page.js` must work with the other three absent. It calls `jqui()` when
 `query.js` is there and falls back to path lookup when it is not. Anything that
@@ -163,9 +163,10 @@ short-circuits as a result, so no builtin may produce an endless stream.
 **The phone breakpoint is written twice.** `@media (max-width: 600px)` in
 `page.css` hides the search box and the line buttons, and `page.js` runs
 `matchMedia` on the same query to clear a search when the window crosses it.
-Change one and change the other. `phone.js` runs at 500px, the narrowest window
-headless Chrome opens, and `narrow.js` at 640px, so a breakpoint moved outside
-that range fails one of them.
+Change one and change the other. `phone.spec.js` runs at 500px and
+`narrow.spec.js` at 640px, so a breakpoint moved outside that range fails one of
+them. The viewport is set exactly now rather than being whatever headless Chrome
+would open, so a spec at a real phone width is available if one is wanted.
 
 **Offline, always.** A rendered page is one file that has to work with no
 network: no CDN, no web fonts, no remote images. The GitHub mark in the toolbar
@@ -233,33 +234,48 @@ of `jq.js`. When jq's behaviour is in question, run `jq` and find out — guessi
 has been wrong about operator stream order, `"ab" * 0`, `max_by` ties and
 `from_entries` key spellings.
 
-**The browser drivers are in `web/browser-test`, and CI runs them.** `node
-web/browser-test/run.js` is the whole suite, 522 checks in about 8 seconds.
-`web/browser-test/README.md` is how it works and how to write one; read it
-before adding a driver. `--screenshot=out.png` in place of `--dump-dom` is
-still the way to look at a page by hand.
+**The browser suite is Playwright, in `web/browser-test`, and CI runs it.**
+`npm --prefix web run test:browser` is the whole suite, 521 assertions in about
+nine seconds, against the Chrome already installed rather than a downloaded one.
+`web/browser-test/README.md` is how it works and how to write a spec; read it
+before adding one. `--headed` watches a run and `--debug` steps through it, and
+the trace of a failure is `npx playwright show-trace` over what it left in
+`.out`.
 
-**Anything that only reproduces in a browser needs a driver before a fix.**
-Three bugs this way were each different from what they looked like: typing `.`
+**Wind the clock after anything that comes back on a timer.** The suite installs
+Playwright's clock, so the 120ms search debounce and the 900ms copy tick cost
+nothing — and never fire on their own. `settle(page)` is what fires them; an
+action without it looks like a search box that did not search.
+
+**Events are real, and the browser acts on them too.** Playwright presses keys
+through the input pipeline, so Chrome's own editing behaviour happens as well as
+the page's listeners. That is how zafnz/jqweb#61 surfaced: `Escape` is meant to
+put the suggestion list away and leave the box alone, and Chrome empties an
+`input` of `type=search` first. The old synthetic `KeyboardEvent` could not see
+it. Do not assume a check that passed under the drivers this replaced describes
+what a browser does.
+
+**Anything that only reproduces in a browser needs a spec before a fix.** Three
+bugs this way were each different from what they looked like: typing `.`
 scrolled halfway down because `.` resolves to the root and centring an element
 taller than the window puts its middle in the middle; a suggestion beginning
 with a name was text-searched because auto mode read the first character; the
-line buttons were invisible in light mode at 1.6:1. All three have a driver on
-them now, and reintroducing the first one fails `scroll.js` with the node
+line buttons were invisible in light mode at 1.6:1. All three have a spec on
+them now, and reintroducing the first one fails `scroll.spec.js` with the node
 1803px off the top.
 
-**Assert the property that matters, not a particular pixel.** Several drivers
+**Assert the property that matters, not a particular pixel.** Several of these
 failed first because the expectation was wrong and not the code. The toolbar
 centres what is on a row, so items of different heights have different tops and
 counting tops says every one of them wrapped. Hiding what did not match
 shortens the document, so a text search that scrolls nowhere still ends at a
 smaller `scrollY` than it started at.
 
-**The contrast bar the drivers hold to is not the one the palette meets.** Six
-colours land under 4.5:1 for words or 3:1 for shapes, and `contrast.js` holds
-each to what it reaches today so a change that dims one further still fails.
-The `BELOW` table in that file is what to delete as zafnz/jqweb#23 is worked
-through.
+**The contrast bar the specs hold to is not the one the palette meets.** Six
+colours land under 4.5:1 for words or 3:1 for shapes, and `contrast.spec.js`
+holds each to what it reaches today so a change that dims one further still
+fails. The `BELOW` table in that file is what to delete as zafnz/jqweb#23 is
+worked through.
 
 ## Working habits that have paid off
 

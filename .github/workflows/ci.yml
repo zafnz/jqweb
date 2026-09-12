@@ -79,9 +79,8 @@ jobs:
 
   # The other half of the page only exists in a browser: the tree, the search
   # box, the suggestion list, folding, scrolling, the toolbar and the two
-  # palettes. The drivers render a page, load it in the Chrome the runner
-  # image already carries, and read their findings back out of it. Nothing is
-  # installed for this, and there is no automation library behind it.
+  # palettes. Playwright renders the pages and drives them in the Chrome the
+  # runner image already carries, so no browser is downloaded for this.
   browser:
     runs-on: ubuntu-latest
     steps:
@@ -96,6 +95,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm --prefix web ci
 
       # Named rather than assumed: a runner image that stopped shipping Chrome
       # should say so here rather than inside the runner.
@@ -107,12 +110,16 @@ jobs:
           "${RUNNER_TEMP}/jqweb" -o "${RUNNER_TEMP}/index.html" docs/k8s.json
           cmp docs/index.html "${RUNNER_TEMP}/index.html"
 
-      - run: node web/browser-test/run.js --keep=${{ runner.temp }}/pages
+      - run: npm --prefix web run test:browser
 
-      # A kept page is the document, the harness and one driver in one file,
-      # so a failure can be opened in a browser and watched.
+      # The trace of a failed test is every action it took, the DOM at each one
+      # and the console, openable with "npx playwright show-trace". The pages it
+      # rendered go up with it, so a failure can also be opened in a browser.
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: browser-pages
-          path: ${{ runner.temp }}/pages/*.run.html
+          name: browser-failures
+          path: |
+            web/browser-test/.out/results
+            web/browser-test/.out/report
+            web/browser-test/.out/pages/*.html

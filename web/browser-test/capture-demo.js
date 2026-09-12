@@ -9,72 +9,16 @@
 
 'use strict';
 
-const { execFileSync, spawn } = require('node:child_process');
+const { chromium } = require('@playwright/test');
+const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
-const here = __dirname;
-const repo = path.resolve(here, '..', '..');
+const repo = path.resolve(__dirname, '..', '..');
 const output = path.resolve(process.argv[2] || path.join(repo, 'demo.png'));
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'jqweb-demo-'));
-
-function findChrome() {
-  const named = process.env.CHROME || process.env.CHROME_PATH;
-  if (named) return named;
-  const candidates = process.platform === 'darwin'
-    ? ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-       '/Applications/Chromium.app/Contents/MacOS/Chromium',
-       '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary']
-    : ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable',
-       '/usr/bin/chromium', '/usr/bin/chromium-browser', '/snap/bin/chromium'];
-  const found = candidates.find((candidate) => fs.existsSync(candidate));
-  if (found) return found;
-  throw new Error('no Chrome found; set $CHROME to one');
-}
-
-function completePNG(file) {
-  try {
-    const size = fs.statSync(file).size;
-    if (size < 12) return false;
-    const fd = fs.openSync(file, 'r');
-    const tail = Buffer.alloc(12);
-    fs.readSync(fd, tail, 0, tail.length, size - tail.length);
-    fs.closeSync(fd);
-    return tail.toString('hex') === '0000000049454e44ae426082';
-  } catch (e) {
-    return false;
-  }
-}
-
-function capture(chrome, args) {
-  return new Promise((resolve, reject) => {
-    let done = false, complaints = '';
-    const child = spawn(chrome, args, { stdio: ['ignore', 'ignore', 'pipe'] });
-    child.stderr.on('data', (chunk) => { complaints += chunk; });
-
-    const finish = (err) => {
-      if (done) return;
-      done = true;
-      clearInterval(poll);
-      clearTimeout(timer);
-      child.kill('SIGKILL');
-      if (err) reject(err);
-      else resolve();
-    };
-
-    const poll = setInterval(() => { if (completePNG(output)) finish(null); }, 50);
-    const timer = setTimeout(() => finish(new Error(
-      'no screenshot within 45s' + (complaints ? '\n' + complaints.trim() : ''))), 45000);
-
-    child.on('error', finish);
-    child.on('exit', () => setTimeout(() => {
-      if (!completePNG(output)) finish(new Error('Chrome exited without a complete screenshot'));
-      else finish(null);
-    }, 50));
-  });
-}
 
 const frame = `
 <div class="demo-browser-bar" aria-hidden="true">
@@ -137,16 +81,6 @@ header { top: 0; }
 </style>`;
 
 const query = '[.items[] | select(.status.phase == "Running")]';
-const drive = `
-<script>
-(function () {
-  var q = document.getElementById('q');
-  q.value = ${JSON.stringify(query)};
-  q.dispatchEvent(new Event('input', { bubbles: true }));
-  q.focus();
-  q.setSelectionRange(q.value.length, q.value.length);
-}());
-</script>`;
 
 async function main() {
   try {
@@ -159,34 +93,46 @@ async function main() {
     let html = fs.readFileSync(page, 'utf8');
     html = html.replace('</head>', frameStyle + '\n</head>');
     html = html.replace('<body>', '<body>' + frame);
-    html = html.replace('</body>', drive + '\n</body>');
     fs.writeFileSync(page, html);
 
     fs.mkdirSync(path.dirname(output), { recursive: true });
     fs.rmSync(output, { force: true });
-    await capture(findChrome(), [
-      '--headless=new',
-      '--no-sandbox',
-      '--disable-gpu',
-      '--disable-dev-shm-usage',
-      '--no-first-run',
-      '--no-default-browser-check',
-      '--disable-background-networking',
-      '--disable-component-update',
-      '--disable-default-apps',
-      '--disable-extensions',
-      '--disable-sync',
-      '--disable-client-side-phishing-detection',
-      '--metrics-recording-only',
-      '--force-color-profile=srgb',
-      '--force-device-scale-factor=2',
-      '--window-size=1015,658',
-      '--virtual-time-budget=5000',
-      '--run-all-compositor-stages-before-draw',
-      '--user-data-dir=' + path.join(work, 'profile'),
-      '--screenshot=' + output,
-      pathToFileURL(page).href
-    ]);
+
+    const browser = await chromium.launch({
+      channel: 'chrome',
+      args: ['--force-color-profile=srgb'],
+      /* Playwright hides the scrollbar in headless, and the picture is of a
+         browser showing a long document: without one the page looks like it
+         ends where the screenshot does. */
+      ignoreDefaultArgs: ['--hide-scrollbars']
+    });
+    try {
+      /* Twice the size, so the picture is legible on the display the README is
+         read on. */
+      const context = await browser.newContext({
+        viewport: { width: 1015, height: 658 },
+        deviceScaleFactor: 2
+      });
+      const tab = await context.newPage();
+
+      /* The query is run rather than pasted in: what the picture is of is the
+         result, and the box waits for a pause in the typing before it runs
+         anything. Winding the clock is that pause. */
+      await tab.clock.install();
+      await tab.goto(pathToFileURL(page).href);
+      await tab.clock.runFor(1000);
+      await tab.locator('#q').fill(query);
+      await tab.clock.runFor(1000);
+
+      /* Focused, so the box reads as the one the query was typed into. The
+         caret is left out of the picture: it blinks, so a capture that included
+         it would come out differently depending on when it was taken. */
+      await tab.locator('#q').focus();
+
+      await tab.screenshot({ path: output, animations: 'disabled', caret: 'hide' });
+    } finally {
+      await browser.close();
+    }
 
     console.log(output);
   } finally {

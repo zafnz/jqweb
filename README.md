@@ -191,6 +191,12 @@ off, since a phone has no room to write a query and the browser's own find in
 page covers text search. A wider window, or a phone turned on its side, gets
 the whole page back.
 
+## Update check
+
+When stderr is a terminal, jqweb asks github.com at most once a day whether a
+newer release is out, and prints one line naming the command to upgrade with.
+Set `JQWEB_NO_UPDATE_CHECK=1` to turn it off.
+
 ## Why?
 
 Sometimes it's easier to view it in your webbrowser then search through large json output to

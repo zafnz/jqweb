@@ -34,9 +34,9 @@ $ curl -s https://zafnz.github.io/jqweb/k8s.json | jqweb
 jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)
 ```
 
-<img src="demo.png" alt="jqweb rendering the Wikipedia REST API spec" width="580">
+<img src="demo.png" alt="jqweb filtering running pods in a Kubernetes resource list" width="580">
 
-*Filtering the Wikipedia REST API specification by a value.*
+*Filtering running Kubernetes pods with a jq-style query.*
 
 Use `-O` (or `--open`) to open the page automatically in your default web
 browser:

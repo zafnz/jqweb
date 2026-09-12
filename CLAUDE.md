@@ -92,32 +92,40 @@ The Go side is five files, all `package main`:
 | `main.go` | the flag definitions, `reorderArgs`, and the flow of `main` |
 | `check.go` | `check` and the error messages it builds for input that is not one well-formed JSON document |
 | `serve.go` | the HTTP server, the `-C` close timer, and `openBrowser` |
-| `page.go` | the embedded `web/*` assets, template assembly, and the comment stripper |
+| `page.go` | the embedded `web/*` assets, compiled-script selection, and template assembly |
 | `update.go` | the once-a-day release check, its state file, and the upgrade command it names |
 
 Each has a `_test.go` of its own along the same lines.
 
-`page.go` assembles the page by substituting into a template built from `web/*`.
-The document goes in as compact JSON inside `<script id="data">`; the tree is
-built in the browser, not in Go. That is why `renderPage` is cheap on a 5MB
-document and why the page scripts are where the work is.
+`web/build.mjs` compiles the page scripts into the committed files under
+`web/dist`, and `page.go` assembles those with the HTML and CSS. The document
+goes in as compact JSON inside `<script id="data">`; the tree is built in the
+browser, not in Go. That is why `renderPage` is cheap on a 5MB document and why
+the page scripts are where the work is.
 
 There are two page builds. The default carries the jq engine; `--simple` leaves
-it out. `script()` and `style()` in `page.go` pick the file list, and
-`pageTemplate(jq)` caches one assembled template per state.
+it out. `script()` picks `web/dist/normal.js` or `web/dist/simple.js`, `style()`
+picks the matching stylesheets, and `pageTemplate(jq)` caches one assembled
+template per state. `web/dist/theme.js` remains separate because it runs in the
+head before the body is parsed.
 
 ## The files in `web/`, and which build gets them
 
-| file | ships in | what it is |
+| source asset | included in | what it is |
 |---|---|---|
-| `core.js` | both | parse, render, path text. No DOM, no jq. |
-| `page.js` | both | the tree, text filter, path lookup, copy, folding, theme button |
-| `theme.js` | both | runs in `<head>`, picks the palette before the body parses |
+| `core.js` | simple and normal | parse, render, path text. No DOM, no jq. |
+| `page.js` | simple and normal | the tree, text filter, path lookup, copy, folding, theme button |
+| `theme.js` | theme | runs in `<head>`, picks the palette before the body parses |
 | `page.css` | both | the palette, both themes |
-| `jq.js` | default only | the jq engine |
-| `suggest.js` | default only | builds the queries a clicked line could mean, and the key completions of a half-typed one. No DOM. |
-| `query.js` | default only | search box as a query, results view, suggestion list |
+| `jq.js` | normal only | the jq engine |
+| `suggest.js` | normal only | builds the queries a clicked line could mean, and the key completions of a half-typed one. No DOM. |
+| `query.js` | normal only | search box as a query, results view, suggestion list |
 | `query.css` | default only | mode select, suggestion list, error box, results |
+
+The three files under `web/dist` are generated, minified and committed. Never
+edit them by hand; run `npm --prefix web run build` and commit the result. CI
+runs the same build and fails when it leaves a diff. Keeping them in the source
+tree is what lets a module fetched by `go install` build without Node.
 
 `web/browser-test` ships in nothing. It is the drivers, the harness they are
 written against and the runner that loads them, and no rendered page has ever
@@ -164,27 +172,23 @@ network: no CDN, no web fonts, no remote images. The GitHub mark in the toolbar
 is inline SVG for this reason. (The `--cdn` issue would change this on
 purpose, for people who want the opposite.)
 
-**No dependencies, either side.** `go.mod` requires nothing, there is no
-`package.json`, and the JavaScript tests use Node's built-in runner. Anything
-needing a build step would have to be committed as generated output.
+**Build dependencies do not become install dependencies.** `go.mod` requires
+nothing, the JavaScript tests use Node's built-in runner, and the TypeScript and
+esbuild packages under `web` are development dependencies only. `go build`
+embeds the committed output and must never invoke Node or need `node_modules`.
 
-**Stylesheets carry no comments.** Only the scripts are comment-stripped; CSS is
-inlined as written, so a comment in `page.css` or `query.css` ships in every
-page. `TestPageCarriesNoComments` fails when one does. Put the reasoning in
+**Stylesheets carry no comments.** The scripts are minified, but CSS is inlined
+as written, so a comment in `page.css` or `query.css` ships in every page.
+`TestPageCarriesNoComments` fails when one does. Put the reasoning in
 `CONTRIBUTING.md` instead.
-
-**No trailing comment on a line containing `/` outside a string.**
-`stripComments` gives up on such a line and emits it verbatim, comment and all,
-because the `/` could open a regular expression. Regexes and division both trip
-it. Comments go on their own line.
 
 **Every colour is a custom property, defined in both palettes.** A literal
 colour anywhere means one theme gets it wrong. Check the contrast ratio rather
 than the look on one screen: dimming a grey with `opacity` once gave 1.6:1.
 
 **`docs/index.html` is generated and committed.** It is `docs/k8s.json`
-rendered, so regenerate it after any change under `web/`, with the command in
-`CONTRIBUTING.md`.
+rendered, so rebuild `web/dist` and then regenerate it after any change under
+`web/`, with the commands in `CONTRIBUTING.md`.
 
 **`docs/k8s.json` is the example document.** It is a generated `kubectl get all
 -o json` listing, committed and served at https://zafnz.github.io/jqweb/k8s.json,

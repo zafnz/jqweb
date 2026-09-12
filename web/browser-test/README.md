@@ -13,7 +13,7 @@ rendered page.
 `harness.js` and one driver into each, loads it in headless Chrome with
 `--dump-dom`, and reads the findings out of the `<pre id="report">` the harness
 leaves in the page. Chrome comes from `$CHROME`, or from the usual places on
-macOS and Linux. There is no npm package behind any of it.
+macOS and Linux. There is no browser automation package behind any of it.
 
 CI runs them in a job of its own, with no install step: the GitHub runner
 image ships Chrome.

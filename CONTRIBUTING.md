@@ -2,23 +2,26 @@
 
 ## Building and testing
 
+    npm --prefix web ci            # install the pinned frontend build tools
+    npm --prefix web run check     # type-check the frontend
+    npm --prefix web run build     # rebuild the committed scripts
     go build .                     # a jqweb binary in the working directory
     go test ./...                  # Go: argument handling, input validation, page assembly
     node --test                    # JavaScript: web/core.test.js, web/jq.test.js
     node web/browser-test/run.js   # the page in a browser (needs Chrome)
 
-No dependencies, either side: `go.mod` requires nothing, there is no
-`package.json`, and the JavaScript tests use the test runner built into Node
-18 and later. Please keep it that way — `go install github.com/zafnz/jqweb@latest`
-runs the Go toolchain and nothing else, so anything that needs a build step
-would have to be committed as generated output. The browser drivers hold to
-the same rule: they drive Chrome through its own command line rather than
-through Playwright or Puppeteer.
+`web/dist` holds the generated scripts embedded in the binary. They are
+committed so `go build` and `go install github.com/zafnz/jqweb@latest` still
+need only Go; do not edit them by hand. The build uses the development
+dependencies pinned in `web/package-lock.json`, while the JavaScript tests use
+Node's built-in runner. The browser drivers still use Chrome's command line
+rather than an automation library.
 
-CI runs the same four commands on every push, with the Go job against both
-the `go.mod` floor and the current release. The two have disagreed before:
-Go 1.27 changed `json.Decoder.More()` at the end of a truncated document,
-which changed the error message a user sees.
+CI runs the same commands on every push and fails when rebuilding `web/dist`
+changes it. The Go job runs against both the `go.mod` floor and the current
+release. The two have disagreed before: Go 1.27 changed
+`json.Decoder.More()` at the end of a truncated document, which changed the
+error message a user sees.
 
 ### Proposals
 
@@ -65,15 +68,9 @@ against a build from `main` covers the rest:
     done
     diff /tmp/dom-old.html /tmp/dom-new.html
 
-The stylesheets carry no comments, because only the scripts are stripped: CSS
-is inlined as written, so a comment in `page.css` or `query.css` ships in every
-page. `TestPageCarriesNoComments` fails if one does.
-
-`stripComments` gives up on any line where a `/` turns up outside a string
-without a `*` after it, and emits that line exactly as written. Regular
-expressions and division both trip it, so a comment at the end of such a line
-would ship in every rendered page. Keep comments on their own line; the page
-should carry none at all, which is what `TestPageCarriesNoComments` checks.
+The stylesheets carry no comments. The scripts are minified, but CSS is inlined
+as written, so a comment in `page.css` or `query.css` ships in every page.
+`TestPageCarriesNoComments` fails if one does.
 
 ## Phone width
 
@@ -139,10 +136,12 @@ a terminal.
 
 `docs/index.html` is a rendered page committed for GitHub Pages, and it does
 not regenerate itself. After a change to the scripts or the styling it is
-stale until someone rebuilds it. Build it the default way, so
-that the page people are pointed at is the one they will get. The input file
-name sets the page title, so build from `docs/k8s.json` where it sits:
+stale until someone rebuilds the scripts and then the page. Build it the
+default way, so that the page people are pointed at is the one they will get.
+The input file name sets the page title, so build from `docs/k8s.json` where it
+sits:
 
+    npm --prefix web run build
     go build -o jqweb . && ./jqweb -o docs/index.html docs/k8s.json
 
 `docs/k8s.json` is the document that page shows: a `kubectl get all -o json`

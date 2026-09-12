@@ -1,14 +1,18 @@
-/* page: default, window: 460x800
+/* page: default, window: 640x800
 
    The toolbar in a window too small to hold it in one row. It is allowed to
    wrap; what it may not do is push the page sideways, leave the search box
-   below its floor, or put anything out of reach. */
+   below its floor, or put anything out of reach.
+
+   The window is just wider than a phone. At 600px and below the toolbar
+   loses the search box altogether, which phone.js covers. */
 T.run(async (t) => {
   const header = t.$('header');
   const box = (el) => el.getBoundingClientRect();
   const bar = box(header);
 
-  t.atMost('the window really is a narrow one', window.innerWidth, 500);
+  t.atMost('the window really is a narrow one', window.innerWidth, 700);
+  t.atLeast('but wider than a phone', window.innerWidth, 601);
 
   const items = [t.$('header .name'), t.$('#mode'), t.$('.qwrap'),
     t.$('#stats'), t.$('#fold'), t.$('#theme')];

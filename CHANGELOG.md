@@ -9,6 +9,13 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+### Phone-width pages keep the tree in view
+
+At 600px wide and below, the page hides the search box, mode selector, match
+count and per-line copy and filter buttons. The tree, its toggles, Collapse all
+and the theme button stay visible, so a phone in portrait gets the document
+rather than a toolbar wrapped over it.
+
 ### Opening a page follows `$BROWSER`
 
 `-O` and `-OC` now use `$BROWSER` when it is set, before falling back to the

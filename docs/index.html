@@ -144,6 +144,10 @@ main { padding: 10px 14px 60px; }
 
 .node.hidden { display: none; }
 .node.hit > .line { background: var(--hit); }
+
+@media (max-width: 600px) {
+  #mode, .qwrap, #stats, .cp, .fq { display: none; }
+}
 #q.bad, #q.bad:focus { border-color: var(--fail); }
 
 #fault {
@@ -2553,6 +2557,10 @@ var jqui = function (page) {
   document.addEventListener('keydown', function (e) {
     if (e.key === '/' && e.target !== input) { e.preventDefault(); input.focus(); }
     if (e.key === 'Escape' && e.target === input) { input.value = ''; run(); }
+  });
+  var phone = window.matchMedia('(max-width: 600px)');
+  phone.addEventListener('change', function () {
+    if (phone.matches && input.value) { input.value = ''; run(); }
   });
   function run() {
     var raw = input.value.trim();

@@ -67,6 +67,24 @@ expressions and division both trip it, so a comment at the end of such a line
 would ship in every rendered page. Keep comments on their own line; the page
 should carry none at all, which is what `TestPageCarriesNoComments` checks.
 
+## Phone width
+
+At 600px and below the page shows the tree, the fold button and the theme
+button. The rule is `@media (max-width: 600px)` in `web/page.css`, and
+`web/page.js` runs `matchMedia` on the same query, so the two have to agree.
+
+The stylesheet hides the search box, the mode select, the count and the line
+buttons rather than leaving them out of the markup, because a phone turned on
+its side is wider than 600px and gets the full page back without a reload. The
+script covers a window narrowed across the line with a search in the box: it
+clears the search, since the filtered tree or the query results would
+otherwise stay on screen with no box left to clear them from.
+
+The breakpoint is 600 rather than a phone's own width because headless Chrome
+will not open a window narrower than 500px, and a lower breakpoint could not be
+driven. `phone.js` runs at 500 and `narrow.js` at 640, either side of it.
+Phones in portrait are 430px and under.
+
 ## The jq subset
 
 `web/jq.js` is the query engine, `web/suggest.js` builds the queries a line of

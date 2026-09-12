@@ -5,14 +5,15 @@ name: pr
 # go on showing the answer it gave before the label arrived.
 #
 # They are their own workflow rather than jobs in ci.yml because "labeled" in
-# that file would rebuild and retest on every label click. Nothing here checks
-# out the repository or builds anything; both jobs are API calls.
+# that file would rebuild and retest on every label click. The label job reads
+# the event payload and nothing else; the changelog job checks the repository
+# out, and only runs when a label asks for an entry.
 on:
   pull_request:
     types: [opened, reopened, synchronize, labeled, unlabeled]
 
 permissions:
-  pull-requests: read
+  contents: read
 
 concurrency:
   group: pr-${{ github.event.pull_request.number }}
@@ -47,21 +48,27 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'optimisation'))
     runs-on: ubuntu-latest
     steps:
-      # The files API reports what the whole pull request changes, so an entry
-      # written in any of its commits counts. It also gives the added-line
-      # count directly, which is what tells an entry from a deletion.
-      - name: The change has a CHANGELOG.md entry
+      # The whole history, because the step below reads CHANGELOG.md at the
+      # base commit as well as at the merge this pull request would make.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Asking only whether CHANGELOG.md changed would take a typo fixed in an
+      # old version's section for an entry. This compares the [Unreleased]
+      # section itself, at the tip of the base branch against what merging this
+      # pull request would produce, so an entry written anywhere in that
+      # section counts and a change to any other section does not.
+      - name: The entry is under [Unreleased]
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR: ${{ github.event.pull_request.number }}
-          REPO: ${{ github.repository }}
+          BASE: ${{ github.event.pull_request.base.sha }}
         run: |
-          added=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[] | select(.filename == "CHANGELOG.md") | .additions' | head -1)
-          if [ -z "$added" ]; then
-            added=0
-          fi
-          if [ "$added" -eq 0 ]; then
-            echo "::error file=CHANGELOG.md::This pull request is labelled for a change someone using jqweb sees, and adds nothing to CHANGELOG.md. Write the entry under '## [Unreleased]', or apply the no-changelog label if the labels fit but the release notes would not want it."
+          unreleased() {
+            git show "$1:CHANGELOG.md" 2>/dev/null |
+              awk '/^## \[Unreleased\]/{inside = 1; next} /^## /{inside = 0} inside'
+          }
+          if [ "$(unreleased "$BASE")" = "$(unreleased HEAD)" ]; then
+            echo "::error file=CHANGELOG.md::This pull request is labelled for a change someone using jqweb sees, and adds nothing under '## [Unreleased]' in CHANGELOG.md. Write the entry there, or apply the no-changelog label if the labels fit but the release notes would not want it."
             exit 1
           fi
-          echo "CHANGELOG.md: $added added lines"
+          echo "the [Unreleased] section differs from the base"

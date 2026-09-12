@@ -17,8 +17,34 @@ two is what both the Unix and the Go conventions lead people to expect, so it
 needs no paragraph — and it is not a feature of jqweb.
 
 `CONTRIBUTING.md` is for people working on jqweb: building, testing, releasing,
-and the reasoning behind decisions in the source. `CLAUDE.md` is this file, for
-Claude. Neither belongs in `README.md`.
+and the reasoning behind decisions that would look wrong without it. `CLAUDE.md`
+is this file, for Claude. Neither belongs in `README.md`.
+
+## How much to write
+
+Length is a cost. The default for a change is no prose outside the code; each
+document then gets the least that does its job.
+
+- `README.md`: what the user does and what happens. Two or three sentences for
+  anything that is not a headline feature. Behaviour nobody installed jqweb for
+  — the update check is the example — is a disclosure rather than a feature, so
+  it goes near the foot of the file and never in the install or usage sections.
+- `CHANGELOG.md`: one or two sentences per entry, written for someone
+  upgrading. No mechanism, no sample output, no rationale.
+- `CONTRIBUTING.md`: only what someone changing the code cannot get by reading
+  it — a build flag, an environment variable, a tool a test needs. How a
+  feature works is not one of those.
+- `CLAUDE.md`: the rule that prevents the next mistake, not a description of
+  how something works.
+
+A pull request is the exception. Its description is read once, by someone
+deciding whether to merge, so sample output and brief reasoning belong there:
+what was run, what it printed, and why a choice was made the way it was. Keep
+it to what a reviewer needs, and do not copy it into the repository afterwards.
+
+A feature that behaves the way everyone expects gets one line and no
+explanation in the files above. Explain only where the code would look wrong to
+the next reader, and then write the reason for that one decision.
 
 ## Where the work is tracked
 

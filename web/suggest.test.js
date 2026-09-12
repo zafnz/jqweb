@@ -1,7 +1,8 @@
-/* Tests for the queries offered when you click the filter button on a line.
+/* Tests for suggest.js: the queries offered when you click the filter button
+   on a line, and the completions of a key name still being typed.
    Run with:  node --test
 
-   The property that matters most is at the bottom: every query offered for
+   The property that matters most is near the bottom: every query offered for
    every line of a document has to compile and run against that document. A
    suggestion that errors is worse than no suggestion, and the shapes that
    break one -- a pivot whose members are not all objects, a value sitting in
@@ -13,7 +14,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { parseJSON } = require('./core.js');
 const { compile } = require('./jq.js');
-const { suggest } = require('./suggest.js');
+const { suggest, splitPartial, completions } = require('./suggest.js');
 
 /* A document with the shapes that have caught the generator out: an object
    used as a map, records reached through a second map level, an array of
@@ -190,4 +191,67 @@ test('the reading of the line itself always finds the line', () => {
     assert.ok(line, `no path row for ${JSON.stringify(segs)}`);
     assert.strictEqual(compile(line.q).run(DOC).length, 1, `${line.q} did not resolve`);
   }
+});
+
+/* ---- completing a half-typed key ---- */
+
+test('splitPartial reads a name still being typed', () => {
+  assert.deepStrictEqual(splitPartial('.ite'), { lead: '', ctx: '.', partial: 'ite' });
+  assert.deepStrictEqual(splitPartial('.items[].ki'),
+    { lead: '.items[]', ctx: '.items[]', partial: 'ki' });
+  assert.deepStrictEqual(splitPartial('.items[].metadata.na'),
+    { lead: '.items[].metadata', ctx: '.items[].metadata', partial: 'na' });
+  /* A trailing dot is a name of length zero: every key completes it. */
+  assert.deepStrictEqual(splitPartial('.items[].'),
+    { lead: '.items[]', ctx: '.items[]', partial: '' });
+});
+
+test('splitPartial keeps a pipe but does not run it', () => {
+  /* ".items[] | " will not compile, so the keys come from ".items[]" while
+     the completed text keeps the pipe as typed. */
+  assert.deepStrictEqual(splitPartial('.items[] | .na'),
+    { lead: '.items[] | ', ctx: '.items[]', partial: 'na' });
+  assert.deepStrictEqual(splitPartial('.items[]|.na'),
+    { lead: '.items[]|', ctx: '.items[]', partial: 'na' });
+});
+
+test('splitPartial leaves whole queries alone', () => {
+  for (const raw of ['.', '..', '.a..', '.items[]', '.items[0]', '.a?', 'keys',
+    '.items|keys', '', '.a == "b"']) {
+    assert.strictEqual(splitPartial(raw), null, `split ${JSON.stringify(raw)}`);
+  }
+});
+
+const stream = (...texts) => texts.map((t) => parseJSON(t));
+
+test('completions gathers the keys that continue the name', () => {
+  const out = stream('{"kind":"Pod","kindle":1}', '{"kind":"Job"}', '{"phase":"x"}', '[1]', '"s"');
+  const got = completions(out, 'ki');
+  assert.strictEqual(got.exact, false);
+  assert.strictEqual(got.objects, 3);
+  assert.deepStrictEqual(got.keys, [{ key: 'kind', n: 2 }, { key: 'kindle', n: 1 }]);
+});
+
+test('a name matching a whole key is exact, and not offered as its own finish', () => {
+  const got = completions(stream('{"name":"a","namespace":"b"}'), 'name');
+  assert.strictEqual(got.exact, true);
+  assert.deepStrictEqual(got.keys, [{ key: 'namespace', n: 1 }]);
+});
+
+test('completions orders by how many objects carry the key, then by name', () => {
+  const out = stream('{"b":1,"a":1}', '{"c":1,"a":1}', '{"c":1}');
+  assert.deepStrictEqual(completions(out, '').keys,
+    [{ key: 'a', n: 2 }, { key: 'c', n: 2 }, { key: 'b', n: 1 }]);
+});
+
+test('completions survives keys named after Object.prototype members', () => {
+  const got = completions(stream('{"constructor":1,"hasOwnProperty":2}'), 'const');
+  assert.deepStrictEqual(got.keys, [{ key: 'constructor', n: 1 }]);
+});
+
+test('completions caps the list', () => {
+  const keys = [];
+  for (let i = 0; i < 250; i++) keys.push(`"k${String(i).padStart(3, '0')}":1`);
+  const got = completions(stream('{' + keys.join(',') + '}'), 'k');
+  assert.strictEqual(got.keys.length, 200);
 });

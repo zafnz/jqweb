@@ -7,7 +7,7 @@
    itself, and gets back the entry points it needs. */
 var jqui = function (page) {
   'use strict';
-  var renderTree = jqweb.renderTree, esc = jqweb.esc;
+  var renderTree = jqweb.renderTree, esc = jqweb.esc, pathText = jqweb.pathText;
   var tree = document.getElementById('tree');
   var results = document.getElementById('results');
   var input = document.getElementById('q');
@@ -45,10 +45,16 @@ var jqui = function (page) {
   /* Compiles and runs the box as a query. One that only walks down the
      document is shown in place, as a pasted path always has been; anything
      else produces values that are not in the document, so its output replaces
-     the view. */
-  function run(raw) {
+     the view.
+
+     A query still being typed is not run at all: while its trailing name is
+     a prefix of keys that are really there, complete() offers those instead
+     and the view stays as it was. force is Enter saying run it anyway. */
+  function run(raw, force) {
     var query, out;
     clearFault();
+    completing = !force && complete(raw);
+    if (completing) return;
     showDocument();
     try {
       query = jqjs.compile(raw);
@@ -134,14 +140,16 @@ var jqui = function (page) {
 
   /* ---- the suggestion list ----
 
-     The filter button on a line does not know which query you meant, so it
-     offers the ones it can build from that line, runs each, and labels it with
-     what came back. Picking by outcome is the point: 14 results against 1 says
-     which reading you were after without anyone having to think about pivots.
+     Two things fill it. The filter button on a line does not know which query
+     you meant, so it offers the ones it can build from that line, runs each,
+     and labels it with what came back. Picking by outcome is the point: 14
+     results against 1 says which reading you were after without anyone having
+     to think about pivots. And typing a name one letter at a time fills it
+     with the keys that could finish the name, through complete() below.
 
-     The list belongs to the search box rather than to the click that filled
-     it, so it comes back when the box is focused again and goes away when
-     attention moves elsewhere. */
+     The list belongs to the search box rather than to whatever filled it, so
+     it comes back when the box is focused again and goes away when attention
+     moves elsewhere. */
 
   var suggestions = document.getElementById('suggest');
   var faultBox = document.getElementById('fault');
@@ -204,7 +212,46 @@ var jqui = function (page) {
   }
 
   function label(c) {
+    if (c.label !== undefined) return c.label;
     return c.count === null ? '' : plural(c.count, c.shape === 'keys' ? 'key' : 'result');
+  }
+
+  /* ---- completing a half-typed name ----
+
+     jq reads a missing key as null, so ".items[].ki" run as written is one
+     null per item while the "nd" of "kind" is still to come. Instead, the
+     query up to the trailing name is run, and while that name is a prefix of
+     keys its output really has, those go on the list and nothing else moves:
+     the view keeps showing whatever last ran. A name that matches a whole key
+     runs -- ".items[].kind" behaves as it always did -- and one that no key
+     starts with runs too, nulls and all. */
+  var completing = false;
+
+  /* Offers completions for raw instead of running it, when there are any.
+     True means it did and the caller has nothing to run. */
+  function complete(raw) {
+    var split = jqsuggest.splitPartial(raw), out, comp;
+    if (!split) return false;
+    try {
+      out = jqjs.compile(split.ctx).run(page.value);
+    } catch (e) {
+      return false;
+    }
+    comp = jqsuggest.completions(out, split.partial);
+    if (comp.exact || !comp.keys.length) return false;
+    rows = comp.keys.map(function (k) {
+      /* pathText writes the segment as jq would -- .name, or ["a b"] for a
+         key that needs quoting, whose leading dot goes when it is a suffix. */
+      var seg = pathText([{ key: k.key }]);
+      return {
+        q: split.lead ? split.lead + seg.replace(/^\.\[/, '[') : seg,
+        label: k.n === comp.objects ? '' : 'on ' + k.n + ' of ' + comp.objects,
+        count: null
+      };
+    });
+    draw();
+    show();
+    return true;
   }
 
   function draw() {
@@ -275,11 +322,18 @@ var jqui = function (page) {
 
   /* Up and down step through the readings, running each, which is the quick
      way to find out which one you meant. Escape puts the list away without
-     clearing the box, which is what Escape does when there is no list. */
+     clearing the box, which is what Escape does when there is no list.
+     Enter runs a half-typed name as written, which nothing does for you
+     while complete() is holding the run back. */
   input.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !suggestions.hidden) {
       hide();
       e.stopPropagation();
+      return;
+    }
+    if (e.key === 'Enter' && completing) {
+      hide();
+      run(input.value.trim(), true);
       return;
     }
     if (suggestions.hidden || !rows.length) return;

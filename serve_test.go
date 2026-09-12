@@ -4,6 +4,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -170,5 +171,33 @@ func TestServeHeadDoesNotStartTheCloseTimer(t *testing.T) {
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("still serving 10s after the GET that followed the HEAD")
+	}
+}
+
+func TestBrowserCommandPrefersBrowserEnvironment(t *testing.T) {
+	cmd := browserCommand("code-browser", "linux", "http://127.0.0.1:1234/")
+	want := []string{"code-browser", "http://127.0.0.1:1234/"}
+	if !reflect.DeepEqual(cmd.Args, want) {
+		t.Errorf("browser command = %#v, want %#v", cmd.Args, want)
+	}
+}
+
+func TestBrowserCommandFallsBackForOS(t *testing.T) {
+	tests := []struct {
+		name string
+		goos string
+		want []string
+	}{
+		{"macOS", "darwin", []string{"open", "http://127.0.0.1:1234/"}},
+		{"Windows", "windows", []string{"cmd", "/c", "start", "", "http://127.0.0.1:1234/"}},
+		{"Other", "linux", []string{"xdg-open", "http://127.0.0.1:1234/"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := browserCommand("", tt.goos, "http://127.0.0.1:1234/")
+			if !reflect.DeepEqual(cmd.Args, tt.want) {
+				t.Errorf("browser command = %#v, want %#v", cmd.Args, tt.want)
+			}
+		})
 	}
 }

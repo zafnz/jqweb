@@ -21,21 +21,30 @@ jobs:
         with:
           fetch-depth: 0
 
-      # The notes in .goreleaser.yaml describe one particular release, and
-      # nothing else notices when they are left describing the last one: the
-      # tag builds, the binaries are fine, and the release page tells everyone
-      # upgrading that last version's features are new again. This is the only
-      # point where the two can be compared, so it runs before anything is
-      # built or published.
-      - name: The release notes are written for this tag
+      # The release notes are the CHANGELOG.md section for this tag. Taking
+      # them out here, rather than pointing GoReleaser at the file, is what
+      # makes a missing section stop the release: GoReleaser treats an empty
+      # --release-header as a warning and publishes without it, leaving a
+      # release page that tells everyone upgrading nothing at all.
+      #
+      # The awk prints what lies between the heading for this version and the
+      # next heading or the link definitions. It writes outside the checkout,
+      # because a file left in the working tree makes it dirty and GoReleaser
+      # refuses to release from a dirty tree. Both run before anything is
+      # built.
+      - name: Take this tag's release notes from CHANGELOG.md
         run: |
           version="${GITHUB_REF_NAME#v}"
-          marker=$(sed -n 's/^  # notes-for: //p' .goreleaser.yaml)
-          if [ "$marker" != "$version" ]; then
-            echo "::error file=.goreleaser.yaml::Release notes are marked for '${marker:-nothing}' but the tag is ${GITHUB_REF_NAME}. Rewrite release.header for ${version}, bump the notes-for marker, then move the tag."
+          awk -v v="$version" '
+            index($0, "## [" v "]") == 1 { inside = 1; next }
+            /^## / || /^\[[^]]*\]: / { inside = 0 }
+            inside { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/release-header.md"
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/release-header.md"; then
+            echo "::error file=CHANGELOG.md::No '## [${version}]' section with anything under it. Rename '## [Unreleased]' to '## [${version}] - $(date -u +%F)', update the link definitions, then move the tag."
             exit 1
           fi
-          echo "release notes are marked for ${version}"
+          echo "release notes for ${version}: $(wc -l < "$RUNNER_TEMP/release-header.md") lines"
 
       - uses: actions/setup-go@v5
         with:
@@ -91,7 +100,7 @@ jobs:
               echo "::notice::Apple's notary service did not answer. Waiting ${delay}s, then attempt ${attempt}."
               sleep "$delay"
             fi
-            if goreleaser release --clean 2>&1 | tee /tmp/goreleaser.log; then
+            if goreleaser release --clean --release-header "$RUNNER_TEMP/release-header.md" 2>&1 | tee /tmp/goreleaser.log; then
               exit 0
             fi
             if ! grep -qiE 'notariz|notary|appstoreconnect\.apple\.com' /tmp/goreleaser.log; then

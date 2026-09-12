@@ -4,7 +4,11 @@
 ![GitHub License](https://img.shields.io/github/license/zafnz/jqweb)
 
 # jqweb
-Renders json like jq, but as a webpage
+
+Turn JSON into a self-contained interactive webpage with tree navigation,
+search, and jq-style queries. Large JSON documents are often easier to explore
+this way, especially when you do not already know the path to the value you
+need.
 
 ## Install
 
@@ -20,9 +24,10 @@ Or download a binary for macOS, Linux or Windows from
 [Releases](https://github.com/zafnz/jqweb/releases) and put it on your `$PATH`.
 The macOS builds are signed and notarized.
 
-## Example Usage
+## Example usage
 
-**Quick view of json output. (See screenshot below, or <a href="https://zafnz.github.io/jqweb/">view here</a>)**
+Pipe JSON into jqweb, then open the printed URL. See the screenshot below or
+[try the live demo](https://zafnz.github.io/jqweb/).
 
 ```
 $ curl -s https://zafnz.github.io/jqweb/k8s.json | jqweb
@@ -31,26 +36,28 @@ jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)
 
 <img src="demo.png" alt="jqweb rendering the Wikipedia REST API spec" width="580">
 
-You can also use -O (or --open) to automatically open your 
-default web browser
+*Filtering the Wikipedia REST API specification by a value.*
+
+Use `-O` (or `--open`) to open the page automatically in your default web
+browser:
+
 ```
 jqweb -O < myfile.json
 ```
 
-Add -C (or --close) and jqweb stops once the browser has the page, instead of
-serving until Ctrl-C. -OC does both:
+Add `-C` (or `--close`) and jqweb stops once the browser has the page, instead
+of serving until Ctrl-C. `-OC` does both:
+
 ```
 jqweb -OC myfile.json
 ```
 
+Write a self-contained HTML file for offline viewing:
 
-**Output to an html file for offline viewing**
 ```bash
 $ kubectl get pods -o json | jqweb -o k8s.html
 # Saves k8s.html for offline viewing
 ```
-
-<br clear="right">
 
 ## Usage
 usage: `jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [-O|--open] [-C|--close] [--simple] [--theme <name>] [<input-file>]`
@@ -196,11 +203,6 @@ the whole page back.
 When stderr is a terminal, jqweb asks github.com at most once a day whether a
 newer release is out, and prints one line naming the command to upgrade with.
 Set `JQWEB_NO_UPDATE_CHECK=1` to turn it off.
-
-## Why?
-
-Sometimes it's easier to view it in your webbrowser then search through large json output to
-find the exact value you need, especially if you don't know the json path.
 
 ## License
 

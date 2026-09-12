@@ -104,7 +104,7 @@ browser, not in Go. That is why `renderPage` is cheap on a 5MB document and why
 the page scripts are where the work is.
 
 There are two page builds. The default carries the jq engine; `--simple` leaves
-it out. `script()` picks `web/dist/normal.js` or `web/dist/simple.js`, `style()`
+it out. `script()` picks `web/dist/full.js` or `web/dist/simple.js`, `style()`
 picks the matching stylesheets, and `pageTemplate(jq)` caches one assembled
 template per state. `web/dist/theme.js` remains separate because it runs in the
 head before the body is parsed.
@@ -113,13 +113,13 @@ head before the body is parsed.
 
 | source asset | included in | what it is |
 |---|---|---|
-| `core.js` | simple and normal | parse, render, path text. No DOM, no jq. |
-| `page.js` | simple and normal | the tree, text filter, path lookup, copy, folding, theme button |
+| `core.js` | simple and full | parse, render, path text. No DOM, no jq. |
+| `page.js` | simple and full | the tree, text filter, path lookup, copy, folding, theme button |
 | `theme.js` | theme | runs in `<head>`, picks the palette before the body parses |
 | `page.css` | both | the palette, both themes |
-| `jq.js` | normal only | the jq engine |
-| `suggest.js` | normal only | builds the queries a clicked line could mean, and the key completions of a half-typed one. No DOM. |
-| `query.js` | normal only | search box as a query, results view, suggestion list |
+| `jq.js` | full only | the jq engine |
+| `suggest.js` | full only | builds the queries a clicked line could mean, and the key completions of a half-typed one. No DOM. |
+| `query.js` | full only | search box as a query, results view, suggestion list |
 | `query.css` | default only | mode select, suggestion list, error box, results |
 
 The three files under `web/dist` are generated, minified and committed. Never

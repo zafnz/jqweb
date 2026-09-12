@@ -8,11 +8,11 @@ const outdir = join(root, 'dist');
 
 // Keep today's source order until the files become modules. The three outputs
 // are already the eventual page entry points: the early palette selection,
-// the page without jq, and the default page with it.
+// the page without jq, and the full page with it.
 const bundles = {
   theme: ['theme.js'],
   simple: ['core.js', 'page.js'],
-  normal: ['core.js', 'jq.js', 'suggest.js', 'query.js', 'page.js']
+  full: ['core.js', 'jq.js', 'suggest.js', 'query.js', 'page.js']
 };
 
 await mkdir(outdir, { recursive: true });

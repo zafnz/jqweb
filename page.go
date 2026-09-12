@@ -52,7 +52,7 @@ func boxText(q string) string {
 	return strings.NewReplacer("\r\n", " ", "\r", " ", "\n", " ").Replace(q)
 }
 
-//go:embed web/page.html web/page.css web/query.css web/dist/theme.js web/dist/simple.js web/dist/normal.js
+//go:embed web/page.html web/page.css web/query.css web/dist/theme.js web/dist/simple.js web/dist/full.js
 var assets embed.FS
 
 // pageTemplate returns the page shell with its stylesheet and script inlined,
@@ -90,7 +90,7 @@ func style(jq bool) string {
 // committed separately so a --simple page carries none of the query engine.
 func script(jq bool) string {
 	if jq {
-		return inline("web/dist/normal.js")
+		return inline("web/dist/full.js")
 	}
 	return inline("web/dist/simple.js")
 }

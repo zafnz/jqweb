@@ -76,11 +76,11 @@ func TestRenderPageInlinesAssets(t *testing.T) {
 func TestRenderPageSelectsTheCompiledScript(t *testing.T) {
 	full := renderPage([]byte(`{}`), "t", options{jq: true})
 	simple := renderPage([]byte(`{}`), "t", options{jq: false})
-	normalScript := inline("web/dist/normal.js")
+	fullScript := inline("web/dist/full.js")
 	simpleScript := inline("web/dist/simple.js")
 
-	if !strings.Contains(full, normalScript) {
-		t.Error("default page does not carry the normal bundle")
+	if !strings.Contains(full, fullScript) {
+		t.Error("default page does not carry the full bundle")
 	}
 	if strings.Contains(full, simpleScript) {
 		t.Error("default page carries the simple bundle")
@@ -88,8 +88,8 @@ func TestRenderPageSelectsTheCompiledScript(t *testing.T) {
 	if !strings.Contains(simple, simpleScript) {
 		t.Error("--simple page does not carry the simple bundle")
 	}
-	if strings.Contains(simple, normalScript) {
-		t.Error("--simple page carries the normal bundle")
+	if strings.Contains(simple, fullScript) {
+		t.Error("--simple page carries the full bundle")
 	}
 	if len(simple) >= len(full) {
 		t.Errorf("--simple page is %d bytes, no smaller than the %d without it",
@@ -204,7 +204,7 @@ func TestPageCarriesNoComments(t *testing.T) {
 }
 
 func TestCompiledScriptsCannotCloseTheirElements(t *testing.T) {
-	for _, name := range []string{"web/dist/theme.js", "web/dist/simple.js", "web/dist/normal.js"} {
+	for _, name := range []string{"web/dist/theme.js", "web/dist/simple.js", "web/dist/full.js"} {
 		if strings.Contains(strings.ToLower(asset(name)), "</script") {
 			t.Errorf("%s contains a closing script tag", name)
 		}

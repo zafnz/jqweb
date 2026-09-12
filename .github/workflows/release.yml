@@ -21,6 +21,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      # A v* tag starts this workflow, but only a tag whose commit has reached
+      # main is allowed to publish. That keeps branch-local release-looking
+      # tags from building assets, creating a GitHub release or updating the
+      # Homebrew tap.
+      - name: Release tags must point at main
+        run: |
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Release tags must point at a commit contained in origin/main."
+            exit 1
+          fi
+
       # The release notes are the CHANGELOG.md section for this tag. Taking
       # them out here, rather than pointing GoReleaser at the file, is what
       # makes a missing section stop the release: GoReleaser treats an empty

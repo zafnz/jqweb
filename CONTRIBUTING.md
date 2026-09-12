@@ -127,17 +127,32 @@ go.
 
 ## Releases
 
-The release notes live in `.goreleaser.yaml` under `release.header`, and say
-what that release changed rather than what the tool does. Rewrite them before
-tagging and bump the `# notes-for:` marker above them to the version going out.
-The tidiest moment for that is in the pull request that makes the change worth
-releasing, rather than in one of its own afterwards: the notes have to be on
-`main` before the tag is pushed, so leaving them costs an extra round trip
-through review.
-The release workflow compares that marker with the tag and refuses to publish
-when they disagree, because nothing else can tell stale notes from fresh ones:
-the tag builds, the binaries are fine, and the release page quietly tells
-everyone upgrading that the last version's features are new again.
+The release notes live in `CHANGELOG.md`, in the form described at
+https://keepachangelog.com/en/1.1.0/. A pull request that changes what someone
+using jqweb sees adds its own section under `## [Unreleased]`, written for
+someone upgrading rather than as a summary of the diff. A version heading is
+`## [0.6.0] - 2026-09-11`, so the headings within an entry start at `###`;
+they say what changed, in place of the Added/Changed/Fixed categories Keep a
+Changelog suggests. Writing the entry in the pull request that earns it is what
+keeps the notes on `main` before the tag is pushed, rather than costing a round
+trip through review of their own.
+
+Labels decide which pull requests have to carry one. `accessibility`, `bug`,
+`functionality` and `optimisation` require an entry, and `.github/workflows/pr.yml`
+fails a pull request without one; `no-changelog` overrides that, for a change
+those labels fit but a reader of the release notes would not. Nothing stops any
+other pull request carrying an entry, and a `toolchain` change that someone
+upgrading would notice should have one. Every pull request needs at least one
+label, which is what keeps a change that wants an entry from arriving
+unlabelled and unasked.
+
+Releasing renames `## [Unreleased]` to the version and the date, opens an empty
+`## [Unreleased]` above it, and updates the link definitions at the foot of the
+file. The release workflow extracts the section for the tag with awk and hands
+it to GoReleaser as `--release-header`, which puts it above the commit list on
+the release page. That step fails the run when the section is missing or empty,
+because GoReleaser does not: an empty header is a warning it publishes through,
+and the release page would tell everyone upgrading nothing at all.
 
 Apple's notary service is the one part of a release that is neither ours nor
 reliable, and a release that trips over it publishes nothing: notarising

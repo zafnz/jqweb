@@ -1,0 +1,74 @@
+name: pr
+
+# Labels live on the pull request, not on a commit, so these run when a label
+# changes as well as when one is pushed: a check that only ran on a push would
+# go on showing the answer it gave before the label arrived.
+#
+# They are their own workflow rather than jobs in ci.yml because "labeled" in
+# that file would rebuild and retest on every label click. The label job reads
+# the event payload and nothing else; the changelog job checks the repository
+# out, and only runs when a label asks for an entry.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # Without this, a change that wants an entry can arrive carrying no label at
+  # all, and the changelog job below would skip rather than ask for one.
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: The pull request carries a label
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ' ') }}
+        run: |
+          if [ -z "$LABELS" ]; then
+            echo "::error::This pull request has no labels. Add the one that describes it: accessibility, bug, documentation, functionality, optimisation or toolchain."
+            exit 1
+          fi
+          echo "labels: $LABELS"
+
+  # Skipped, rather than passed, when no label calls for an entry. A green tick
+  # would be claiming a check that never ran. GitHub reports a job skipped by
+  # its own condition as a success, so this can be required without ever
+  # leaving a pull request waiting on a result that is not coming.
+  changelog:
+    if: >-
+      !contains(github.event.pull_request.labels.*.name, 'no-changelog') &&
+      (contains(github.event.pull_request.labels.*.name, 'accessibility') ||
+      contains(github.event.pull_request.labels.*.name, 'bug') ||
+      contains(github.event.pull_request.labels.*.name, 'functionality') ||
+      contains(github.event.pull_request.labels.*.name, 'optimisation'))
+    runs-on: ubuntu-latest
+    steps:
+      # The whole history, because the step below reads CHANGELOG.md at the
+      # base commit as well as at the merge this pull request would make.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Asking only whether CHANGELOG.md changed would take a typo fixed in an
+      # old version's section for an entry. This compares the [Unreleased]
+      # section itself, at the tip of the base branch against what merging this
+      # pull request would produce, so an entry written anywhere in that
+      # section counts and a change to any other section does not.
+      - name: The entry is under [Unreleased]
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          unreleased() {
+            git show "$1:CHANGELOG.md" 2>/dev/null |
+              awk '/^## \[Unreleased\]/{inside = 1; next} /^## /{inside = 0} inside'
+          }
+          if [ "$(unreleased "$BASE")" = "$(unreleased HEAD)" ]; then
+            echo "::error file=CHANGELOG.md::This pull request is labelled for a change someone using jqweb sees, and adds nothing under '## [Unreleased]' in CHANGELOG.md. Write the entry there, or apply the no-changelog label if the labels fit but the release notes would not want it."
+            exit 1
+          fi
+          echo "the [Unreleased] section differs from the base"

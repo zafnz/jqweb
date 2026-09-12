@@ -77,14 +77,17 @@ changelog:
   # alphabetical by whatever word a subject starts with. Spelled out rather
   # than left off, so that it reads as a choice.
   sort: ""
-  # A merge commit says only that a branch arrived.
+  # GoReleaser has no first-parent option. GitHub writes the mainline commit
+  # for a merged pull request as the pull request title with "(#123)" on the
+  # end, while the commits from the branch keep their original subjects. Keeping
+  # only those subjects gives the release page the same shape as:
+  #
+  #   git log --first-parent --pretty=format:%s <previous-tag>..HEAD
+  #
+  # If include is set, GoReleaser ignores exclude.
   filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
-      - "^chore:"
-      - "^Merge pull request"
-      - "^Merge branch"
+    include:
+      - "\\(#[0-9]+\\)$"
 
 homebrew_casks:
   - name: jqweb

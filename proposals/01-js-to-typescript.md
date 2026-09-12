@@ -129,6 +129,9 @@ framework, or runtime package loader. At the repository root the build rigging
 only needs the existing Go changes plus `.gitignore` and `.gitattributes`
 entries.
 
+Node 24.12 or later is the frontend development baseline. It is not an install
+or runtime requirement for jqweb users.
+
 ### Why keep `package.json` and the lockfile
 
 Running globally installed `tsc` and `esbuild`, or fetching floating versions
@@ -161,6 +164,9 @@ During migration:
 
 - `allowJs` remains enabled;
 - JavaScript and TypeScript may coexist;
+- `erasableSyntaxOnly` prevents source syntax that Node cannot execute by
+  stripping types;
+- `verbatimModuleSyntax` makes type-only imports explicit;
 - `strict` applies to converted TypeScript;
 - temporary boundary types are acceptable when they isolate unconverted code;
 - `any` should be a local escape hatch, not the representation of the value
@@ -198,17 +204,19 @@ modules without making the generated page load modules from separate files.
 There is no immediate reason to add Jest or Vitest. The existing DOM-free tests
 are fast and expressive enough.
 
-When unit tests need to import TypeScript directly, there are two reasonable
-options:
+Node 24.12 has stable native TypeScript stripping, and its test runner discovers
+`.test.ts` files directly. Unit tests will therefore continue to run with:
 
-1. Use the already-installed esbuild to compile test entry points into an
-   ignored temporary directory, then run them with `node --test`.
-2. Add a small TypeScript execution helper such as `tsx` and continue using
-   `node --test` semantics.
+```sh
+npm --prefix web test
+```
 
-The first option is preferred initially because it introduces no additional
-dependency. This decision should be tested on the first converted module rather
-than designed in the abstract.
+That command is `node --test`; there is no test compiler, `tsx`, Jest or Vitest.
+`tsc --noEmit` performs type checking separately. Because Node ignores
+`tsconfig.json` while executing TypeScript, source run by the test runner must
+use erasable syntax, explicit `.ts` import extensions and explicit `import type`
+where needed. PR 3 must prove this path with a small TypeScript test before PR 4
+starts converting application modules.
 
 ### Browser tests: Playwright Test
 
@@ -230,6 +238,14 @@ should:
 - keep retries disabled initially so a flaky test remains visible;
 - continue to load generated pages offline, preferably using the current
   `file://` model.
+
+The system Chrome version follows the `ubuntu-latest` runner image. A runner
+update can therefore make an unrelated PR red; that already happens with the
+current Chrome runner and is the accepted price of testing the current stable
+browser. The first such failure is investigated as a browser-version change,
+not evidence that the Playwright port failed, and retries are not enabled to
+hide it. If runner-driven failures become recurrent, the alternative is to pin
+Playwright's bundled Chromium and accept its download cost.
 
 Bundled Chromium, Firefox, and WebKit are later options. They should be added
 only when the additional download and CI cost buys coverage the project wants.
@@ -331,6 +347,7 @@ web/
   package.json
   package-lock.json
   tsconfig.json
+  page.html
 
   theme.js
   core.js
@@ -430,6 +447,7 @@ harder to navigate.
 
 | current file | likely destination |
 |---|---|
+| `page.html` | remains `web/page.html`; it is a Go-consumed template rather than a TypeScript build input |
 | `theme.js` | `entries/theme.ts` plus reusable preference/palette code in `page/theme.ts` |
 | `core.js` | the node types, parser, renderer, and path modules under `model/` |
 | `page.js` | bootstrap, tree DOM, filtering, folding, clipboard, and theme control under `page/` |
@@ -505,10 +523,17 @@ Status: open as PR #53.
 
 Scope:
 
-- add the package manifest, lockfile, TypeScript configuration, and esbuild;
+- add the package manifest, lockfile, Node 24.12 baseline, TypeScript
+  configuration, and esbuild;
 - generate committed `theme`, `simple`, and `full` bundles;
 - embed those bundles from Go;
-- remove the Go comment stripper;
+- remove the Go comment stripper, `TestStripComments`,
+  `TestStripCommentsIsIdempotent`, and `TestPageShipsWithoutComments`;
+- remove the obsolete source rule about comments on lines containing `/`, but
+  retain `TestPageCarriesNoComments` and the no-CSS-comments rule because CSS
+  remains inlined as written;
+- add `TestCompiledScriptsCannotCloseTheirElements` over all three generated
+  bundles;
 - verify generated bundles and the docs page in CI and release jobs;
 - mark generated files for review tooling;
 - leave all application JavaScript unchanged.
@@ -520,7 +545,9 @@ Acceptance:
 - the committed docs page matches a fresh render;
 - an archive containing no `node_modules` builds with Go alone;
 - `--simple` contains the simple bundle and not the full bundle;
-- no compiled script can close its containing `<script>` element.
+- no compiled script can close its containing `<script>` element;
+- output generated by esbuild on macOS ARM64 is reproduced byte for byte by
+  the pinned Linux x64 binary in CI.
 
 Issue wording: `Part of #34`, because this does not finish the migration.
 
@@ -531,6 +558,8 @@ Scope:
 - add Playwright Test as a pinned development dependency;
 - port browser setup, page generation, viewports, actions, and assertions;
 - retain the custom path and contrast helpers where they add domain value;
+- rewrite `web/browser-test/README.md` and the corresponding `CLAUDE.md`
+  guidance for the new runner;
 - capture useful traces and screenshots on failure;
 - run against system Chrome first;
 - delete the old process, profile, `--dump-dom`, polling, and report-extraction
@@ -555,6 +584,9 @@ Scope:
 
 - move application sources under `web/src`;
 - add `entries/theme.js`, `entries/simple.js`, and `entries/full.js`;
+- convert the current CommonJS unit tests to ESM and mark the package as a
+  module, so later `.test.ts` files and browser-source modules use the same
+  import rules;
 - replace concatenation and source ordering with imports and exports;
 - switch `build.mjs` from transform-on-concatenated-text to bundling entry
   points;
@@ -569,6 +601,9 @@ Acceptance:
 - all behavior and coverage remain unchanged;
 - simple has no query-engine module in its esbuild dependency graph;
 - all three outputs remain classic, self-contained scripts;
+- a small `.test.ts` imports TypeScript directly and passes under
+  `npm --prefix web test` on Node 24.12, with no test compiler or execution
+  helper;
 - output and rendered-page sizes are measured against PR #53;
 - rebuilding and docs verification remain deterministic.
 
@@ -631,7 +666,11 @@ Acceptance:
 - suggestion unit cases and all query-oriented browser cases pass;
 - auto, text, path, and jq modes retain their current selection rules;
 - the simple bundle remains unchanged except for shared code changes that are
-  explicitly explained.
+  explicitly explained;
+- before PR 7 begins, its description records whether the jq engine will be
+  converted before it is split or split before it is converted, with a small
+  spike and corpus, type-friction, reviewability, size, and performance evidence
+  supporting the choice.
 
 Issue wording: `Part of #34`.
 
@@ -650,7 +689,7 @@ forced now.
 
 Acceptance for every engine PR:
 
-- all 147 corpus queries agree with real jq;
+- every corpus case agrees with real jq;
 - the corpus still exercises every builtin;
 - stream order, errors, paths, limits, and exact-number behavior remain
   covered;
@@ -682,6 +721,37 @@ Acceptance:
 
 Issue wording: `Closes #34` only here, once no required conversion work remains.
 
+## Stop and rollback criteria
+
+Acceptance criteria say what a stage must prove before merging. The migration
+also needs an agreed answer when a stage cannot prove it. A stage stops and is
+reverted, split smaller, or redesigned rather than pushed through when any of
+the following remains unexplained:
+
+- the pinned esbuild version produces different committed bytes on supported
+  development and CI platforms;
+- the Playwright suite needs retries to stay green, loses a current assertion,
+  or produces less useful evidence than the runner it replaces;
+- the module graph pulls jq or query code into `simple`, or `simple` grows for
+  a reason the entry-point graph cannot account for;
+- a movement, module, or typing stage changes observable behavior despite
+  being scoped as mechanical;
+- a TypeScript boundary needs broad `any`, repeated assertions, or weakened
+  strictness merely to make the stage compile;
+- any jq corpus case disagrees with real jq and the difference cannot be shown
+  to be a defect in the existing fixture;
+- page size, startup, interaction time, or suite duration regresses materially
+  without a measured cause and an explicitly accepted tradeoff;
+- Go-only installation, offline pages, generated-file reproduction, or docs
+  reproduction stops working.
+
+Stopping a stage does not abandon #34. It means keeping the last green boundary
+and changing the next step. A failed Playwright port leaves the current runner
+in place; a failed module split returns to the previous entry graph; a jq
+disagreement returns to the last corpus-clean engine. Any intentional behavior
+change or accepted regression moves to its own issue and PR rather than being
+smuggled through as migration work.
+
 ## Review strategy
 
 For each PR:
@@ -712,14 +782,14 @@ output.
 | bundle | raw source | embedded on `main` | generated in PR #53 | change from `main` |
 |---|---:|---:|---:|---:|
 | theme | 1,871 B | 945 B | 610 B | -335 B (-35.4%) |
-| simple | 29,313 B | 14,968 B | 8,818 B | -6,150 B (-41.1%) |
-| full | 130,302 B | 86,638 B | 49,451 B | -37,187 B (-42.9%) |
+| simple | 30,156 B | 15,121 B | 8,916 B | -6,205 B (-41.0%) |
+| full | 131,479 B | 86,874 B | 49,600 B | -37,274 B (-42.9%) |
 
 | rendered page | `main` | PR #53 | change |
 |---|---:|---:|---:|
-| browser fixture, full | 98,116 B | 60,592 B | -37,524 B (-38.2%) |
-| browser fixture, simple | 24,478 B | 17,991 B | -6,487 B (-26.5%) |
-| committed `docs/index.html` | 345,999 B | 308,475 B | -37,524 B (-10.8%) |
+| browser fixture, full | 98,361 B | 60,750 B | -37,611 B (-38.2%) |
+| browser fixture, simple | 24,640 B | 18,098 B | -6,542 B (-26.6%) |
+| committed `docs/index.html` | 346,244 B | 308,633 B | -37,611 B (-10.9%) |
 
 These are baselines, not hard budgets. A later bundle may grow for a justified
 reason. The rule is to measure and explain rather than assume that a refactor is
@@ -745,6 +815,7 @@ Go job
   go build with no Node installation
 
 Frontend job
+  Node 24
   npm ci
   tsc --noEmit
   unit tests
@@ -752,6 +823,7 @@ Frontend job
   fail if web/dist changes
 
 Browser job
+  Node 24
   npm ci
   render page variants
   run Playwright against system Chrome
@@ -759,6 +831,7 @@ Browser job
   upload traces/screenshots on failure
 
 Release job
+  Node 24
   npm ci
   type-check and test
   rebuild and verify committed frontend output
@@ -776,8 +849,8 @@ During PR #53 the complete local workflow is:
 npm --prefix web ci
 npm --prefix web run check
 npm --prefix web run build
+npm --prefix web test
 go test ./...
-node --test
 node web/browser-test/run.js
 ```
 
@@ -804,13 +877,14 @@ The exact permanent commands belong in `CONTRIBUTING.md` as each stage lands.
 |---|---|
 | Bundling changes global initialization order | make imports explicit in one behavior-neutral PR; run every browser case |
 | `simple` accidentally imports jq | separate entry points, inspect the esbuild graph, and assert bundle selection/size |
-| Minified output contains `</script>` | retain the Go test over all compiled scripts |
+| Minified output contains `</script>` | PR #53 adds a direct Go test over `theme`, `simple`, and `full`; retain it with the exact-inlining tests |
 | Generated files drift from source | pinned lockfile plus a build-and-clean-diff CI check |
+| Platform-specific esbuild binaries disagree | PR #53 proves Darwin ARM64 output on Linux x64; retain that CI comparison and re-check it on every esbuild upgrade |
 | `docs/index.html` becomes stale | render independently in CI and compare bytes |
 | Type assertions hide real model mistakes | define discriminated domain types early and keep casts at boundaries |
 | Refactoring changes key order or number text | keep the parser/render unit cases and browser tree checks |
 | jq behavior changes during the engine split | require the real-jq corpus and builtin coverage on every engine PR |
-| Browser migration hides flakes with retries | begin with no retries and retain traces on failure |
+| Browser migration hides flakes with retries | keep retries off, retain traces, and investigate runner Chrome updates explicitly |
 | Playwright adds large browser downloads | use installed Chrome first; consider bundled/cross-browser projects separately |
 | Node leaks into installation | keep compiled output committed and retain a Go-only CI job |
 | Generated PRs become unreadable | mark outputs generated and put measurements/reasoning in PR descriptions |
@@ -823,7 +897,9 @@ The exact permanent commands belong in `CONTRIBUTING.md` as each stage lands.
 - Commit generated, minified JavaScript.
 - Keep all npm files under `web/`.
 - Use npm with a committed lockfile.
+- Require Node 24.12 or later for frontend development and CI.
 - Use TypeScript for checking and esbuild for production output.
+- Run erasable `.test.ts` files directly with Node's built-in test runner.
 - Produce separate `theme`, `simple`, and `full` scripts.
 - Call the complete bundle `full`, not `normal`.
 - Keep the page offline and self-contained.
@@ -835,11 +911,9 @@ The exact permanent commands belong in `CONTRIBUTING.md` as each stage lands.
 
 ## Decisions to confirm later
 
-- Whether TypeScript unit tests should be compiled to a temporary directory or
-  run through a small execution helper.
 - The exact module split inside `page.js` once its imports are explicit.
 - Whether `jq.js` is easier to convert before splitting or split before
-  converting.
+  converting; PR 6 must settle this before PR 7 starts.
 - Whether local-only source maps materially improve debugging.
 - Whether Playwright should eventually install bundled Chromium or add Firefox
   and WebKit projects.

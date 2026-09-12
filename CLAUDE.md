@@ -44,9 +44,15 @@ branch, ask whether it should go in a worktree before making any change. The
 usual answer is yes, so that is the one to offer first, but ask rather than
 assume: a one-line fix is sometimes wanted on `main` in the primary checkout.
 
+When creating a new branch on a worktree, base it on `origin/main` unless told
+otherwise.
+
 To move work already started on a branch in the primary checkout: commit it,
 switch that checkout back to `main`, `git worktree add .claude/worktrees/<branch>
 <branch>`, then work from that path.
+
+When opening a pull request, link any GitHub issues it fixes and put the closing
+keyword in the PR body too: `Closes #123`, `Fixes #223` or similar.
 
 ## What it is
 

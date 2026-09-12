@@ -22,6 +22,13 @@
   tree.innerHTML = renderTree(rootValue, typeof jqui !== 'undefined');
   var rootNode = tree.querySelector(':scope > .node');
 
+  /* A query given on the command line is in the page as the box's value. One
+     in a ?q= on the page's address takes its place, so a link to a served
+     page can carry a query of its own. Whichever it is runs at the end of
+     this file, once everything it needs is set up. */
+  var asked = new URLSearchParams(location.search).get('q');
+  if (asked !== null) input.value = asked;
+
   /* The query half, or null in a page built with --simple. It reads the search
      box, so it needs the document to run against and the two path helpers
      below, which walk the rendered tree rather than the value. */
@@ -183,13 +190,16 @@
   });
 
   /* Runs whatever is in the box. Without query.js that is text to find or a
-     path, as it has always been; with it, the mode decides. */
-  function run() {
+     path, as it has always been; with it, the mode decides. force runs a
+     half-typed name as written rather than completing it, which is what the
+     query the page opened with is given, since nobody is part way through
+     typing it. */
+  function run(force) {
     var raw = input.value.trim();
     if (query) query.clearFault();
     if (!raw) { reset(); return; }
     if (!query) { runPath(raw); return; }
-    if (query.wants(raw)) { query.run(raw); return; }
+    if (query.wants(raw)) { query.run(raw, force); return; }
     query.showDocument();
     textFilter(raw.toLowerCase());
   }
@@ -343,4 +353,9 @@
     walk(rootNode, false);
     stats.textContent = hits === 1 ? '1 match' : hits + ' matches';
   }
+
+  /* Whatever the box started with runs as though it had been typed, except
+     that it is run as written: it was given whole rather than a letter at a
+     time, so a name in it that no key finishes is still the query. */
+  if (input.value.trim()) run(true);
 })();

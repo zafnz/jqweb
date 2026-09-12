@@ -29,12 +29,18 @@ comment says which page it wants:
     });
 
 The pages are `default` (the fixture built the default way), `simple`
-(`--simple`), `light` (`--theme light`) and `docs` (`docs/index.html` as
-committed). A driver naming none of them gets `default`. Each page is rendered
-once and shared by every driver that asks for it.
+(`--simple`), `light` (`--theme light`), `query` (opening on the query
+`.items[] | .metadata.name`), `simplequery` (`--simple`, opening on
+`.items[3]`) and `docs` (`docs/index.html` as committed). A driver naming none
+of them gets `default`. Each page is rendered once and shared by every driver
+that asks for it.
 
 `window:` is optional and defaults to 1200x800. Only the toolbar drivers set
 it, because a toolbar with no room cannot be driven in a window that has room.
+
+`address:` is optional too. Whatever follows it is added after the page's file
+name in the address Chrome loads, so `address: ?q=keys` is how a driver checks
+what the page reads out of its own URL.
 
 The fixture is `testdata/doc.json`: ten records with repeated fields, so a
 suggestion has something to pivot on, and long enough that the page scrolls.

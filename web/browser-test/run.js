@@ -42,11 +42,14 @@ const VIRTUAL_TIME_MS = 60000;
 /* Each page is rendered once and shared by every driver naming it. "docs" is
    not rendered: it is the copy committed for GitHub Pages, and driving the
    committed bytes is the only way anything here says whether the page people
-   are pointed at works. */
+   are pointed at works. "query" and "simplequery" are built with a query on
+   the command line, for the drivers checking the query a page opens on. */
 const PAGES = {
   default: ['-o', '$out', '$doc'],
   simple: ['--simple', '-o', '$out', '$doc'],
   light: ['--theme', 'light', '-o', '$out', '$doc'],
+  query: ['-o', '$out', '.items[] | .metadata.name', '$doc'],
+  simplequery: ['--simple', '-o', '$out', '.items[3]', '$doc'],
   docs: null
 };
 
@@ -96,6 +99,14 @@ const WINDOW = '1200,800';
 function windowOf(src) {
   const m = src.match(/\bwindow:\s*(\d+)\s*x\s*(\d+)/);
   return m ? m[1] + ',' + m[2] : WINDOW;
+}
+
+/* What follows the file name in the address Chrome loads, from an
+   "address: ?q=keys" in the same header. It is how a driver checks what the
+   page reads out of its own URL. */
+function addressOf(src) {
+  const m = src.match(/\baddress:\s*([^\s,]+)/);
+  return m ? m[1] : '';
 }
 
 /* ---- running one ---- */
@@ -163,12 +174,12 @@ function dumped(fd) {
    not reliably exit by itself: a profile it has not seen before leaves it
    running afterwards, and on macOS it starts an updater that inherits the
    handles it was given. */
-function loadPage(chrome, profile, size, file, domFile) {
+function loadPage(chrome, profile, size, url, domFile) {
   return new Promise((resolve) => {
     const fd = fs.openSync(domFile, 'w+');
     let errOut = '', done = false;
 
-    const child = spawn(chrome, chromeArgs(profile, size, 'file://' + file),
+    const child = spawn(chrome, chromeArgs(profile, size, url),
       { stdio: ['ignore', fd, 'pipe'] });
     child.stderr.on('data', (b) => { errOut += b; });
 
@@ -344,9 +355,10 @@ async function runAll(chrome, work, harness, sources, pages) {
          rather than loading anything. */
       const profile = path.join(work, 'profile-' + job.name);
       const dom = path.join(work, job.name + '.dom.html');
-      const out = await loadPage(chrome, profile, windowOf(job.src), file, dom);
+      const address = addressOf(job.src);
+      const out = await loadPage(chrome, profile, windowOf(job.src), 'file://' + file + address, dom);
       runs.push({
-        name: job.name, file: file, err: out.err, stderr: out.stderr,
+        name: job.name, file: file + address, err: out.err, stderr: out.stderr,
         report: out.bytes ? readReport(fs.readFileSync(dom, 'utf8')) : null
       });
     }

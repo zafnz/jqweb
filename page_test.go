@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"html"
 	"reflect"
 	"strings"
 	"testing"
@@ -280,5 +281,56 @@ func TestInlineTrimsOnlyTheTrailingNewline(t *testing.T) {
 	}
 	if got, want := inline("web/page.css"), strings.TrimSuffix(css, "\n"); got != want {
 		t.Error("inline() did not trim exactly one trailing newline")
+	}
+}
+
+// boxValue returns the search box's value attribute, unescaped, which is where
+// renderPage puts the query.
+func boxValue(t *testing.T, page string) string {
+	t.Helper()
+	const open = `<input id="q" type="search" value="`
+	i := strings.Index(page, open)
+	if i < 0 {
+		t.Fatal("page has no search box with a value")
+	}
+	rest := page[i+len(open):]
+	j := strings.IndexByte(rest, '"')
+	if j < 0 {
+		t.Fatal("the search box value is not closed")
+	}
+	return html.UnescapeString(rest[:j])
+}
+
+// The query goes in the box's value attribute. A quote in it has to stay
+// inside the attribute, or the query could close the element and add markup
+// of its own.
+func TestRenderPageStartsWithTheQuery(t *testing.T) {
+	tests := []struct{ query, want string }{
+		{"", ""},
+		{".items[] | .metadata.name", ".items[] | .metadata.name"},
+		{`select(.kind == "Pod")`, `select(.kind == "Pod")`},
+		{`"><script>alert(1)</script>`, `"><script>alert(1)</script>`},
+		{"a & b", "a & b"},
+		// A text input drops line breaks from its value, so each is a space.
+		{".a\n| .b", ".a | .b"},
+		{".a\r\nand .b", ".a and .b"},
+	}
+	for _, jq := range []bool{true, false} {
+		for _, tt := range tests {
+			page := renderPage([]byte(`{}`), "t", options{jq: jq, query: tt.query})
+			if got := boxValue(t, page); got != tt.want {
+				t.Errorf("jq=%v: box value for %q = %q, want %q", jq, tt.query, got, tt.want)
+			}
+			if strings.Contains(page, "<script>alert(1)") {
+				t.Errorf("jq=%v: page carries the query's script element unescaped", jq)
+			}
+		}
+	}
+}
+
+func TestRenderPageDoesNotRescanTheQuery(t *testing.T) {
+	page := renderPage([]byte(`{"a":1}`), "t", options{query: "{{DATA}}"})
+	if got := boxValue(t, page); got != "{{DATA}}" {
+		t.Errorf("box value = %q, want {{DATA}} as written", got)
 	}
 }

@@ -14,12 +14,14 @@ import (
 type options struct {
 	jq    bool   // inline the query engine, which --simple turns off
 	theme string // auto, light or dark
+	query string // what the search box starts with, if anything
 }
 
 // renderPage embeds the document in the page as compact JSON; the script in
 // the template parses it and builds the tree in the browser. opt.jq selects
 // the template that carries the query engine, and opt.theme is the palette the
-// page starts in, which the reader can change afterwards.
+// page starts in, which the reader can change afterwards. opt.query goes in the
+// search box, which the page runs once it has built the tree.
 func renderPage(data []byte, title string, opt options) string {
 	var buf bytes.Buffer
 	if err := json.Compact(&buf, data); err != nil {
@@ -30,6 +32,7 @@ func renderPage(data []byte, title string, opt options) string {
 	return strings.NewReplacer(
 		"{{TITLE}}", html.EscapeString(title),
 		"{{PREF}}", opt.theme,
+		"{{QUERY}}", html.EscapeString(boxText(opt.query)),
 		"{{DATA}}", scriptSafe(buf.String()),
 	).Replace(pageTemplate(opt.jq))
 }
@@ -39,6 +42,14 @@ func renderPage(data []byte, title string, opt options) string {
 // only ever appears inside a string, where \u003c denotes the same character.
 func scriptSafe(s string) string {
 	return strings.ReplaceAll(s, "<", `\u003c`)
+}
+
+// boxText is the query as the search box can hold it. A text input drops every
+// line break from its value, which would join the words either side of one, so
+// each becomes a space instead. That keeps a query written over several lines
+// working unless it has a "#" comment in it, which then runs to the end.
+func boxText(q string) string {
+	return strings.NewReplacer("\r\n", " ", "\r", " ", "\n", " ").Replace(q)
 }
 
 //go:embed web/page.html web/page.css web/query.css web/theme.js web/core.js web/jq.js web/suggest.js web/query.js web/page.js

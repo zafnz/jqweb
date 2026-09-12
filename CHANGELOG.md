@@ -9,6 +9,12 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+### A query on the command line
+
+`jqweb '.items[] | .metadata.name' file.json` opens the page with that query
+already run. With only one argument supplied it auto-detects if its a file
+or query.
+
 ## [0.7.1] - 2026-09-12
 
 ### Update checker

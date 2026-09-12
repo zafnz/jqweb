@@ -225,7 +225,7 @@ has been wrong about operator stream order, `"ab" * 0`, `max_by` ties and
 `from_entries` key spellings.
 
 **The browser drivers are in `web/browser-test`, and CI runs them.** `node
-web/browser-test/run.js` is the whole suite, 441 checks in about 8 seconds.
+web/browser-test/run.js` is the whole suite, 522 checks in about 8 seconds.
 `web/browser-test/README.md` is how it works and how to write one; read it
 before adding a driver. `--screenshot=out.png` in place of `--dump-dom` is
 still the way to look at a page by hand.

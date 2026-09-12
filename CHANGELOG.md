@@ -9,11 +9,12 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-09-12
+
 ### Update checker
 
-Added update checker to notify user if they are running an old version. The
-notice appears at most once a day, and a release is not mentioned until a day
-after jqweb first sees it.
+jqweb now tells you when a newer release is available. It checks at most once a
+day, and does not mention a release until a day after first seeing it.
 
 ## [0.7.0] - 2026-09-12
 
@@ -197,7 +198,8 @@ The first release: a JSON document rendered as one self-contained HTML page,
 served or written to a file, with a flag to open a browser on it and a flag to
 report the version.
 
-[Unreleased]: https://github.com/zafnz/jqweb/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/zafnz/jqweb/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/zafnz/jqweb/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/zafnz/jqweb/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/zafnz/jqweb/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/zafnz/jqweb/compare/v0.4.1...v0.5.0

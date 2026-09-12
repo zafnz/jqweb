@@ -335,6 +335,7 @@ var jqui = function (page) {
   input.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !suggestions.hidden) {
       hide();
+      e.preventDefault();
       e.stopPropagation();
       return;
     }

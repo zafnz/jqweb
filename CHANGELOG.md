@@ -9,6 +9,9 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+**Fixed:** pressing Escape to dismiss query suggestions no longer clears the
+search box.
+
 ## [0.8.0] - 2026-09-12
 
 ### A query on the command line

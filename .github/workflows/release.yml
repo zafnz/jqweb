@@ -33,6 +33,18 @@ jobs:
             exit 1
           fi
 
+      # GoReleaser runs custom publishers after the GitHub release and the tap
+      # commit, so without the token the Gemfury push would fail a release that
+      # is already public.
+      - name: The Gemfury token is set
+        env:
+          FURY_TOKEN: ${{ secrets.FURY_TOKEN }}
+        run: |
+          if [ -z "$FURY_TOKEN" ]; then
+            echo "::error::The FURY_TOKEN secret is not set. The .deb and .rpm packages are pushed to Gemfury with it."
+            exit 1
+          fi
+
       # The release notes are the CHANGELOG.md section for this tag. Taking
       # them out here, rather than pointing GoReleaser at the file, is what
       # makes a missing section stop the release: GoReleaser treats an empty
@@ -107,6 +119,7 @@ jobs:
           NOTARY_RETRY_DELAYS: ${{ inputs.notary_retry_delays || '0 300 600 1200' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          FURY_TOKEN: ${{ secrets.FURY_TOKEN }}
           MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
           MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
           MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}

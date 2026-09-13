@@ -224,8 +224,10 @@ half an hour. Set the `NOTARY_RETRY_DELAYS` repository variable to change the
 waits, or to shorten them while testing the retrying itself.
 
 Tagging `v*` on a commit contained in `main` runs GoReleaser, which builds for
-macOS, Linux and Windows, signs and notarizes the macOS binaries, and updates
-the Homebrew tap. A release-looking tag on a branch may start the workflow, but
+macOS, Linux and Windows, signs and notarizes the macOS binaries, updates
+the Homebrew tap, and pushes the .deb and .rpm packages to the `zafnz` Gemfury
+account with the `FURY_TOKEN` repository secret, which a release fails without.
+A release-looking tag on a branch may start the workflow, but
 the first step fails before GoReleaser can publish anything.
 
 The repository's `release tags` ruleset covers `refs/tags/v*`, so those names

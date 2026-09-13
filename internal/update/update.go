@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -36,6 +37,10 @@ const (
 	ExitWait = time.Second
 
 	installCommand = "curl -fsSL https://raw.githubusercontent.com/zafnz/jqweb/main/install.sh | sh"
+
+	// Where the .deb and .rpm packages put the binary: bindir in the nfpms
+	// section of .goreleaser.yaml.
+	packagedPath = "/usr/bin/jqweb"
 )
 
 // updateState is what a check leaves behind for the runs that follow it: when
@@ -48,8 +53,9 @@ type updateState struct {
 }
 
 // updater is one update check. The fields are what the check reaches outside
-// the process for -- github.com, the state file, the clock, the environment
-// and the path of the running binary -- so that a test can supply all five.
+// the process for -- github.com, the state file, the clock, the environment,
+// the path of the running binary and the system package manager -- so that a
+// test can supply all six.
 type updater struct {
 	version   string
 	url       string
@@ -58,6 +64,7 @@ type updater struct {
 	now       func() time.Time
 	getenv    func(string) string
 	exe       func() (string, error)
+	packaged  func(exe string) string
 }
 
 // Check starts the check for a release newer than version, unless off is
@@ -79,6 +86,7 @@ func Check(version string, off bool) <-chan string {
 		now:       time.Now,
 		getenv:    os.Getenv,
 		exe:       executablePath,
+		packaged:  systemPackageUpgrade,
 	}
 	go func() {
 		defer close(ch)
@@ -243,10 +251,10 @@ func (u *updater) upgradeHint() string {
 	if err != nil {
 		exe = ""
 	}
-	return upgradeHint(exe, u.getenv)
+	return upgradeHint(exe, u.getenv, u.packaged)
 }
 
-func upgradeHint(exe string, getenv func(string) string) string {
+func upgradeHint(exe string, getenv, packaged func(string) string) string {
 	// A Homebrew cask keeps the binary in the Caskroom and links it onto the
 	// path; executablePath resolves the link, which is the only way the
 	// Caskroom shows up here. Homebrew runs on macOS and Linux, so the
@@ -257,7 +265,35 @@ func upgradeHint(exe string, getenv func(string) string) string {
 	if inGoBin(filepath.Dir(exe), getenv) {
 		return "go install github.com/zafnz/jqweb@latest"
 	}
+	if cmd := packaged(exe); cmd != "" {
+		return cmd
+	}
 	return installCommand
+}
+
+// systemPackageUpgrade is the command that upgrades jqweb through the package
+// manager that installed exe, or "" when no package did. dpkg keeps a list of
+// each installed package's files under /var/lib/dpkg/info. The rpm database is
+// in a format only rpm reads, so rpm is asked; that runs only for a binary at
+// packagedPath, and only when there is a newer release to name.
+func systemPackageUpgrade(exe string) string {
+	if exe != packagedPath {
+		return ""
+	}
+	if _, err := os.Stat("/var/lib/dpkg/info/jqweb.list"); err == nil {
+		// apt sees the new release only once its package lists are refreshed.
+		return "sudo apt update && sudo apt install --only-upgrade jqweb"
+	}
+	if exec.Command("rpm", "-q", "--quiet", "-f", exe).Run() != nil {
+		return ""
+	}
+	if _, err := exec.LookPath("dnf"); err == nil {
+		return "sudo dnf upgrade --refresh jqweb"
+	}
+	if _, err := exec.LookPath("yum"); err == nil {
+		return "sudo yum upgrade jqweb"
+	}
+	return ""
 }
 
 // inGoBin reports whether dir is where "go install" puts a binary: $GOBIN, or

@@ -1,18 +1,18 @@
-/* Tests for the jq subset. Run with:  node --test web/
+/* Tests for the jq subset. Run with:  npm --prefix web test
 
    The bulk of the coverage is a corpus of queries whose expected output came
-   from jq itself (see testdata/regenerate.js); the tests written out here
+   from jq itself (see ../testdata/regenerate.js); the tests written out here
    cover what a corpus cannot -- the queries that must fail, and the stream
    behaviour that is easy to get subtly wrong. */
 
 import test from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
-import { stringify } from './src/model/node.ts';
-import { parseJSON } from './src/model/parse.ts';
-import { parsePath } from './src/model/path.ts';
-import { builtins } from './src/query/engine/builtins.ts';
-import { compile, isJqError } from './src/query/engine/index.ts';
+import { stringify } from '../../src/model/node.ts';
+import { parseJSON } from '../../src/model/parse.ts';
+import { parsePath } from '../../src/model/path.ts';
+import { builtins } from '../../src/query/engine/builtins.ts';
+import { compile, isJqError } from '../../src/query/engine/index.ts';
 
 /* The corpus file: a fixture document, and each query with the output jq gave
    for it, one JSON text per output. */
@@ -21,7 +21,7 @@ interface Corpus {
   cases: { q: string; out: string[] }[];
 }
 
-const corpus: Corpus = JSON.parse(fs.readFileSync(new URL('./testdata/jq-corpus.json', import.meta.url), 'utf8'));
+const corpus: Corpus = JSON.parse(fs.readFileSync(new URL('../testdata/jq-corpus.json', import.meta.url), 'utf8'));
 
 /* Runs a query over a JSON document and returns its outputs as JSON text, so
    that a test can talk about values rather than nodes. */

@@ -13,7 +13,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const here = import.meta.dirname;
-const repo = path.resolve(here, '..', '..');
+const repo = path.resolve(here, '..', '..', '..');
 
 /* Rendered pages and the binary that made them. Kept at a stable path rather
    than in a temporary directory, so a page named in a trace can be opened in a

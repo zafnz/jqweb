@@ -40,9 +40,10 @@ until the label comes off.
 
 ## Colours
 
-Every colour is a custom property on `:root` in `web/page.css`, defined twice:
-once for dark and once under `:root[data-theme="light"]`. Adding a colour means
-adding it to both, and using a literal anywhere means one theme gets it wrong.
+Every colour is a custom property on `:root` in `web/styles/page.css`, defined
+twice: once for dark and once under `:root[data-theme="light"]`. Adding a
+colour means adding it to both, and using a literal anywhere means one theme
+gets it wrong.
 
 `web/src/page/theme.ts` runs in the head, before the body is parsed, so a page
 never paints in one theme and swaps to the other. It reads `data-pref` -- which
@@ -59,7 +60,7 @@ comparing against a stored copy of a rendered page, which would need
 regenerating for every change to the styling.
 
 The Go and Node tests do not run the page in a browser. The specs that do are
-in `web/browser-test` and are documented there. CI runs them on every push.
+in `web/test/browser` and are documented there. CI runs them on every push.
 
 A spec only checks what it was written to check. For a change to the scripts
 that should not have altered the rendering at all, diffing the whole tree
@@ -81,7 +82,7 @@ as written, so a comment in `page.css` or `query.css` ships in every page.
 ## Phone width
 
 At 600px and below the page shows the tree, the fold button and the theme
-button. The rule is `@media (max-width: 600px)` in `web/page.css`, and
+button. The rule is `@media (max-width: 600px)` in `web/styles/page.css`, and
 `web/src/page/search.ts` runs `matchMedia` on the same query, so the two
 have to agree.
 
@@ -103,9 +104,9 @@ now if the breakpoint ever moves.
 
 `web/src/query/engine` is the query engine, `web/src/query/suggest.ts` builds
 the queries a line of the document could have meant, `web/src/query/ui.ts` is
-the search box wiring that drives both, and `web/query.css` styles what only
-they put on the page. Those four are what `--simple` leaves out, so none of them
-costs anything in a page built with it; the modules in `web/src/page` ship
+the search box wiring that drives both, and `web/styles/query.css` styles what
+only they put on the page. Those four are what `--simple` leaves out, so none of
+them costs anything in a page built with it; the modules in `web/src/page` ship
 either way and work without them, calling the `jqui` that
 `web/src/entries/full.ts` passes it, and falling back to the path lookup when
 `web/src/entries/simple.ts` passes null. Anything that reads the box as a
@@ -113,11 +114,11 @@ query, or renders what one produced, belongs in `query/ui.ts` rather than
 `web/src/page`.
 
 `query/suggest.ts` is text in, text out -- segments and a parsed document give
-back query strings -- so `web/suggest.test.ts` can check it without a browser.
-The test that matters most runs every query it offers for every line of a
-fixture and fails if any of them will not compile or will not run: a suggestion
-that errors is worse than no suggestion, and the shapes that cause one are easy
-to miss by hand.
+back query strings -- so `web/test/unit/suggest.test.ts` can check it without a
+browser. The test that matters most runs every query it offers for every line
+of a fixture and fails if any of them will not compile or will not run: a
+suggestion that errors is worse than no suggestion, and the shapes that cause
+one are easy to miss by hand.
 
 The engine works on the nodes `web/src/model/parse.ts` builds for rendering, so
 a result goes straight back to `renderTree` with key order and number text
@@ -125,12 +126,12 @@ intact and the document is parsed once; scalars come from the `r` field on a
 leaf.
 
 Its answers are checked against jq itself rather than against what anyone
-believed jq does. `web/testdata/jq-corpus.json` holds a fixture document, a
-list of queries and the output jq gave for each, and `web/jq.test.ts` runs
-every one through the engine. After adding a query, or after a jq upgrade whose
-behaviour the tests should follow:
+believed jq does. `web/test/testdata/jq-corpus.json` holds a fixture document,
+a list of queries and the output jq gave for each, and
+`web/test/unit/jq.test.ts` runs every one through the engine. After adding a
+query, or after a jq upgrade whose behaviour the tests should follow:
 
-    node web/testdata/regenerate.js
+    node web/test/testdata/regenerate.js
 
 That needs `jq` on the path. CI has none, which is why the answers are
 committed rather than worked out while the tests run. A builtin with no case in
@@ -168,7 +169,7 @@ browser frame around the page, and writes `demo.png`. It drives the page with
 Playwright, so it needs `npm --prefix web ci` first; two runs of it produce the
 same bytes.
 
-    node web/browser-test/capture-demo.js
+    node web/test/browser/capture-demo.js
 
 ## Bugs and wanted features
 

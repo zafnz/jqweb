@@ -122,7 +122,7 @@ head before the body is parsed.
 | `src/page/theme.ts` | theme | runs in `<head>`, picks the palette before the body parses |
 | `src/page/alive.ts` | theme | runs in `<head>`, holds `/alive` open on a served page |
 | `page.css` | both | the palette, both themes |
-| `src/jq.js` | full only | the jq engine |
+| `src/query/engine/*.js` | full only | the jq engine: lexer, parser, evaluator, builtins. No DOM. |
 | `src/query/suggest.ts` | full only | builds the queries a clicked line could mean, and the key completions of a half-typed one. No DOM. |
 | `src/query/ui.ts` | full only | search box as a query, results view, suggestion list |
 | `query.css` | default only | mode select, suggestion list, error box, results |
@@ -139,9 +139,9 @@ that renders one. No rendered page has ever seen any of it.
 `src/page` must work with the query modules absent. `entries/full.ts` passes
 `startPage` the `jqui` from `query/ui.ts` and `entries/simple.ts` passes null,
 which falls back to path lookup. Nothing reachable from `entries/simple.ts` may
-import `jq.js` or a module under `src/query`; `web/bundles.test.ts` reads
-esbuild's module graph and fails when one does. Anything that reads the box as
-a query, or renders what a query produced, belongs in `query/ui.ts`.
+import a module under `src/query`; `web/bundles.test.ts` reads esbuild's module
+graph and fails when one does. Anything that reads the box as a query, or
+renders what a query produced, belongs in `query/ui.ts`.
 
 ## The value model
 
@@ -162,7 +162,7 @@ number text intact, and the document is parsed once rather than twice. `r` is
 what comparisons and arithmetic read; `leafOf` builds a node from a computed
 scalar.
 
-In `jq.js`, a stream is an array. Every jq expression maps one input to many
+In the engine, a stream is an array. Every jq expression maps one input to many
 outputs, and an array makes `,`, `[]` and `select` fall out for free. Nothing
 short-circuits as a result, so no builtin may produce an endless stream.
 
@@ -251,8 +251,8 @@ success for a run that failed and the output is lost.
 **The jq engine is checked against real jq.** `web/testdata/jq-corpus.json` holds
 queries with the output jq itself gave for each; `node
 web/testdata/regenerate.js` rewrites the answers and needs `jq` on the path. A
-builtin with no case in the corpus fails the test that reads the table back out
-of `jq.js`. When jq's behaviour is in question, run `jq` and find out — guessing
+builtin with no case in the corpus fails the test that reads the builtin table's
+names. When jq's behaviour is in question, run `jq` and find out — guessing
 has been wrong about operator stream order, `"ab" * 0`, `max_by` ties and
 `from_entries` key spellings.
 

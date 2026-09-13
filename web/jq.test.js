@@ -11,7 +11,8 @@ import fs from 'node:fs';
 import { stringify } from './src/model/node.ts';
 import { parseJSON } from './src/model/parse.ts';
 import { parsePath } from './src/model/path.ts';
-import { compile } from './src/jq.js';
+import { builtins } from './src/query/engine/builtins.js';
+import { compile } from './src/query/engine/index.js';
 
 const corpus = JSON.parse(fs.readFileSync(new URL('./testdata/jq-corpus.json', import.meta.url), 'utf8'));
 
@@ -41,16 +42,9 @@ test('every corpus query agrees with jq', () => {
 
 test('the corpus exercises every builtin', () => {
   /* A builtin no corpus case runs is one whose answer has never been compared
-     with jq's. The names are read back out of the table in jq.js, so adding a
-     builtin without a case for it fails here. */
-  const table = fs.readFileSync(new URL('./src/jq.js', import.meta.url), 'utf8');
-  const names = new Set();
-  for (const m of table.slice(table.indexOf('var builtins = {'))
-    .matchAll(/^ {4}'([a-z_0-9]+)\/\d+':/gm)) names.add(m[1]);
-  /* The format strings are put into the table by name, so they are read out
-     of the object that declares them instead. */
-  for (const m of table.slice(table.indexOf('var FORMATS = {'), table.indexOf('function asText'))
-    .matchAll(/^ {4}'(@[a-z0-9]+)':/gm)) names.add(m[1]);
+     with jq's. The names are read out of the builtin table, format strings
+     included, so adding a builtin without a case for it fails here. */
+  const names = new Set(Object.keys(builtins).map((key) => key.slice(0, key.lastIndexOf('/'))));
   assert.ok(names.size > 80, `only found ${names.size} builtins to check`);
 
   const queries = corpus.cases.map((c) => c.q).join('\n');

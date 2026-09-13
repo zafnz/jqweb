@@ -101,10 +101,10 @@ now if the breakpoint ever moves.
 
 ## The jq subset
 
-`web/src/jq.js` is the query engine, `web/src/query/suggest.ts` builds the
-queries a line of the document could have meant, `web/src/query/ui.ts` is the
-search box wiring that drives both, and `web/query.css` styles what only they
-put on the page. Those four are what `--simple` leaves out, so none of them
+`web/src/query/engine` is the query engine, `web/src/query/suggest.ts` builds
+the queries a line of the document could have meant, `web/src/query/ui.ts` is
+the search box wiring that drives both, and `web/query.css` styles what only
+they put on the page. Those four are what `--simple` leaves out, so none of them
 costs anything in a page built with it; the modules in `web/src/page` ship
 either way and work without them, calling the `jqui` that
 `web/src/entries/full.ts` passes it, and falling back to the path lookup when
@@ -134,7 +134,7 @@ behaviour the tests should follow:
 
 That needs `jq` on the path. CI has none, which is why the answers are
 committed rather than worked out while the tests run. A builtin with no case in
-the corpus fails the test that reads the table back out of `jq.js`, so adding
+the corpus fails the test that reads the names in the builtin table, so adding
 one means adding a query for it.
 
 ## The update check

@@ -1,6 +1,6 @@
 /* The page --simple builds: the tree, text search and path lookup, without the
-   jq engine. Nothing reachable from here may import jq.js or a module under
-   query/, and bundles.test.ts fails when something does. */
+   jq engine. Nothing reachable from here may import a module under query/, and
+   bundles.test.ts fails when something does. */
 
 import { esc, quote } from '../model/escape.ts';
 import { leafOf, stringify } from '../model/node.ts';

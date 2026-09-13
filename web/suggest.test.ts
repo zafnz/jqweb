@@ -10,10 +10,10 @@
 
 import test from 'node:test';
 import assert from 'node:assert';
-import { compile, isJqError } from './src/jq.js';
 import type { Node } from './src/model/node.ts';
 import { parseJSON } from './src/model/parse.ts';
 import type { Segment } from './src/model/path.ts';
+import { compile, isJqError } from './src/query/engine/index.js';
 import { suggest, splitPartial, completions } from './src/query/suggest.ts';
 import type { Candidate } from './src/query/suggest.ts';
 

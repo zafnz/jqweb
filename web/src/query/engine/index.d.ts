@@ -1,8 +1,8 @@
-/* The types jq.js is called through by query/ui.ts, the full entry and the
-   unit tests. The engine itself is still JavaScript. */
+/* The types the engine is called through by query/ui.ts, the full entry and
+   the unit tests. The engine itself is still JavaScript. */
 
-import type { Node } from './model/node.ts';
-import type { Segment } from './model/path.ts';
+import type { Node } from '../../model/node.ts';
+import type { Segment } from '../../model/path.ts';
 
 /* A compiled query. path is the segments of a query that only walks down the
    document, in the form parsePath produces, and null for anything else. run

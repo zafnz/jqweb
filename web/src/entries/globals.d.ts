@@ -2,12 +2,12 @@
    jqjs and jqsuggest in the full page only. jqtheme, which the head script
    sets, is declared in page/theme.ts. */
 
-import type { compile } from '../jq.js';
 import type { esc, quote } from '../model/escape.ts';
 import type { leafOf, stringify } from '../model/node.ts';
 import type { parseJSON } from '../model/parse.ts';
 import type { parsePath, pathText } from '../model/path.ts';
 import type { renderTree } from '../model/render.ts';
+import type { compile } from '../query/engine/index.js';
 import type { completions, splitPartial, suggest } from '../query/suggest.ts';
 
 declare global {

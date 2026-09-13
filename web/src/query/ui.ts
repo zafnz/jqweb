@@ -6,14 +6,14 @@
    without it. page/search.ts calls jqui() once, with the few things it
    cannot look up for itself, and gets back the entry points it needs. */
 
-import { compile, isJqError } from '../jq.js';
-import type { Query } from '../jq.js';
 import { esc } from '../model/escape.ts';
 import type { Node as ValueNode } from '../model/node.ts';
 import { pathText } from '../model/path.ts';
 import { renderTree } from '../model/render.ts';
 import { find } from '../page/dom.ts';
 import type { QueryHost, QueryUI } from '../page/search.ts';
+import { compile, isJqError } from './engine/index.js';
+import type { Query } from './engine/index.js';
 import { completions, splitPartial, suggest } from './suggest.ts';
 import type { Candidate, Shape } from './suggest.ts';
 

@@ -120,8 +120,11 @@ func TestParseFlagsDefaults(t *testing.T) {
 	if opt.closeOnGet {
 		t.Error("closeOnGet is on by default; -C has to be asked for")
 	}
-	if opt.closeDelay != time.Second {
-		t.Errorf("closeDelay = %s, want 1s", opt.closeDelay)
+	if opt.closeDelay != 10*time.Second {
+		t.Errorf("closeDelay = %s, want 10s", opt.closeDelay)
+	}
+	if opt.child {
+		t.Error("child is on by default; only the -C parent passes --child")
 	}
 	if opt.portSet || opt.outSet || len(opt.args) != 0 {
 		t.Errorf("portSet = %v, outSet = %v, args = %q; want false, false, none",
@@ -130,6 +133,7 @@ func TestParseFlagsDefaults(t *testing.T) {
 }
 
 func TestParseFlagsClose(t *testing.T) {
+	const def = 10 * time.Second
 	tests := []struct {
 		name      string
 		args      []string
@@ -138,15 +142,15 @@ func TestParseFlagsClose(t *testing.T) {
 		open      bool
 		leftovers []string
 	}{
-		{"absent", []string{"f.json"}, false, time.Second, false, []string{"f.json"}},
-		{"short", []string{"-C", "f.json"}, true, time.Second, false, []string{"f.json"}},
-		{"long", []string{"--close", "f.json"}, true, time.Second, false, []string{"f.json"}},
-		{"-OC", []string{"-OC", "f.json"}, true, time.Second, true, []string{"f.json"}},
-		{"-CO", []string{"-CO", "f.json"}, true, time.Second, true, []string{"f.json"}},
-		{"-OC after the file", []string{"f.json", "-OC"}, true, time.Second, true, []string{"f.json"}},
+		{"absent", []string{"f.json"}, false, def, false, []string{"f.json"}},
+		{"short", []string{"-C", "f.json"}, true, def, false, []string{"f.json"}},
+		{"long", []string{"--close", "f.json"}, true, def, false, []string{"f.json"}},
+		{"-OC", []string{"-OC", "f.json"}, true, def, true, []string{"f.json"}},
+		{"-CO", []string{"-CO", "f.json"}, true, def, true, []string{"f.json"}},
+		{"-OC after the file", []string{"f.json", "-OC"}, true, def, true, []string{"f.json"}},
 		{"-OC with a delay", []string{"-OC", "--close-delay", "3s"}, true, 3 * time.Second, true, nil},
-		{"-O without -C", []string{"-O", "f.json"}, false, time.Second, true, []string{"f.json"}},
-		{"one-dash close", []string{"-close", "f.json"}, true, time.Second, false, []string{"f.json"}},
+		{"-O without -C", []string{"-O", "f.json"}, false, def, true, []string{"f.json"}},
+		{"one-dash close", []string{"-close", "f.json"}, true, def, false, []string{"f.json"}},
 		{"one-dash delay after the file", []string{"f.json", "-close-delay", "2s"}, true, 2 * time.Second, false, []string{"f.json"}},
 		{"delay implies close", []string{"--close-delay", "5s"}, true, 5 * time.Second, false, nil},
 		{"delay with an equals sign", []string{"--close-delay=250ms"}, true, 250 * time.Millisecond, false, nil},

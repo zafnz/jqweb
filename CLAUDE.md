@@ -85,17 +85,20 @@ keyword in the PR body too: `Closes #123`, `Fixes #223` or similar.
 A Go binary that turns a JSON document into one self-contained HTML page, and
 either serves it or writes it to a file. Everything interesting is in the page.
 
-The Go side is five files, all `package main`:
+The Go side is these files, all `package main`:
 
 | file | what it holds |
 |---|---|
 | `main.go` | the flag definitions, `reorderArgs`, and the flow of `main` |
 | `check.go` | `check` and the error messages it builds for input that is not one well-formed JSON document |
-| `serve.go` | the HTTP server, the `-C` close timer, and `openBrowser` |
+| `serve.go` | the HTTP server, the `/alive` count behind `-C`, and `openBrowser` |
+| `background.go` | the `-C` parent: starts itself again with `--child` and relays its output until it is ready |
+| `detach_*.go`, `dup2_*.go` | per-platform: how the child is started detached and how it lets go of its outputs |
 | `page.go` | the embedded `web/*` assets, compiled-script selection, and template assembly |
 | `update.go` | the once-a-day release check, its state file, and the upgrade command it names |
 
-Each has a `_test.go` of its own along the same lines.
+Each apart from the per-platform files has a `_test.go` of its own along the
+same lines.
 
 `web/build.mjs` bundles the entry points in `web/src/entries` into the
 committed files under `web/dist`, and `page.go` assembles those with the HTML
@@ -115,8 +118,9 @@ head before the body is parsed.
 |---|---|---|
 | `src/entries/*.js` | one each | what each bundle imports, whether `startPage` gets `jqui`, and the page globals |
 | `src/model/*.ts` | simple and full | the node types, parse, render, escaping, path text. No DOM, no jq. |
-| `src/page/*.ts` except `theme.ts` | simple and full | the tree, search box, text filter, path lookup, copy, folding, theme button |
+| `src/page/*.ts` except `theme.ts` and `alive.ts` | simple and full | the tree, search box, text filter, path lookup, copy, folding, theme button |
 | `src/page/theme.ts` | theme | runs in `<head>`, picks the palette before the body parses |
+| `src/page/alive.ts` | theme | runs in `<head>`, holds `/alive` open on a served page |
 | `page.css` | both | the palette, both themes |
 | `src/jq.js` | full only | the jq engine |
 | `src/suggest.js` | full only | builds the queries a clicked line could mean, and the key completions of a half-typed one. No DOM. |
@@ -229,8 +233,16 @@ works: `-vO` is rejected as an unknown flag.
 
 **The update check never delays anything.** `checkForUpdate` hands back a
 channel; `serve` prints from a goroutine of its own after the "serving on"
-line, and only the exit in `-o` mode waits, for `updateWait`. A check that has
-not answered by then is dropped. `wantUpdateCheck` is where the skips live.
+line, and only an exit waits, for `updateWait`: in `-o` mode, and in the `-C`
+parent once the child is ready. A check that has not answered by then is
+dropped. `wantUpdateCheck` is where the skips live. The `-C` child never
+checks.
+
+**The `-C` child writes nothing after its ready line.** The parent exits on
+reading `jqweb: running in the background`, and the child's stdout and stderr
+point at the null device from then on. Anything the child has to say, an error
+opening the browser included, comes before that line, or the parent reports
+success for a run that failed and the output is lost.
 
 ## Testing
 

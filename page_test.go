@@ -271,3 +271,23 @@ func TestRenderPageDoesNotRescanTheQuery(t *testing.T) {
 		t.Errorf("box value = %q, want {{DATA}} as written", got)
 	}
 }
+
+// Only a served page opens /alive, and the page script reads data-served off
+// the root element to decide.
+func TestRenderPageMarksOnlyAServedPage(t *testing.T) {
+	root := func(page string) string {
+		i := strings.Index(page, "<html")
+		j := strings.Index(page[i:], ">")
+		return page[i : i+j+1]
+	}
+	for _, jq := range []bool{true, false} {
+		written := root(renderPage([]byte(`{}`), "t", options{jq: jq}))
+		served := root(renderPage([]byte(`{}`), "t", options{jq: jq, served: true}))
+		if strings.Contains(written, "data-served") {
+			t.Errorf("jq=%v: written page's root %q is marked as served", jq, written)
+		}
+		if !strings.Contains(served, " data-served") {
+			t.Errorf("jq=%v: served page's root %q is not marked as served", jq, served)
+		}
+	}
+}

@@ -32,6 +32,7 @@ test('the full script reaches the simple modules and the query modules', async (
   assert.deepStrictEqual(QUERY.filter((m) => !full.includes(m)), []);
 });
 
-test('the head script reaches only the theme', async () => {
-  assert.deepStrictEqual(await modules('theme'), ['src/entries/theme.js', 'src/page/theme.ts']);
+test('the head script reaches only the theme and the /alive request', async () => {
+  assert.deepStrictEqual(await modules('theme'),
+    ['src/entries/theme.js', 'src/page/alive.ts', 'src/page/theme.ts']);
 });

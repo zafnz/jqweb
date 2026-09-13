@@ -15,9 +15,11 @@ func detachedProcess() *syscall.SysProcAttr {
 
 // detachOutputs puts null in place of the -C child's stdout and stderr. Once
 // the parent exits they are pipes with no reader, and the Go runtime exits a
-// process on its first write to a broken pipe on fd 1 or 2.
+// process on its first write to a broken pipe on fd 1 or 2. It closes null,
+// whose descriptor fds 1 and 2 are copies of.
 func detachOutputs(null *os.File) {
 	fd := int(null.Fd())
 	dup2(fd, 1)
 	dup2(fd, 2)
+	null.Close()
 }

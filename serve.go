@@ -22,7 +22,7 @@ type serveOptions struct {
 	open       bool          // open the page in the browser once listening
 	closeOnGet bool          // stop serving once the last tab has closed
 	closeDelay time.Duration // how long after the last tab closes closeOnGet waits
-	firstLoad  time.Duration // how long closeOnGet waits for the first load; 0 waits forever
+	firstLoad  time.Duration // how long closeOnGet waits for a page to open, from startup or a GET of "/"
 	notice     <-chan string // an update notice, printed whenever it arrives
 	background bool          // the -C child: detach from the parent once ready
 }
@@ -65,24 +65,24 @@ func serve(host string, port int, page []byte, opt serveOptions) error {
 		}
 		fmt.Fprintf(os.Stderr, "%s, pid %d\n", readyLine, os.Getpid())
 		// The parent exits once it reads that line, and nothing may be
-		// written to its pipes after it. See detachOutputs.
+		// written to its pipes after it. detachOutputs owns null from here.
 		detachOutputs(null)
-		null.Close()
 	}
 	return serveOn(ln, page, opt)
 }
 
 // serveOn serves the page on ln until the process is interrupted, or, with
-// opt.closeOnGet, until opt.closeDelay has passed with no tab showing it.
+// opt.closeOnGet, until the timer runs out with no tab showing it.
 //
 // A served page holds a request to /alive open for as long as it exists, and
-// the browser drops that connection when the tab unloads. The close timer runs
-// while none are open. Until the page is first loaded it is opt.firstLoad, or
-// opt.closeDelay if that is longer. After that it starts when the last /alive
-// closes, or on a GET of "/" when none are open, which covers a client that
-// fetches the page and runs no script; a new /alive stops it. A reload fetches "/" before the old page
-// unloads, and the new page's /alive has to arrive within opt.closeDelay of
-// the old one closing.
+// the browser drops that connection when the tab unloads; a new /alive stops
+// the timer. While no tab has the page open, the timer waits for one to open
+// it, for opt.firstLoad or opt.closeDelay if that is longer. That wait starts
+// when jqweb starts, which leaves time to click the link, and again on a GET
+// of "/", which covers the page arriving and its script running however short
+// the close delay is. The last tab closing starts opt.closeDelay instead. A
+// reload fetches "/" while the old page still holds its connection, so the
+// new page's /alive has to arrive within opt.closeDelay of the old one closing.
 func serveOn(ln net.Listener, page []byte, opt serveOptions) error {
 	srv := &http.Server{}
 	if opt.background {
@@ -111,22 +111,21 @@ func serveOn(ln net.Listener, page []byte, opt serveOptions) error {
 		mu.Unlock()
 		srv.Shutdown(context.Background())
 	}
-	// startTimer is called with mu held.
-	startTimer := func() {
+	// startTimer starts the timer, or restarts it, for d. It is called with mu
+	// held.
+	startTimer := func(d time.Duration) {
 		if timer == nil {
-			timer = time.AfterFunc(opt.closeDelay, expire)
+			timer = time.AfterFunc(d, expire)
 			return
 		}
-		timer.Reset(opt.closeDelay)
+		timer.Reset(d)
 	}
-	if opt.closeOnGet && opt.firstLoad > 0 {
-		wait := opt.firstLoad
-		if opt.closeDelay > wait {
-			wait = opt.closeDelay
-		}
-		// The first GET of "/" or /alive resets or stops this, and the close
-		// delay applies from then on.
-		timer = time.AfterFunc(wait, expire)
+	opening := opt.firstLoad
+	if opt.closeDelay > opening {
+		opening = opt.closeDelay
+	}
+	if opt.closeOnGet {
+		timer = time.AfterFunc(opening, expire)
 	}
 
 	mux := http.NewServeMux()
@@ -142,7 +141,7 @@ func serveOn(ln net.Listener, page []byte, opt serveOptions) error {
 		if opt.closeOnGet && r.Method == http.MethodGet {
 			mu.Lock()
 			if alive == 0 {
-				startTimer()
+				startTimer(opening)
 			}
 			mu.Unlock()
 		}
@@ -163,7 +162,7 @@ func serveOn(ln net.Listener, page []byte, opt serveOptions) error {
 				mu.Lock()
 				alive--
 				if alive == 0 {
-					startTimer()
+					startTimer(opt.closeDelay)
 				}
 				mu.Unlock()
 			}()

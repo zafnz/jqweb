@@ -125,7 +125,7 @@ func TestServeSendsThePage(t *testing.T) {
 
 func TestServeStopsAfterTheFetch(t *testing.T) {
 	const delay = 300 * time.Millisecond
-	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay})
+	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay, firstLoad: delay})
 	defer ln.Close()
 
 	start := time.Now()
@@ -145,13 +145,12 @@ func TestServeStopsAfterTheFetch(t *testing.T) {
 	}
 }
 
-// A reload, a second reader, or a prefetch that beat the reader to it all have
-// to keep the server up rather than end it, which is the whole reason for the
-// delay. The timings here assume the fetches land within about 150ms of when
-// they are asked for.
-func TestServeFetchRestartsTheCloseTimer(t *testing.T) {
+// A second reader, or a prefetch that beat the reader to the page, restarts
+// the wait for a page to open rather than ending it. The timings here assume
+// the fetches land within about 150ms of when they are asked for.
+func TestServeFetchRestartsTheWait(t *testing.T) {
 	const delay = 600 * time.Millisecond
-	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay})
+	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay, firstLoad: delay})
 	defer ln.Close()
 
 	if status, _ := fetch(t, http.MethodGet, url); status != http.StatusOK {
@@ -168,7 +167,7 @@ func TestServeFetchRestartsTheCloseTimer(t *testing.T) {
 	status, _ := fetch(t, http.MethodGet, url)
 	last := time.Now()
 	if status != http.StatusOK {
-		t.Fatalf("third GET / = %d, want 200: the fetches did not restart the close timer", status)
+		t.Fatalf("third GET / = %d, want 200: the fetches did not restart the wait", status)
 	}
 
 	select {
@@ -201,30 +200,20 @@ func TestServeKeepsServingWithoutClose(t *testing.T) {
 	}
 }
 
-// A HEAD is how a link scanner checks that a URL is there. Nobody has read the
-// page, so it must not start the clock.
-func TestServeHeadDoesNotStartTheCloseTimer(t *testing.T) {
-	const delay = 150 * time.Millisecond
-	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay})
+// A HEAD is how a link scanner checks that a URL is there. Nobody is opening
+// the page, so it must not restart the wait for one.
+func TestServeHeadDoesNotRestartTheWait(t *testing.T) {
+	const firstLoad = 400 * time.Millisecond
+	start := time.Now()
+	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: 50 * time.Millisecond, firstLoad: firstLoad})
 	defer ln.Close()
 
+	time.Sleep(firstLoad / 2)
 	fetch(t, http.MethodHead, url)
-	time.Sleep(5 * delay)
-	select {
-	case err := <-done:
-		t.Fatalf("stopped after a HEAD (returned %v); only a GET of / counts as a fetch", err)
-	default:
-	}
-	if status, _ := fetch(t, http.MethodGet, url); status != http.StatusOK {
-		t.Fatalf("GET / = %d after a HEAD, want 200", status)
-	}
-	select {
-	case err := <-done:
-		if err != nil {
-			t.Errorf("serveOn returned %v, want nil", err)
-		}
-	case <-time.After(10 * time.Second):
-		t.Fatal("still serving 10s after the GET that followed the HEAD")
+	stopsAfter(t, done, start, firstLoad)
+	// Restarted by the HEAD, the wait would have run to 600ms.
+	if took := time.Since(start); took > firstLoad+firstLoad/3 {
+		t.Errorf("stopped %s after starting; the HEAD at %s restarted the %s wait", took, firstLoad/2, firstLoad)
 	}
 }
 
@@ -260,7 +249,7 @@ func TestBrowserCommandFallsBackForOS(t *testing.T) {
 // starts the delay.
 func TestServeAliveKeepsServing(t *testing.T) {
 	const delay = 150 * time.Millisecond
-	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay})
+	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay, firstLoad: delay})
 	defer ln.Close()
 
 	fetch(t, http.MethodGet, url)
@@ -279,7 +268,7 @@ func TestServeAliveKeepsServing(t *testing.T) {
 
 func TestServeClosingOneOfTwoTabsKeepsServing(t *testing.T) {
 	const delay = 150 * time.Millisecond
-	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay})
+	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay, firstLoad: delay})
 	defer ln.Close()
 
 	first := hold(t, url)
@@ -296,7 +285,7 @@ func TestServeClosingOneOfTwoTabsKeepsServing(t *testing.T) {
 // its own connection. The gap between the last two is what the delay covers.
 func TestServeReloadKeepsServing(t *testing.T) {
 	const delay = 400 * time.Millisecond
-	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay})
+	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay, firstLoad: delay})
 	defer ln.Close()
 
 	old := hold(t, url)
@@ -350,4 +339,20 @@ func TestServeFirstLoadWaitIsNoShorterThanTheCloseDelay(t *testing.T) {
 	_, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay, firstLoad: firstLoad})
 	defer ln.Close()
 	stopsAfter(t, done, start, delay)
+}
+
+// With no close delay, a fetched page still gets the wait for it to open, so
+// the /alive its head script sends arrives before anything stops.
+func TestServeZeroCloseDelayLetsThePageOpen(t *testing.T) {
+	const firstLoad = 400 * time.Millisecond
+	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: 0, firstLoad: firstLoad})
+	defer ln.Close()
+
+	if status, _ := fetch(t, http.MethodGet, url); status != http.StatusOK {
+		t.Fatalf("GET / = %d, want 200", status)
+	}
+	time.Sleep(firstLoad / 4)
+	stillServing(t, done, "between the page arriving and its /alive")
+	hold(t, url)()
+	stopsAfter(t, done, time.Now(), 0)
 }

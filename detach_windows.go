@@ -15,9 +15,13 @@ func detachedProcess() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{CreationFlags: detachedProcessFlag | syscall.CREATE_NEW_PROCESS_GROUP}
 }
 
-// detachOutputs points the -C child's stdout and stderr at null, so nothing
-// written after the parent exits goes to a pipe with no reader.
+// detachOutputs points the -C child's stdout and stderr at null, which it
+// keeps open, and closes the pipe handles they held. The parent reads those
+// pipes until they close, so replacing the variables alone would leave it
+// waiting.
 func detachOutputs(null *os.File) {
-	os.Stdout = null
-	os.Stderr = null
+	stdout, stderr := os.Stdout, os.Stderr
+	os.Stdout, os.Stderr = null, null
+	stdout.Close()
+	stderr.Close()
 }

@@ -8,7 +8,9 @@
 import test from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
-import { parseJSON, parsePath, stringify } from './src/core.js';
+import { stringify } from './src/model/node.ts';
+import { parseJSON } from './src/model/parse.ts';
+import { parsePath } from './src/model/path.ts';
 import { compile } from './src/jq.js';
 
 const corpus = JSON.parse(fs.readFileSync(new URL('./testdata/jq-corpus.json', import.meta.url), 'utf8'));

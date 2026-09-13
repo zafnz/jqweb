@@ -5,7 +5,9 @@
    whether or not the engine is, and none of this means anything without it.
    page.js calls jqui() once, with the few things it cannot look up for
    itself, and gets back the entry points it needs. */
-import { esc, pathText, renderTree } from './core.js';
+import { esc } from './model/escape.ts';
+import { pathText } from './model/path.ts';
+import { renderTree } from './model/render.ts';
 import { compile } from './jq.js';
 import { completions, splitPartial, suggest } from './suggest.js';
 

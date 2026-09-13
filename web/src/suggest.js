@@ -14,9 +14,10 @@
    splitPartial() and completions() are the other half: reading a query that
    ends in a half-typed name, and the keys that could finish it.
 
-   Everything here is text in, text out, over the node form core.js parses to.
+   Everything here is text in, text out, over the nodes in model/node.ts.
    Nothing touches the DOM and nothing runs a query. */
-import { pathText, stringify } from './core.js';
+import { stringify } from './model/node.ts';
+import { pathText } from './model/path.ts';
 
 var jqsuggest = (function () {
   /* How many ancestors to offer a pivot on. The outermost are the ones worth

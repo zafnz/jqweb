@@ -1,9 +1,9 @@
 /* A subset of jq, evaluated in the page against the parsed document.
 
-   The values this works on are the same nodes core.js builds for rendering,
-   so a result goes straight to renderTree with object key order and number
-   text intact, and the document is parsed once rather than twice. Scalars are
-   read from a leaf's r field and built with core's leafOf.
+   The values this works on are the same nodes model/parse.ts builds for
+   rendering, so a result goes straight to renderTree with object key order
+   and number text intact, and the document is parsed once rather than twice.
+   Scalars are read from a leaf's r field and built with leafOf.
 
    Every jq expression maps one input to a stream of outputs. Here a stream is
    an array, which makes ",", "[]" and select fall out of the evaluator for
@@ -15,7 +15,8 @@
    interpolation, format strings, and try/catch. Bare "?" is supported.
 
    Nothing here touches the DOM; page.js drives it. */
-import { leafOf, parseJSON, stringify } from './core.js';
+import { leafOf, stringify } from './model/node.ts';
+import { parseJSON } from './model/parse.ts';
 
 var jqjs = (function () {
   var NULL = leafOf(null), TRUE = leafOf(true), FALSE = leafOf(false);

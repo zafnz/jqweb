@@ -1,7 +1,11 @@
 /* The default page: everything the simple page has, with the search box also
    read as a jq query. */
 
-import { esc, leafOf, parseJSON, parsePath, pathText, quote, renderTree, stringify } from '../core.js';
+import { esc, quote } from '../model/escape.ts';
+import { leafOf, stringify } from '../model/node.ts';
+import { parseJSON } from '../model/parse.ts';
+import { parsePath, pathText } from '../model/path.ts';
+import { renderTree } from '../model/render.ts';
 import { compile } from '../jq.js';
 import { completions, splitPartial, suggest } from '../suggest.js';
 import { startPage } from '../page.js';

@@ -10,7 +10,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert';
-import { parseJSON } from './src/core.js';
+import { parseJSON } from './src/model/parse.ts';
 import { compile } from './src/jq.js';
 import { suggest, splitPartial, completions } from './src/suggest.js';
 

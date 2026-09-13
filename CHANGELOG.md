@@ -9,6 +9,8 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-13
+
 ### Dev container feature
 
 `ghcr.io/zafnz/devcontainer-features/jqweb:1` installs jqweb in a dev
@@ -31,6 +33,12 @@ is closed, or after 5 minutes if the page is never opened.
 `winget install zafnz.jqweb`, or `scoop install jqweb` after adding the
 `zafnz` bucket, installs jqweb and keeps it upgradeable. The update notice
 names the matching upgrade command on Windows.
+
+### Almost all of the code is rewritten
+
+The Go code and the page scripts have been rewritten to be more readable, with
+no intended change to what the command or the page does. Anything that behaves
+differently from 0.8.0 is a bug; please report it.
 
 **Fixed:** pressing Escape to dismiss query suggestions no longer clears the
 search box.
@@ -232,7 +240,8 @@ The first release: a JSON document rendered as one self-contained HTML page,
 served or written to a file, with a flag to open a browser on it and a flag to
 report the version.
 
-[Unreleased]: https://github.com/zafnz/jqweb/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/zafnz/jqweb/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/zafnz/jqweb/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/zafnz/jqweb/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/zafnz/jqweb/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/zafnz/jqweb/compare/v0.6.0...v0.7.0

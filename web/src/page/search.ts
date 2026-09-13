@@ -6,21 +6,18 @@
 import type { Node as ValueNode } from '../model/node.ts';
 import type { Segment } from '../model/path.ts';
 import { parsePath } from '../model/path.ts';
-import { copy } from './clipboard.ts';
 import { find } from './dom.ts';
 import { textFilter } from './filter.ts';
 import type { Found } from './tree.ts';
-import { each, pathOf, resolvePath, segsOf, showPath } from './tree.ts';
+import { each, pathOf, resolvePath, showPath } from './tree.ts';
 
 /* What the page hands the query UI: the document to run a query against, and
-   the parts of the page the UI cannot look up for itself. resolve and segsOf
-   walk the rendered tree rather than the value. */
+   what only this closure holds -- the tree root that resolve walks, the header
+   and count that showFound writes to, and the run that rerun repeats. */
 export interface QueryHost {
   value: ValueNode;
   resolve(segs: Segment[]): Found;
   showFound(found: Found, want: number): void;
-  segsOf(node: HTMLElement): Segment[];
-  copy(text: string, btn: Element): void;
   rerun(force?: boolean): void;
 }
 
@@ -52,15 +49,11 @@ export function startSearch(jqui: StartQuery | null, value: ValueNode, root: HTM
   const asked = new URLSearchParams(location.search).get('q');
   if (asked !== null) input.value = asked;
 
-  /* The query half, or null in a page built with --simple. It reads the search
-     box, so it needs the document to run against and the two path helpers,
-     which walk the rendered tree rather than the value. */
+  /* The query half, or null in a page built with --simple. */
   const query = jqui ? jqui({
     value: value,
     resolve: function (segs) { return resolvePath(root, segs); },
     showFound: showFound,
-    segsOf: segsOf,
-    copy: copy,
     rerun: run
   }) : null;
 

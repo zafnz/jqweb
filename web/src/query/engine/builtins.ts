@@ -278,6 +278,7 @@ function pick(list: Node[], arg: Ast | null, want: number): Node {
   return best === null ? NULL : best;
 }
 
+/* A builtin that maps one number to another; name is for its error message. */
 function mathOf(f: (n: number) => number, name: string): Builtin {
   return function (x) { return [leafOf(f(num(x, name)))]; };
 }
@@ -285,10 +286,6 @@ function mathOf(f: (n: number) => number, name: string): Builtin {
 /* select(type == "...") under the shorter name jq gives it. */
 function typeFilter(t: JqType): Builtin {
   return function (x) { return typeOf(x) === t ? [x] : []; };
-}
-
-function mathFilter(f: (n: number) => number): Builtin {
-  return function (x) { return [leafOf(f(num(x, 'a number filter')))]; };
 }
 
 export const builtins: Record<string, Builtin> = {
@@ -597,21 +594,24 @@ export const builtins: Record<string, Builtin> = {
     return [leafOf(n)];
   },
   'tojson/0': function (x) { return [leafOf(stringify(x))]; },
+  /* JSON.parse is the check and parseJSON the parse. parseJSON keeps key order
+     and number text but validates nothing, and its string scanner never ends
+     on text with no closing quote, so it only sees what JSON.parse accepted. */
   'fromjson/0': function (x) {
     const s = wantType(x, 'string', 'fromjson').r;
     try {
       JSON.parse(s);
-    } catch (e) {
+    } catch {
       throw runErr('cannot parse "' + s + '" as JSON');
     }
     return [parseJSON(s)];
   },
 
-  'floor/0': mathFilter(Math.floor),
-  'ceil/0': mathFilter(Math.ceil),
-  'round/0': mathFilter(Math.round),
-  'fabs/0': mathFilter(Math.abs),
-  'sqrt/0': mathFilter(Math.sqrt),
+  'floor/0': mathOf(Math.floor, 'floor'),
+  'ceil/0': mathOf(Math.ceil, 'ceil'),
+  'round/0': mathOf(Math.round, 'round'),
+  'fabs/0': mathOf(Math.abs, 'fabs'),
+  'sqrt/0': mathOf(Math.sqrt, 'sqrt'),
 
   'arrays/0': typeFilter('array'),
   'objects/0': typeFilter('object'),

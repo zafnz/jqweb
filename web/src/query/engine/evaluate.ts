@@ -48,7 +48,7 @@ export function push(out: Stream, list: Stream): void {
   for (let i = 0; i < list.length; i++) out.push(list[i]);
 }
 
-const COMPARE: Record<string, (c: number) => boolean> = {
+const COMPARE: Record<'==' | '!=' | '<' | '<=' | '>' | '>=', (c: number) => boolean> = {
   '==': function (c) { return c === 0; },
   '!=': function (c) { return c !== 0; },
   '<': function (c) { return c < 0; },
@@ -56,7 +56,9 @@ const COMPARE: Record<string, (c: number) => boolean> = {
   '>': function (c) { return c > 0; },
   '>=': function (c) { return c >= 0; }
 };
-const ARITH: Record<string, (a: Node, b: Node) => Node> = { '+': add2, '-': sub2, '*': mul2, '/': div2, '%': mod2 };
+const ARITH: Record<'+' | '-' | '*' | '/' | '%', (a: Node, b: Node) => Node> = {
+  '+': add2, '-': sub2, '*': mul2, '/': div2, '%': mod2
+};
 
 /* Runs one expression against one input and returns its stream. */
 export function ev(a: Ast, x: Node): Stream {

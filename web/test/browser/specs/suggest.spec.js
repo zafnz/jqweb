@@ -56,9 +56,8 @@ test('every label is what its query really returns', async ({ page }) => {
     const doc = window.jqweb.parseJSON(__t.text('#data'));
     return queries.map(({ query, label }) => {
       const out = window.jqjs.compile(query).run(doc);
-      return label.endsWith('key') || label.endsWith('keys')
-        ? (out.length && out[0].t === 'o' ? out[0].k.length : 0)
-        : out.length;
+      /* The label says which way the row was counted. */
+      return window.jqsuggest.countOf(/\bkeys?$/.test(label) ? 'keys' : 'results', out);
     });
   }, rows.map(({ query, label }) => ({ query, label })));
 

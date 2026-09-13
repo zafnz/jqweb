@@ -51,7 +51,7 @@ export function lex(src: string): Token[] {
         if (e === '(') throw parseErr('string interpolation is not supported', j);
         if (ESCAPES[e] !== undefined) { buf += ESCAPES[e]; j += 2; continue; }
         if (e === 'u') {
-          const hex = src.substr(j + 2, 4);
+          const hex = src.slice(j + 2, j + 6);
           if (!/^[0-9a-fA-F]{4}$/.test(hex)) throw parseErr('bad \\u escape', j);
           buf += String.fromCharCode(parseInt(hex, 16));
           j += 6;
@@ -109,7 +109,7 @@ export function lex(src: string): Token[] {
     }
     let j = 0;
     for (; j < OPS.length; j++) {
-      if (src.substr(i, OPS[j].length) === OPS[j]) break;
+      if (src.startsWith(OPS[j], i)) break;
     }
     if (j === OPS.length) throw parseErr('unexpected "' + c + '"', p);
     toks.push({ k: 'op', v: OPS[j], p: p });

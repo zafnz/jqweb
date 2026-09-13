@@ -31,7 +31,7 @@ export function startTheme(): Theme {
 
   try {
     asked = localStorage.getItem(KEY) || asked;
-  } catch (e) { /* no storage here, so the flag stands */ }
+  } catch { /* no storage here, so the flag stands */ }
   let pref: Preference = asked === 'light' || asked === 'dark' ? asked : 'auto';
 
   /* data-theme is the palette in force and what the stylesheet reads;
@@ -45,15 +45,13 @@ export function startTheme(): Theme {
     pref = ORDER[(ORDER.indexOf(pref) + 1) % ORDER.length];
     try {
       localStorage.setItem(KEY, pref);
-    } catch (e) { /* as above: this one only lasts as long as the tab */ }
+    } catch { /* as above: this one only lasts as long as the tab */ }
     paint();
     return pref;
   }
 
   /* Following the system means following it while the page is open. */
-  if (light.addEventListener) {
-    light.addEventListener('change', function () { if (pref === 'auto') paint(); });
-  }
+  light.addEventListener('change', function () { if (pref === 'auto') paint(); });
   paint();
 
   return { cycle: cycle, current: function () { return pref; } };

@@ -22,7 +22,9 @@ const SETTLE = 1000;
 /* Finds a line of the tree by its jq path, so a spec can say which line it
    means instead of counting its way through the markup. It is a selector
    engine rather than a helper so that what it finds is an ordinary locator,
-   with the waiting, the clicking and the failure message that come with one. */
+   with the waiting, the clicking and the failure message that come with one.
+   The walk is the one at() in helpers.js does; Playwright serialises a
+   selector engine into the page on its own, so it cannot share that one. */
 function atEngine() {
   return {
     query(root, selector) {

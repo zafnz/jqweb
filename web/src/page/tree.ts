@@ -12,10 +12,9 @@ export interface Found {
   depth: number;
 }
 
-/* Runs fn over every node in either view matching sel. querySelectorAll
-   gives a NodeList, which in older browsers has no forEach of its own. */
+/* Runs fn over every node in either view matching sel. */
 export function each(sel: string, fn: (n: HTMLElement) => void): void {
-  Array.prototype.forEach.call(document.querySelectorAll<HTMLElement>('main ' + sel), fn);
+  document.querySelectorAll<HTMLElement>('main ' + sel).forEach(fn);
 }
 
 /* The tree node an element in a line belongs to. Every button and summary
@@ -93,7 +92,7 @@ export function showPath(header: HTMLElement, target: HTMLElement, mark: boolean
     n.classList.remove('hidden', 'collapsed');
   }
   if (mark) target.classList.add('hit');
-  Array.prototype.forEach.call(target.querySelectorAll('.node'), function (d: Element) {
+  target.querySelectorAll('.node').forEach(function (d) {
     d.classList.remove('hidden');
   });
   reveal(header, target);

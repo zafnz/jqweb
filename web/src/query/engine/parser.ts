@@ -83,9 +83,6 @@ function among<T extends string>(v: string, ops: readonly T[]): v is T {
   return ops.some(function (op) { return op === v; });
 }
 
-/* Which argument counts each builtin name accepts, worked out once from the
-   table below so that a wrong count can say so rather than claim the name
-   does not exist. */
 /* "1", "1 or 2", "1, 2 or 3". */
 function orList(ns: number[]): string {
   const sorted = ns.slice().sort(function (a, b) { return a - b; });
@@ -93,6 +90,9 @@ function orList(ns: number[]): string {
   return sorted.slice(0, -1).join(', ') + ' or ' + sorted[sorted.length - 1];
 }
 
+/* Which argument counts each builtin name accepts, worked out once from the
+   builtin table so that a wrong count can say so rather than claim the name
+   does not exist. */
 let arityCache: Record<string, number[]> | null = null;
 function arities(): Record<string, number[]> {
   if (!arityCache) {
@@ -139,8 +139,7 @@ export function parse(src: string): Ast {
     throw parseErr('unexpected "' + t.v + '"', t.p);
   }
 
-  function expr(level?: number): Ast {
-    if (level === undefined) level = 0;
+  function expr(level = 0): Ast {
     if (level >= BINOPS.length) return unary();
     let lhs = expr(level + 1);
     const lv = BINOPS[level];

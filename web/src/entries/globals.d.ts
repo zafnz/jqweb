@@ -8,7 +8,7 @@ import type { parseJSON } from '../model/parse.ts';
 import type { parsePath, pathText } from '../model/path.ts';
 import type { renderTree } from '../model/render.ts';
 import type { compile } from '../query/engine/index.ts';
-import type { completions, splitPartial, suggest } from '../query/suggest.ts';
+import type { completions, countOf, splitPartial, suggest } from '../query/suggest.ts';
 
 declare global {
   var jqweb: {
@@ -28,5 +28,6 @@ declare global {
     suggest: typeof suggest;
     splitPartial: typeof splitPartial;
     completions: typeof completions;
+    countOf: typeof countOf;
   };
 }

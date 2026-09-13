@@ -7,7 +7,7 @@ import { parseJSON } from '../model/parse.ts';
 import { parsePath, pathText } from '../model/path.ts';
 import { renderTree } from '../model/render.ts';
 import { compile } from '../query/engine/index.ts';
-import { completions, splitPartial, suggest } from '../query/suggest.ts';
+import { completions, countOf, splitPartial, suggest } from '../query/suggest.ts';
 import { startPage } from '../page/bootstrap.ts';
 import { jqui } from '../query/ui.ts';
 
@@ -17,6 +17,6 @@ import { jqui } from '../query/ui.ts';
    simple.ts. */
 window.jqweb = { parseJSON, leafOf, stringify, renderTree, parsePath, pathText, quote, esc };
 window.jqjs = { compile };
-window.jqsuggest = { suggest, splitPartial, completions };
+window.jqsuggest = { suggest, splitPartial, completions, countOf };
 
 startPage(jqui);

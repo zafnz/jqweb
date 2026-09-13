@@ -7,9 +7,7 @@
    that this covers the same window it always did. Phones in portrait are 430px
    and under, so they are narrower than this and inside the same rule. */
 
-'use strict';
-
-const { test, expect, settle } = require('../fixtures.js');
+import { test, expect, settle } from '../fixtures.js';
 
 test.use({ variant: 'default', viewport: { width: 500, height: 800 } });
 

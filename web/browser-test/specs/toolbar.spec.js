@@ -2,9 +2,7 @@
    select, a search box that takes what is left, a count and two buttons, and
    the failure it is prone to is one of them taking room from another. */
 
-'use strict';
-
-const { test, expect, settle, type, near } = require('../fixtures.js');
+import { test, expect, settle, type, near } from '../fixtures.js';
 
 test.use({ variant: 'default' });
 

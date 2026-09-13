@@ -39,7 +39,7 @@ Every colour is a custom property on `:root` in `web/page.css`, defined twice:
 once for dark and once under `:root[data-theme="light"]`. Adding a colour means
 adding it to both, and using a literal anywhere means one theme gets it wrong.
 
-`web/theme.js` runs in the head, before the body is parsed, so a page never
+`web/src/theme.js` runs in the head, before the body is parsed, so a page never
 paints in one theme and swaps to the other. It reads `data-pref` -- which
 `--theme` sets -- then the stored choice if there is one, resolves `auto`
 against `prefers-color-scheme`, and writes `data-theme`, which is what the
@@ -77,7 +77,7 @@ as written, so a comment in `page.css` or `query.css` ships in every page.
 
 At 600px and below the page shows the tree, the fold button and the theme
 button. The rule is `@media (max-width: 600px)` in `web/page.css`, and
-`web/page.js` runs `matchMedia` on the same query, so the two have to agree.
+`web/src/page.js` runs `matchMedia` on the same query, so the two have to agree.
 
 The stylesheet hides the search box, the mode select, the count and the line
 buttons rather than leaving them out of the markup, because a phone turned on
@@ -95,14 +95,15 @@ now if the breakpoint ever moves.
 
 ## The jq subset
 
-`web/jq.js` is the query engine, `web/suggest.js` builds the queries a line of
-the document could have meant, `web/query.js` is the search box wiring that
-drives both, and `web/query.css` styles what only they put on the page. Those
-four are what `--simple` leaves out, so none of them costs
-anything in a page built with it; `web/page.js` ships either way and works
-without them, calling `jqui()` when it is there and falling back to the path
-lookup when it is not. Anything that reads the box as a query, or renders what
-one produced, belongs in `query.js` rather than `page.js`.
+`web/src/jq.js` is the query engine, `web/src/suggest.js` builds the queries a
+line of the document could have meant, `web/src/query.js` is the search box
+wiring that drives both, and `web/query.css` styles what only they put on the
+page. Those four are what `--simple` leaves out, so none of them costs anything
+in a page built with it; `web/src/page.js` ships either way and works without
+them, calling the `jqui` that `web/src/entries/full.js` passes it, and falling
+back to the path lookup when `web/src/entries/simple.js` passes null. Anything
+that reads the box as a query, or renders what one produced, belongs in
+`query.js` rather than `page.js`.
 
 `suggest.js` is text in, text out -- segments and a parsed document give back
 query strings -- so `web/suggest.test.js` can check it without a browser. The

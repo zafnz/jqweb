@@ -1,9 +1,7 @@
 /* The search box as text to find and as a path: what a page did before the
    engine existed and still does for anything that is not a query. */
 
-'use strict';
-
-const { test, expect, settle, type } = require('../fixtures.js');
+import { test, expect, settle, type } from '../fixtures.js';
 
 test.use({ variant: 'default' });
 

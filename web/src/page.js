@@ -5,21 +5,23 @@
 
    Reading the box as a jq query lives in query.js, which every page has unless
    --simple left it out. This file is in every page either way, so it works
-   without it. */
-(function () {
-  'use strict';
+   without it: the full entry passes jqui from query.js to startPage, and the
+   simple entry passes null. */
+
+import { parseJSON, parsePath, pathText, renderTree } from './core.js';
+
+export function startPage(jqui) {
   var header = document.querySelector('header');
   var tree = document.getElementById('tree');
   var input = document.getElementById('q');
   var stats = document.getElementById('stats');
-  var parseJSON = jqweb.parseJSON, renderTree = jqweb.renderTree, parsePath = jqweb.parsePath;
 
   /* Build the whole tree in one write. The document is served inside the page
      as JSON rather than as markup, which keeps the file smaller and lets the
      tree be rendered here where the collapsing state lives. The parsed
      document is kept as well, because a query runs against it. */
   var rootValue = parseJSON(document.getElementById('data').textContent);
-  tree.innerHTML = renderTree(rootValue, typeof jqui !== 'undefined');
+  tree.innerHTML = renderTree(rootValue, !!jqui);
   var rootNode = tree.querySelector(':scope > .node');
 
   /* A query given on the command line is in the page as the box's value. One
@@ -32,14 +34,14 @@
   /* The query half, or null in a page built with --simple. It reads the search
      box, so it needs the document to run against and the two path helpers
      below, which walk the rendered tree rather than the value. */
-  var query = typeof jqui === 'undefined' ? null : jqui({
+  var query = jqui ? jqui({
     value: rootValue,
     resolve: resolvePath,
     showFound: showFound,
     segsOf: segsOf,
     copy: copy,
     rerun: run
-  });
+  }) : null;
 
   /* The toolbar's theme button reports what is in force and cycles when
      clicked; the palette itself was settled by theme.js before the body was
@@ -117,7 +119,7 @@
   /* The jq-style path of a node, which is what parsePath() reads, so a copied
      path can be pasted straight back into the search box. */
   function pathOf(node) {
-    return jqweb.pathText(segsOf(node));
+    return pathText(segsOf(node));
   }
 
   /* Copies text, reporting the outcome on the button that asked for it. */
@@ -358,4 +360,4 @@
      that it is run as written: it was given whole rather than a letter at a
      time, so a name in it that no key finishes is still the query. */
   if (input.value.trim()) run(true);
-})();
+}

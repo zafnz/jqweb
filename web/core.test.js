@@ -2,11 +2,9 @@
    These cover the parser, the HTML renderer and the path reader; the DOM
    wiring in page.js is not exercised here. */
 
-'use strict';
-
-const test = require('node:test');
-const assert = require('node:assert');
-const { parseJSON, renderTree, parsePath, quote, esc } = require('./core.js');
+import test from 'node:test';
+import assert from 'node:assert';
+import { parseJSON, renderTree, parsePath, quote, esc } from './src/core.js';
 
 /* The leaf text of a node, with the markup stripped and the escaping undone,
    so tests can talk about values rather than spans. Escaping itself is checked

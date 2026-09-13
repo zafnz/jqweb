@@ -8,13 +8,11 @@
    break one -- a pivot whose members are not all objects, a value sitting in
    an array, a key that needs quoting -- are easy to miss by hand. */
 
-'use strict';
-
-const test = require('node:test');
-const assert = require('node:assert');
-const { parseJSON } = require('./core.js');
-const { compile } = require('./jq.js');
-const { suggest, splitPartial, completions } = require('./suggest.js');
+import test from 'node:test';
+import assert from 'node:assert';
+import { parseJSON } from './src/core.js';
+import { compile } from './src/jq.js';
+import { suggest, splitPartial, completions } from './src/suggest.js';
 
 /* A document with the shapes that have caught the generator out: an object
    used as a map, records reached through a second map level, an array of

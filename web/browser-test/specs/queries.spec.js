@@ -1,9 +1,7 @@
 /* The search box read as a query, and the results view that replaces the
    document when one produces values that are not in it. */
 
-'use strict';
-
-const { test, expect, settle, type } = require('../fixtures.js');
+import { test, expect, settle, type } from '../fixtures.js';
 
 test.use({ variant: 'default' });
 

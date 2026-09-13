@@ -5,9 +5,11 @@
    whether or not the engine is, and none of this means anything without it.
    page.js calls jqui() once, with the few things it cannot look up for
    itself, and gets back the entry points it needs. */
-var jqui = function (page) {
-  'use strict';
-  var renderTree = jqweb.renderTree, esc = jqweb.esc, pathText = jqweb.pathText;
+import { esc, pathText, renderTree } from './core.js';
+import { compile } from './jq.js';
+import { completions, splitPartial, suggest } from './suggest.js';
+
+export function jqui(page) {
   var tree = document.getElementById('tree');
   var results = document.getElementById('results');
   var input = document.getElementById('q');
@@ -64,7 +66,7 @@ var jqui = function (page) {
     if (completing) return;
     showDocument();
     try {
-      query = jqjs.compile(raw);
+      query = compile(raw);
     } catch (e) {
       fault(e.message, e.pos);
       return;
@@ -172,7 +174,7 @@ var jqui = function (page) {
   function filter(node) {
     var segs = page.segsOf(node);
     var deadline = Date.now() + COUNT_BUDGET_MS;
-    rows = jqsuggest.suggest(page.value, segs).map(function (c) {
+    rows = suggest(page.value, segs).map(function (c) {
       c.count = Date.now() > deadline ? null : count(c);
       return c;
     }).filter(function (c) {
@@ -209,7 +211,7 @@ var jqui = function (page) {
   function count(c) {
     var out;
     try {
-      out = jqjs.compile(c.q).run(page.value);
+      out = compile(c.q).run(page.value);
     } catch (e) {
       if (e.jq) return 0;
       throw e;
@@ -237,14 +239,14 @@ var jqui = function (page) {
   /* Offers completions for raw instead of running it, when there are any.
      True means it did and the caller has nothing to run. */
   function complete(raw) {
-    var split = jqsuggest.splitPartial(raw), out, comp;
+    var split = splitPartial(raw), out, comp;
     if (!split) return false;
     try {
-      out = jqjs.compile(split.ctx).run(page.value);
+      out = compile(split.ctx).run(page.value);
     } catch (e) {
       return false;
     }
-    comp = jqsuggest.completions(out, split.partial);
+    comp = completions(out, split.partial);
     if (comp.exact || !comp.keys.length) return false;
     rows = comp.keys.map(function (k) {
       /* pathText writes the segment as jq would -- .name, or ["a b"] for a
@@ -366,4 +368,4 @@ var jqui = function (page) {
     clearFault: clearFault,
     showDocument: showDocument
   };
-};
+}

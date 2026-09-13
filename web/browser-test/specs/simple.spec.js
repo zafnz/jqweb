@@ -2,17 +2,16 @@
    everything that reads the box as a query has to be absent without leaving a
    hole where it was. */
 
-'use strict';
-
-const { test, expect, settle, type } = require('../fixtures.js');
+import { test, expect, settle, type } from '../fixtures.js';
 
 test.use({ variant: 'simple' });
 
 test('the query half of the page is absent', async ({ page }) => {
   const got = await page.evaluate(() => ({
-    /* None of the four files --simple leaves out is in the page. */
+    /* The engine and the suggestion builder are not in the page. query.js
+       has no global of its own, so the mode select below is what says it is
+       absent. */
     engine: typeof window.jqjs,
-    ui: typeof window.jqui,
     suggest: typeof window.jqsuggest,
     core: typeof window.jqweb,
     theme: typeof window.jqtheme,
@@ -32,7 +31,6 @@ test('the query half of the page is absent', async ({ page }) => {
   }));
 
   expect.soft(got.engine, 'the engine is not here').toBe('undefined');
-  expect.soft(got.ui, 'nor the search box wiring').toBe('undefined');
   expect.soft(got.suggest, 'nor the suggestion builder').toBe('undefined');
   expect.soft(got.core, 'but the parser and renderer are').toBe('object');
   expect.soft(got.theme, 'and so is the theme').toBe('object');

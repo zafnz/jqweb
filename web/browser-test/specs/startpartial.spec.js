@@ -3,9 +3,7 @@
    command line or in the address is the whole query, so it runs as written --
    nulls and all -- rather than opening on a list of completions. */
 
-'use strict';
-
-const { test, expect, type } = require('../fixtures.js');
+import { test, expect, type } from '../fixtures.js';
 
 test.use({ variant: 'default', address: '?q=.items[].ki' });
 

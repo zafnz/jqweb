@@ -8,13 +8,11 @@
 
    and gets `page` already loaded and settled. */
 
-'use strict';
+import { test as base, expect, selectors } from '@playwright/test';
+import path from 'node:path';
+import { pageURL } from './pages.js';
 
-const { test: base, expect, selectors } = require('@playwright/test');
-const path = require('node:path');
-const { pageURL } = require('./pages.js');
-
-const helpers = path.join(__dirname, 'helpers.js');
+const helpers = path.join(import.meta.dirname, 'helpers.js');
 
 /* How far to wind the clock after an action. page.js waits 120ms for a pause
    in typing and leaves a copy button ticked for 900ms, so this covers both.
@@ -119,4 +117,4 @@ function near(got, want, tol, name) {
   expect.soft(Math.abs(got - want), name).toBeLessThanOrEqual(tol);
 }
 
-module.exports = { test, expect, settle, type, clickAway, refocus, near, SETTLE };
+export { test, expect, settle, type, clickAway, refocus, near, SETTLE };

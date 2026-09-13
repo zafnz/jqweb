@@ -2,9 +2,7 @@
    drives, rendered with --theme light, so the only thing it can say is whether
    the flag reaches the browser. */
 
-'use strict';
-
-const { test, expect, settle } = require('../fixtures.js');
+import { test, expect, settle } from '../fixtures.js';
 
 test.use({ variant: 'light' });
 

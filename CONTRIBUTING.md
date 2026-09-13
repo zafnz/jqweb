@@ -224,11 +224,15 @@ half an hour. Set the `NOTARY_RETRY_DELAYS` repository variable to change the
 waits, or to shorten them while testing the retrying itself.
 
 Tagging `v*` on a commit contained in `main` runs GoReleaser, which builds for
-macOS, Linux and Windows, signs and notarizes the macOS binaries, updates
-the Homebrew tap, and pushes the .deb and .rpm packages to the `zafnz` Gemfury
-account with the `FURY_TOKEN` repository secret, which a release fails without.
-A release-looking tag on a branch may start the workflow, but
-the first step fails before GoReleaser can publish anything.
+macOS, Linux and Windows, signs and notarizes the macOS binaries, updates the
+Homebrew tap and the Scoop bucket, pushes the .deb and .rpm packages to the
+`zafnz` Gemfury account, and opens a pull request on `microsoft/winget-pkgs`
+from the fork `zafnz/winget-pkgs`. `winget` offers the release once a moderator
+merges that pull request. The tap uses the `HOMEBREW_TAP_GITHUB_TOKEN` secret
+and Gemfury the `FURY_TOKEN` secret, which a release fails without; the bucket
+and the fork use `PACKAGE_REPOS_TOKEN`, which has to be a classic token with
+the `public_repo` scope. A release-looking tag on a branch may start the
+workflow, but the first step fails before GoReleaser can publish anything.
 
 The repository's `release tags` ruleset covers `refs/tags/v*`, so those names
 are the release namespace. Use some other tag name for local or branch-only

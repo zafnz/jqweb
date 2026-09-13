@@ -19,6 +19,7 @@ $ kubectl get pods -o json | jqweb -O
 ## Install
 
     brew install zafnz/tap/jqweb              # macOS, Linux
+    winget install zafnz.jqweb                # Windows
     go install github.com/zafnz/jqweb@latest  # with Go installed
 
 On Debian and Ubuntu:
@@ -30,6 +31,11 @@ On Fedora and RHEL:
 
     printf '[jqweb]\nname=jqweb\nbaseurl=https://yum.fury.io/zafnz/\nenabled=1\ngpgcheck=0\n' | sudo tee /etc/yum.repos.d/jqweb.repo
     sudo dnf install jqweb
+
+With Scoop on Windows:
+
+    scoop bucket add zafnz https://github.com/zafnz/scoop-bucket
+    scoop install jqweb
 
 On Linux or macOS without Homebrew, this puts the latest release in
 `~/.local/bin`:

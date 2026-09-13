@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -41,6 +42,10 @@ const (
 	// Where the .deb and .rpm packages put the binary: bindir in the nfpms
 	// section of .goreleaser.yaml.
 	packagedPath = "/usr/bin/jqweb"
+
+	// install.sh does not run on Windows, so a binary there that no package
+	// manager put in place is pointed at the download instead.
+	releasesPage = "https://github.com/zafnz/jqweb/releases/latest"
 )
 
 // updateState is what a check leaves behind for the runs that follow it: when
@@ -251,10 +256,10 @@ func (u *updater) upgradeHint() string {
 	if err != nil {
 		exe = ""
 	}
-	return upgradeHint(exe, u.getenv, u.packaged)
+	return upgradeHint(exe, runtime.GOOS, u.getenv, u.packaged)
 }
 
-func upgradeHint(exe string, getenv, packaged func(string) string) string {
+func upgradeHint(exe, goos string, getenv, packaged func(string) string) string {
 	// A Homebrew cask keeps the binary in the Caskroom and links it onto the
 	// path; executablePath resolves the link, which is the only way the
 	// Caskroom shows up here. Homebrew runs on macOS and Linux, so the
@@ -268,7 +273,42 @@ func upgradeHint(exe string, getenv, packaged func(string) string) string {
 	if cmd := packaged(exe); cmd != "" {
 		return cmd
 	}
-	return installCommand
+	if goos != "windows" {
+		return installCommand
+	}
+
+	// Windows paths ignore case. The backslashes are replaced by hand because
+	// filepath.ToSlash does nothing to them when the tests run elsewhere.
+	path := strings.ToLower(strings.ReplaceAll(exe, `\`, "/"))
+
+	// winget unpacks a portable package into WinGet\Packages\<identifier>_<source>
+	// under the user's or the machine's install root, and links it onto the
+	// path from WinGet\Links.
+	if strings.Contains(path, "/winget/packages/zafnz.jqweb_") {
+		return "winget upgrade zafnz.jqweb"
+	}
+
+	// The Scoop shim on the path starts the real binary as a child process,
+	// so the path here is the one under apps. $SCOOP_GLOBAL and $SCOOP move
+	// the two install roots away from C:\ProgramData\scoop and ~\scoop, and
+	// the global root is tested first because the user pattern matches it too.
+	if underScoopApps(path, getenv("SCOOP_GLOBAL")) || strings.Contains(path, "/programdata/scoop/apps/jqweb/") {
+		return "scoop update jqweb --global"
+	}
+	if underScoopApps(path, getenv("SCOOP")) || strings.Contains(path, "/scoop/apps/jqweb/") {
+		return "scoop update jqweb"
+	}
+	return releasesPage
+}
+
+// underScoopApps reports whether path, already lowercased and with forward
+// slashes, is inside jqweb's directory under the Scoop root named by root.
+func underScoopApps(path, root string) bool {
+	if root == "" {
+		return false
+	}
+	root = strings.TrimRight(strings.ToLower(strings.ReplaceAll(root, `\`, "/")), "/")
+	return strings.HasPrefix(path, root+"/apps/jqweb/")
 }
 
 // systemPackageUpgrade is the command that upgrades jqweb through the package

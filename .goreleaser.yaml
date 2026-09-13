@@ -136,3 +136,44 @@ publishers:
     env:
       - FURY_TOKEN={{ .Env.FURY_TOKEN }}
     cmd: curl -fsS -F package=@{{ .ArtifactName }} https://{{ .Env.FURY_TOKEN }}@push.fury.io/zafnz/
+
+# microsoft/winget-pkgs accepts manifests only as pull requests, so GoReleaser
+# commits them to a branch on the fork zafnz/winget-pkgs and opens the pull
+# request from there. The fork is never synced with upstream. The branch adds
+# one new directory, so the pull request shows only that manifest whatever
+# commit the fork's master is at.
+#
+# PACKAGE_REPOS_TOKEN has to be a classic token with the public_repo scope: a
+# fine-grained token cannot open a pull request on a repository its owner does
+# not own. A pull request that fails to open is logged and does not fail the
+# release, so read the run output after tagging.
+winget:
+  - name: jqweb
+    publisher: zafnz
+    package_identifier: zafnz.jqweb
+    short_description: Renders JSON like jq, but as a webpage
+    license: MIT
+    homepage: https://github.com/zafnz/jqweb
+    publisher_url: https://github.com/zafnz
+    release_notes_url: "https://github.com/zafnz/jqweb/releases/tag/{{ .Tag }}"
+    repository:
+      owner: zafnz
+      name: winget-pkgs
+      branch: "jqweb-{{ .Version }}"
+      token: "{{ .Env.PACKAGE_REPOS_TOKEN }}"
+      pull_request:
+        enabled: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
+
+scoops:
+  - repository:
+      owner: zafnz
+      name: scoop-bucket
+      token: "{{ .Env.PACKAGE_REPOS_TOKEN }}"
+    directory: bucket
+    homepage: https://github.com/zafnz/jqweb
+    description: Renders JSON like jq, but as a webpage
+    license: MIT

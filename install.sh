@@ -22,7 +22,7 @@ command -v curl >/dev/null 2>&1 || die "curl is required"
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
 case "$os" in
 linux | darwin) ;;
-*) die "unsupported OS: $os (macOS and Linux only; Windows builds are on the releases page)" ;;
+*) die "unsupported OS: $os (macOS and Linux only; on Windows run: winget install zafnz.jqweb)" ;;
 esac
 
 arch=$(uname -m)

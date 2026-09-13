@@ -21,6 +21,12 @@ apt or dnf command in its update notice.
 has the page open, so reloading it works. The server exits once the last tab
 is closed, or after 5 minutes if the page is never opened.
 
+### Windows installs with winget or Scoop
+
+`winget install zafnz.jqweb`, or `scoop install jqweb` after adding the
+`zafnz` bucket, installs jqweb and keeps it upgradeable. The update notice
+names the matching upgrade command on Windows.
+
 **Fixed:** pressing Escape to dismiss query suggestions no longer clears the
 search box.
 

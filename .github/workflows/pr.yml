@@ -80,7 +80,7 @@ jobs:
     steps:
       # The whole history, because the step below reads CHANGELOG.md at the
       # base commit as well as at the merge this pull request would make.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

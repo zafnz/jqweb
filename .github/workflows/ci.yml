@@ -33,9 +33,9 @@ jobs:
         # differed between them before, and the error messages depend on it.
         go-version: ["1.24", "stable"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -58,9 +58,9 @@ jobs:
   js:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -84,15 +84,15 @@ jobs:
   browser:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # A page has to be rendered before it can be driven, and rendering one
       # means building jqweb.
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: stable
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -115,7 +115,7 @@ jobs:
       # The trace of a failed test is every action it took, the DOM at each one
       # and the console, openable with "npx playwright show-trace". The pages it
       # rendered go up with it, so a failure can also be opened in a browser.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: browser-failures

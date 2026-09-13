@@ -6,9 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,6 +17,7 @@ import (
 	"time"
 
 	"github.com/zafnz/jqweb/internal/serve"
+	"github.com/zafnz/jqweb/internal/testutil"
 )
 
 // TestMain runs jqweb's main instead of the tests when JQWEB_TEST_MAIN is set.
@@ -42,35 +41,6 @@ func jqweb(t *testing.T, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, os.Args[0], args...)
 	cmd.Env = append(os.Environ(), "JQWEB_TEST_MAIN=1", "JQWEB_NO_UPDATE_CHECK=1")
 	return cmd
-}
-
-// testClient talks to the background server without keeping connections
-// alive, so that an idle connection cannot hold up its shutdown.
-var testClient = &http.Client{
-	Timeout:   5 * time.Second,
-	Transport: &http.Transport{DisableKeepAlives: true},
-}
-
-const closeTimerSlack = 50 * time.Millisecond
-
-// fetch performs one request and reads the body to the end, so the connection
-// is not left active behind it.
-func fetch(t *testing.T, method, url string) (status int, body string) {
-	t.Helper()
-	req, err := http.NewRequest(method, url, nil)
-	if err != nil {
-		t.Fatalf("%s %s: %v", method, url, err)
-	}
-	resp, err := testClient.Do(req)
-	if err != nil {
-		t.Fatalf("%s %s: %v", method, url, err)
-	}
-	defer resp.Body.Close()
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("reading %s: %v", url, err)
-	}
-	return resp.StatusCode, string(b)
 }
 
 func TestBackgroundReportsABadDocument(t *testing.T) {
@@ -128,7 +98,7 @@ func TestBackgroundOutlivesTheParentUntilTheTabCloses(t *testing.T) {
 	})
 
 	url := "http://" + addr[1] + "/"
-	if status, _ := fetch(t, "GET", url); status != 200 {
+	if status, _ := testutil.Fetch(t, "GET", url); status != 200 {
 		t.Fatalf("GET / after the parent returned = %d, want 200", status)
 	}
 
@@ -142,7 +112,7 @@ func TestBackgroundOutlivesTheParentUntilTheTabCloses(t *testing.T) {
 		t.Fatalf("GET /alive = %q, %v; want 200", status, err)
 	}
 	time.Sleep(3 * delay)
-	if status, _ := fetch(t, "GET", url); status != 200 {
+	if status, _ := testutil.Fetch(t, "GET", url); status != 200 {
 		t.Fatalf("GET / with /alive held = %d, want 200", status)
 	}
 	time.Sleep(3 * delay)
@@ -161,7 +131,7 @@ func TestBackgroundOutlivesTheParentUntilTheTabCloses(t *testing.T) {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	if waited := time.Since(closed); waited+closeTimerSlack < delay {
+	if waited := time.Since(closed); waited+testutil.TimerSlack < delay {
 		t.Errorf("exited %s after /alive closed, before the %s delay", waited, delay)
 	}
 }

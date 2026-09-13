@@ -82,27 +82,34 @@ $ kubectl get pods -o json | jqweb -o k8s.html
 ```
 
 ## Usage
-usage: `jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [-O|--open] [-C|--close] [--simple] [--theme <name>] [<query>] [<input-file>]`
+
+```
+usage: jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [-O|--open]
+             [-C|--close] [--close-delay <d>] [--simple] [--theme <name>]
+             [-v|--version] [<query>] [<input-file>]
 
 Reads JSON from <input-file> ("-" or absent: stdin) and renders it as a
-self-contained interactive HTML page, served on a random port or written to file.
+self-contained interactive HTML page, which opens with <query> in its search
+box. A single argument is the input file if a file by that name exists, and
+the query otherwise: "jqweb <query> -" reads stdin, and "jqweb . <input-file>"
+reads the file, since "." is no query.
 
-A single argument is the input file if a file by that name exists, and the
-query otherwise. `jqweb <query> -` always reads stdin, and `jqweb . <input-file>`
-always reads the file, since `.` is no query.
-```
   -p, --port <port>    serve the page on http://<host>:<port>/
       --host <ip>      bind address for -p (default 127.0.0.1)
   -o, --output <file>  write the page to <file>; "-" writes to stdout
-  -O, --open           opens your default web browser with the output
+  -O, --open           open the page in the default browser
   -C, --close          serve from the background until the last tab closes
       --close-delay <d>  how long after the last tab closes -C waits
                        (default 10s); giving it turns on -C
       --simple         leave out the jq query engine, for a smaller page
       --theme <name>   light, dark, or auto to follow the reader's system
-```
-With no -p and no -o, it listens on a random available port.
+                       (default auto)
+  -v, --version        print the version and exit
 
+-OC does both: open the browser and serve from the background.
+
+With no -p and no -o, it listens on a random available port.
+```
 
 ## Search
 

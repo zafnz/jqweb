@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/zafnz/jqweb/internal/testutil"
 )
 
 // releaseServer answers the way github.com does: /releases/latest redirects to
@@ -547,7 +549,7 @@ func TestLatestVersionRejectsWhatNamesNoTag(t *testing.T) {
 // The check runs in a goroutine of its own, so a build from a working tree has
 // to be turned away before that goroutine starts rather than by it.
 func TestCheckSkipsADevBuild(t *testing.T) {
-	ch := Check("dev", false)
+	ch := Check("dev", false, true)
 	select {
 	case line, ok := <-ch:
 		if ok {
@@ -594,10 +596,6 @@ func TestPrintNoticeIsSilentWithNoAnswer(t *testing.T) {
 	}
 }
 
-// timerSlack is how far ahead of its delay a timer can appear to fire when it
-// is timed from outside.
-const timerSlack = 50 * time.Millisecond
-
 func TestWaitNoticeGivesUpAfterTheDelay(t *testing.T) {
 	const delay = 150 * time.Millisecond
 	ch := make(chan string) // never answered
@@ -605,7 +603,7 @@ func TestWaitNoticeGivesUpAfterTheDelay(t *testing.T) {
 
 	start := time.Now()
 	WaitNotice(w, ch, delay)
-	if waited := time.Since(start); waited+timerSlack < delay {
+	if waited := time.Since(start); waited+testutil.TimerSlack < delay {
 		t.Errorf("gave up after %s, before the %s delay", waited, delay)
 	}
 	select {

@@ -1,6 +1,6 @@
-// jqweb renders a JSON document as a self-contained interactive HTML page:
-// a collapsible tree with jq-style coloring, text filtering, path lookup, and
-// per-key copy-path buttons.
+// jqweb renders a JSON document as one self-contained HTML page: a collapsible
+// tree with text search, path lookup, jq queries and a copy-path button on
+// every line. The page is served locally or written to a file.
 package main
 
 import (
@@ -46,8 +46,12 @@ func releaseVersion() string {
 	return "dev"
 }
 
-func usage() {
-	fmt.Fprint(os.Stderr, `usage: jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [<query>] [<input-file>]
+// usageText is what a bad command line prints. README.md carries the same
+// text in its usage section, and TestReadmeCarriesUsage fails when the two
+// drift apart.
+const usageText = `usage: jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [-O|--open]
+             [-C|--close] [--close-delay <d>] [--simple] [--theme <name>]
+             [-v|--version] [<query>] [<input-file>]
 
 Reads JSON from <input-file> ("-" or absent: stdin) and renders it as a
 self-contained interactive HTML page, which opens with <query> in its search
@@ -65,11 +69,15 @@ reads the file, since "." is no query.
       --simple         leave out the jq query engine, for a smaller page
       --theme <name>   light, dark, or auto to follow the reader's system
                        (default auto)
+  -v, --version        print the version and exit
 
 -OC does both: open the browser and serve from the background.
 
 With no -p and no -o, it listens on a random available port.
-`)
+`
+
+func usage() {
+	fmt.Fprint(os.Stderr, usageText)
 }
 
 // cliOptions is a parsed command line: the flag values, which of them were
@@ -141,19 +149,16 @@ func main() {
 	if err != nil {
 		os.Exit(2)
 	}
-	port, output, host := opt.port, opt.output, opt.host
-	open, simple, theme := opt.open, opt.simple, opt.theme
-	portSet, outSet := opt.portSet, opt.outSet
 
 	if opt.version {
 		fmt.Fprintf(os.Stdout, "jqweb %s\n", releaseVersion())
 		os.Exit(0)
 	}
 
-	switch theme {
+	switch opt.theme {
 	case "auto", "light", "dark":
 	default:
-		fmt.Fprintf(os.Stderr, "jqweb: --theme must be auto, light or dark, not %q\n", theme)
+		fmt.Fprintf(os.Stderr, "jqweb: --theme must be auto, light or dark, not %q\n", opt.theme)
 		usage()
 		os.Exit(2)
 	}
@@ -171,15 +176,19 @@ func main() {
 		os.Exit(2)
 	}
 
+	// -p serves and -o writes a file; given neither, the page is served on a
+	// random port, and given both it is served and written.
+	serving := opt.portSet || !opt.outSet
+
 	// Started once the command line is known to be good and before the
 	// document is read, so the request runs alongside the work that follows.
 	// Only an exit ever waits on it. The -C parent keeps the terminal, so it
 	// checks and the child does not.
 	var notice <-chan string
 	if !opt.child {
-		notice = update.Check(releaseVersion(), updateCheck == "off")
+		notice = update.Check(releaseVersion(), updateCheck == "off", isTTY(os.Stderr))
 	}
-	if opt.closeOnGet && !opt.child && (portSet || !outSet) {
+	if opt.closeOnGet && !opt.child && serving {
 		os.Exit(serve.RunInBackground(notice))
 	}
 
@@ -205,17 +214,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
 		os.Exit(1)
 	}
-	if !portSet && !outSet {
-		port = 0
-		portSet = true
-	}
 
-	displayName := inName
-	title := "stdin"
+	displayName, title := inName, filepath.Base(inName)
 	if inName == "-" {
-		displayName = "stdin"
-	} else {
-		title = filepath.Base(inName)
+		displayName, title = "stdin", "stdin"
 	}
 
 	if err := check.Document(data); err != nil {
@@ -225,38 +227,38 @@ func main() {
 
 	// The page assembly asks for what to put in rather than what to leave out,
 	// so the flag is turned round here and nowhere else.
-	pageOpt := page.Options{JQ: !simple, Theme: theme, Query: query}
-	rendered := []byte(page.Render(data, title, pageOpt))
+	pageOpt := page.Options{JQ: !opt.simple, Theme: opt.theme, Query: query}
 
-	if outSet {
-		if output == "-" {
+	if opt.outSet {
+		rendered := []byte(page.Render(data, title, pageOpt))
+		if opt.output == "-" {
 			os.Stdout.Write(rendered)
 		} else {
-			if err := os.WriteFile(output, rendered, 0o644); err != nil {
+			if err := os.WriteFile(opt.output, rendered, 0o644); err != nil {
 				fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
 				os.Exit(1)
 			}
-			if open {
-				// The filepath must be the absolute path, otherwise the browser will not be able to find the file.
-				output, err := filepath.Abs(output)
+			if opt.open {
+				// A file: URL needs the absolute path; the browser has no
+				// working directory to resolve a relative one against.
+				abs, err := filepath.Abs(opt.output)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
 					os.Exit(1)
 				}
-				url := "file://" + output
-				if err := serve.OpenBrowser(url); err != nil {
+				if err := serve.OpenBrowser("file://" + abs); err != nil {
 					fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
 					os.Exit(1)
 				}
 			}
 		}
 	}
-	if portSet {
-		// Only a served page holds /alive open, so -o and -p together
-		// render it twice.
+	if serving {
+		// Only a served page holds /alive open, so -o and -p together render
+		// it twice.
 		pageOpt.Served = true
-		err := serve.Serve(host, port, []byte(page.Render(data, title, pageOpt)), serve.Options{
-			Open:       open,
+		err := serve.Serve(opt.host, opt.port, []byte(page.Render(data, title, pageOpt)), serve.Options{
+			Open:       opt.open,
 			CloseOnGet: opt.closeOnGet,
 			CloseDelay: opt.closeDelay,
 			FirstLoad:  serve.FirstLoadTimeout,
@@ -268,9 +270,6 @@ func main() {
 			os.Exit(1)
 		}
 		return
-	}
-	if !outSet {
-		os.Stdout.Write(rendered) // stdout is not a tty here
 	}
 	// Nothing follows but the exit, so this is the last chance to print an
 	// update notice, and the wait is what a check still in flight costs.
@@ -324,6 +323,8 @@ func flagName(a string) string {
 	return name
 }
 
+// isTTY reports whether f is a terminal, which decides whether stdin can be
+// read for the document and whether anyone is watching stderr for a notice.
 func isTTY(f *os.File) bool {
 	fi, err := f.Stat()
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0

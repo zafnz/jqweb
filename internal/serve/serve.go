@@ -23,8 +23,8 @@ import (
 type Options struct {
 	Open       bool          // open the page in the browser once listening
 	CloseOnGet bool          // stop serving once the last tab has closed
-	CloseDelay time.Duration // how long after the last tab closes closeOnGet waits
-	FirstLoad  time.Duration // how long closeOnGet waits for a page to open, from startup or a GET of "/"
+	CloseDelay time.Duration // how long after the last tab closes CloseOnGet waits
+	FirstLoad  time.Duration // how long CloseOnGet waits for a page to open, from startup or a GET of "/"
 	Notice     <-chan string // an update notice, printed whenever it arrives
 	Background bool          // the -C child: detach from the parent once ready
 }
@@ -38,6 +38,12 @@ const FirstLoadTimeout = 300 * time.Second
 // watches for it to know the child did not fail.
 const ReadyLine = "jqweb: running in the background"
 
+// Serve listens on host and port, says where on stderr, and serves page there
+// until the process is interrupted or, with opt.CloseOnGet, until the last
+// tab showing it has closed. With opt.Open it starts the browser on the page
+// first, and with opt.Background it prints the ready line and lets go of its
+// outputs before serving. It returns nil when the server stopped because
+// CloseOnGet asked it to.
 func Serve(host string, port int, page []byte, opt Options) error {
 	ln, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if err != nil {
@@ -55,15 +61,13 @@ func Serve(host string, port int, page []byte, opt Options) error {
 	}
 	if opt.Open {
 		if err := OpenBrowser(fmt.Sprintf("http://%s/", ln.Addr())); err != nil {
-			fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 	}
 	if opt.Background {
 		null, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 		fmt.Fprintf(os.Stderr, "%s, pid %d\n", ReadyLine, os.Getpid())
 		// The parent exits once it reads that line, and nothing may be
@@ -188,10 +192,15 @@ func serveOn(ln net.Listener, page []byte, opt Options) error {
 	return nil
 }
 
+// OpenBrowser starts the reader's browser on url: $BROWSER when it is set,
+// and the platform's opener otherwise. It returns once the command has
+// started, not once the page has opened.
 func OpenBrowser(url string) error {
 	return browserCommand(os.Getenv("BROWSER"), runtime.GOOS, url).Start()
 }
 
+// browserCommand is the command OpenBrowser runs, built apart from running it
+// so a test can read the command line.
 func browserCommand(browser, goos, url string) *exec.Cmd {
 	if browser != "" {
 		return exec.Command(browser, url)

@@ -13,21 +13,36 @@ import { each, pathOf, resolvePath, showPath } from './tree.ts';
 
 /* What the page hands the query UI: the document to run a query against, and
    what only this closure holds -- the tree root that resolve walks, the header
-   and count that showFound writes to, and the run that rerun repeats. */
+   and count that showFound writes to, the run that rerun repeats, and the
+   browser history that record writes the box to. */
 export interface QueryHost {
   value: ValueNode;
   resolve(segs: Segment[]): Found;
   showFound(found: Found, want: number): void;
-  rerun(force?: boolean): void;
+  rerun(): void;
+  record(how?: EntryWrite): void;
 }
 
-/* What the query UI hands back. */
+/* What the query UI hands back. run returns false when it held the query back
+   to offer completions. */
 export interface QueryUI {
   wants(raw: string): boolean;
-  run(raw: string, force?: boolean): void;
+  run(raw: string, force?: boolean): boolean;
   filter(node: HTMLElement): void;
   clearFault(): void;
   showDocument(): void;
+  forget(): void;
+}
+
+/* How record writes the box to the browser's history: push always starts a
+   new entry, replace always rewrites the current one, and leaving it out
+   decides by how long ago the last write was. */
+export type EntryWrite = 'push' | 'replace';
+
+/* One history entry: what the box and the mode select held. */
+interface Entry {
+  q: string;
+  mode: string;
 }
 
 /* jqui from query/ui.ts, which the full entry passes to startPage and the
@@ -41,33 +56,42 @@ export function startSearch(jqui: StartQuery | null, value: ValueNode, root: HTM
   const header = find('header', HTMLElement);
   const input = find('#q', HTMLInputElement);
   const stats = find('#stats', HTMLElement);
+  /* In the page with or without the engine; only query/ui.ts reads it, but
+     every history entry records it. */
+  const mode = find('#mode', HTMLSelectElement);
 
   /* A query given on the command line is in the page as the box's value. One
      in a ?q= on the page's address takes its place, so a link to a served
-     page can carry a query of its own. Whichever it is runs at the end of
-     this function, once everything it needs is set up. */
+     page can carry a query of its own. A history entry the page is loading
+     into, on a reload or on coming back from another page, takes the place of
+     both, since it holds what the box last held. Whichever it is runs at the
+     end of this function, once everything it needs is set up. */
+  const kept = entryOf(history.state);
   const asked = new URLSearchParams(location.search).get('q');
-  if (asked !== null) input.value = asked;
+  if (kept) input.value = kept.q;
+  else if (asked !== null) input.value = asked;
 
   /* The query half, or null in a page built with --simple. */
   const query = jqui ? jqui({
     value: value,
     resolve: function (segs) { return resolvePath(root, segs); },
     showFound: showFound,
-    rerun: run
+    rerun: function () { step(); },
+    record: record
   }) : null;
+  if (kept) mode.value = kept.mode;
 
   /* Searching walks the whole tree, so wait for a pause in typing rather than
      doing it on every keystroke. */
   let timer: ReturnType<typeof setTimeout> | undefined;
   input.addEventListener('input', function () {
     clearTimeout(timer);
-    timer = setTimeout(run, 120);
+    timer = setTimeout(step, 120);
   });
   /* "/" focuses the search box, Escape clears it. */
   document.addEventListener('keydown', function (e) {
     if (e.key === '/' && e.target !== input) { e.preventDefault(); input.focus(); }
-    if (e.key === 'Escape' && e.target === input) { input.value = ''; run(); }
+    if (e.key === 'Escape' && e.target === input) { input.value = ''; step('push'); }
   });
 
   /* A phone gets the tree and the fold button only: page.css hides the search
@@ -77,22 +101,70 @@ export function startSearch(jqui: StartQuery | null, value: ValueNode, root: HTM
      is cleared on the way in. */
   const phone = window.matchMedia('(max-width: 600px)');
   phone.addEventListener('change', function () {
-    if (phone.matches && input.value) { input.value = ''; run(); }
+    if (phone.matches && input.value) { input.value = ''; step('replace'); }
   });
+
+  /* Back and Forward step through what the box has held. Going to an entry
+     puts the box and the mode select back and runs the box as written: an
+     entry is only recorded for a run that was not held back to offer
+     completions, so forcing it shows what was on screen when it was recorded.
+
+     The address is left alone. A ?q= in it runs as a jq query however it
+     reads, so a text search written there would come back as a query on a
+     reload.
+
+     Typing makes one entry per query rather than one per pause: a write within
+     EDIT_MS of the last one replaces the entry, and a longer gap starts a new
+     one. */
+  const EDIT_MS = 1000;
+  let written = 0;
+
+  function record(how?: EntryWrite): void {
+    const entry: Entry = { q: input.value, mode: mode.value };
+    const now = Date.now();
+    if (how === 'replace' || (!how && now - written < EDIT_MS)) {
+      history.replaceState(entry, '');
+    } else {
+      const at = entryOf(history.state);
+      if (at && at.q === entry.q && at.mode === entry.mode) return;
+      history.pushState(entry, '');
+    }
+    written = now;
+  }
+
+  window.addEventListener('popstate', function (e) {
+    const entry = entryOf(e.state);
+    if (!entry) return;
+    clearTimeout(timer);
+    input.value = entry.q;
+    mode.value = entry.mode;
+    if (query) query.forget();
+    run(true);
+    /* Typing after going back starts an entry of its own rather than
+       rewriting the one gone back to. */
+    written = 0;
+  });
+
+  /* Runs the box and records it in the history. */
+  function step(how?: EntryWrite): void {
+    if (run()) record(how);
+  }
 
   /* Runs whatever is in the box. Without query/ui.ts that is text to find or a
      path, as it has always been; with it, the mode decides. force runs a
      half-typed name as written rather than completing it, which is what the
      query the page opened with is given, since nobody is part way through
-     typing it. */
-  function run(force?: boolean): void {
+     typing it. Returns false when the query UI held the run back to offer
+     completions. */
+  function run(force?: boolean): boolean {
     const raw = input.value.trim();
     if (query) query.clearFault();
-    if (!raw) { reset(); return; }
-    if (!query) { runPath(raw); return; }
-    if (query.wants(raw)) { query.run(raw, force); return; }
+    if (!raw) { reset(); return true; }
+    if (!query) { runPath(raw); return true; }
+    if (query.wants(raw)) return query.run(raw, force);
     query.showDocument();
     findText(raw);
+    return true;
   }
 
   /* What a page built with --simple does, and what every page did before the
@@ -144,6 +216,14 @@ export function startSearch(jqui: StartQuery | null, value: ValueNode, root: HTM
      that it is run as written: it was given whole rather than a letter at a
      time, so a name in it that no key finishes is still the query. */
   if (input.value.trim()) run(true);
+  history.replaceState({ q: input.value, mode: mode.value } satisfies Entry, '');
 
   return query;
+}
+
+/* The entry in a history state, or null for a state this page did not write. */
+function entryOf(state: unknown): Entry | null {
+  if (!state || typeof state !== 'object') return null;
+  const s = state as Partial<Entry>;
+  return typeof s.q === 'string' && typeof s.mode === 'string' ? { q: s.q, mode: s.mode } : null;
 }

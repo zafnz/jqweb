@@ -9,6 +9,11 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+### Back and Forward step through searches
+
+The browser's Back and Forward buttons step through the searches and queries
+run in the search box, and reloading the page keeps the one in it.
+
 ## [0.9.0] - 2026-09-13
 
 ### Dev container feature

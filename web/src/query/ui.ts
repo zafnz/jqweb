@@ -12,7 +12,7 @@ import { pathText } from '../model/path.ts';
 import { COPY_GLYPH, renderTree } from '../model/render.ts';
 import { copy } from '../page/clipboard.ts';
 import { find } from '../page/dom.ts';
-import type { QueryHost, QueryUI } from '../page/search.ts';
+import type { EntryWrite, QueryHost, QueryUI } from '../page/search.ts';
 import { segsOf } from '../page/tree.ts';
 import { compile, isJqError } from './engine/index.ts';
 import type { Query } from './engine/index.ts';
@@ -95,11 +95,12 @@ export function jqui(page: QueryHost): QueryUI {
 
      A query still being typed is not run at all: while its trailing name is
      a prefix of keys that are really there, complete() offers those instead
-     and the view stays as it was. force is Enter saying run it anyway. */
-  function run(raw: string, force?: boolean): void {
+     and the view stays as it was, and run returns false. force is Enter
+     saying run it anyway. */
+  function run(raw: string, force?: boolean): boolean {
     clearFault();
     completing = !force && complete(raw);
-    if (completing) return;
+    if (completing) return false;
     showDocument();
     let query: Query;
     try {
@@ -107,18 +108,19 @@ export function jqui(page: QueryHost): QueryUI {
     } catch (e) {
       if (!(e instanceof Error)) throw e;
       fault(e.message, isJqError(e) ? e.pos : undefined);
-      return;
+      return true;
     }
-    if (query.path) { page.showFound(page.resolve(query.path), query.path.length); return; }
+    if (query.path) { page.showFound(page.resolve(query.path), query.path.length); return true; }
     let out: ValueNode[];
     try {
       out = query.run(page.value);
     } catch (e) {
       if (!(e instanceof Error)) throw e;
       fault(e.message);
-      return;
+      return true;
     }
     showResults(out);
+    return true;
   }
 
   /* Reports a query that would not compile or would not run. The message goes
@@ -234,7 +236,7 @@ export function jqui(page: QueryHost): QueryUI {
       }
     }
     draw();
-    if (rows.length) pick(0);
+    if (rows.length) pick(0, 'push');
     show();
   }
 
@@ -330,11 +332,12 @@ export function jqui(page: QueryHost): QueryUI {
 
      It runs the query itself rather than going back through the box, because
      every row is a query by construction and nothing about it should depend on
-     what the mode select would have guessed. */
-  function pick(i: number): void {
+     what the mode select would have guessed. The filter button asks for a new
+     history entry; stepping through the list goes by the usual timing. */
+  function pick(i: number, how?: EntryWrite): void {
     input.value = rows[i].q;
     mark(i);
-    run(rows[i].q);
+    if (run(rows[i].q)) page.record(how);
   }
 
   suggestions.addEventListener('click', function (e) {
@@ -377,6 +380,7 @@ export function jqui(page: QueryHost): QueryUI {
     if (e.key === 'Enter' && completing) {
       hide();
       run(input.value.trim(), true);
+      page.record();
       return;
     }
     if (suggestions.hidden || !rows.length) return;
@@ -400,6 +404,7 @@ export function jqui(page: QueryHost): QueryUI {
     run: run,
     filter: filter,
     clearFault: clearFault,
-    showDocument: showDocument
+    showDocument: showDocument,
+    forget: forget
   };
 }

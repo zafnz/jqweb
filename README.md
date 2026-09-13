@@ -125,6 +125,9 @@ path. Paste `.list.of.things[302].item`, or any prefix of it such as
 copy button on each line puts that line's path on the clipboard, so a copied
 path can be pasted straight back into the box.
 
+The browser's Back and Forward buttons step through the searches and queries
+run in the box, and reloading the page keeps the one in it.
+
 ## jq queries
 
 The search box answers jq queries as well as filtering text:

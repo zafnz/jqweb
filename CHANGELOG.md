@@ -13,7 +13,7 @@ above the commit list GoReleaser generates.
 
 `-C` and `-OC` return the prompt straight away and keep serving while any tab
 has the page open, so reloading it works. The server exits once the last tab
-is closed.
+is closed, or after 5 minutes if the page is never opened.
 
 **Fixed:** pressing Escape to dismiss query suggestions no longer clears the
 search box.

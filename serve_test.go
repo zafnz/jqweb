@@ -312,3 +312,42 @@ func TestServeReloadKeepsServing(t *testing.T) {
 	reloaded()
 	stopsAfter(t, done, time.Now(), delay)
 }
+
+// Nothing ever loads the page, so -C gives up once the first-load wait is over,
+// and not at the close delay.
+func TestServeStopsWhenThePageIsNeverLoaded(t *testing.T) {
+	const delay, firstLoad = 50 * time.Millisecond, 400 * time.Millisecond
+	start := time.Now()
+	_, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay, firstLoad: firstLoad})
+	defer ln.Close()
+	stopsAfter(t, done, start, firstLoad)
+}
+
+// The link is clicked well after the close delay: the page is still there, and
+// from the first load on the close delay is what counts.
+func TestServeWaitsForTheFirstLoad(t *testing.T) {
+	const delay, firstLoad = 150 * time.Millisecond, 5 * time.Second
+	start := time.Now()
+	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay, firstLoad: firstLoad})
+	defer ln.Close()
+
+	time.Sleep(5 * delay)
+	stillServing(t, done, "before the page was first loaded")
+	if status, _ := fetch(t, http.MethodGet, url); status != http.StatusOK {
+		t.Fatalf("GET / = %d, want 200", status)
+	}
+	hold(t, url)()
+	stopsAfter(t, done, time.Now(), delay)
+	if took := time.Since(start); took >= firstLoad {
+		t.Errorf("stopped %s after starting, which is the first-load wait rather than the close delay", took)
+	}
+}
+
+// A --close-delay longer than the first-load wait is not cut short by it.
+func TestServeFirstLoadWaitIsNoShorterThanTheCloseDelay(t *testing.T) {
+	const delay, firstLoad = 400 * time.Millisecond, 100 * time.Millisecond
+	start := time.Now()
+	_, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay, firstLoad: firstLoad})
+	defer ln.Close()
+	stopsAfter(t, done, start, delay)
+}

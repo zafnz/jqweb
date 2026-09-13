@@ -45,7 +45,8 @@ jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)
 
 Add `-C` (or `--close`) and jqweb returns the prompt straight away, serving
 from the background until the last tab showing the page is closed. Reloading
-the page keeps it running. `-OC` does both:
+the page keeps it running, and if the page is not opened within 5 minutes
+jqweb exits. `-OC` does both:
 
 ```
 $ jqweb -OC myfile.json

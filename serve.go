@@ -22,9 +22,15 @@ type serveOptions struct {
 	open       bool          // open the page in the browser once listening
 	closeOnGet bool          // stop serving once the last tab has closed
 	closeDelay time.Duration // how long after the last tab closes closeOnGet waits
+	firstLoad  time.Duration // how long closeOnGet waits for the first load; 0 waits forever
 	notice     <-chan string // an update notice, printed whenever it arrives
 	background bool          // the -C child: detach from the parent once ready
 }
+
+// firstLoadTimeout is how long -C serves before anything has loaded the page.
+// It is longer than --close-delay so there is time to find the link and click
+// it, and it ends a run whose link nobody clicked.
+const firstLoadTimeout = 300 * time.Second
 
 // readyLine starts the line the -C child prints once it is serving. The parent
 // watches for it to know the child did not fail.
@@ -71,9 +77,10 @@ func serve(host string, port int, page []byte, opt serveOptions) error {
 //
 // A served page holds a request to /alive open for as long as it exists, and
 // the browser drops that connection when the tab unloads. The close timer runs
-// while none are open. It starts when the last one closes, or on a GET of "/"
-// when none are open, which covers a client that fetches the page and runs no
-// script; a new /alive stops it. A reload fetches "/" before the old page
+// while none are open. Until the page is first loaded it is opt.firstLoad, or
+// opt.closeDelay if that is longer. After that it starts when the last /alive
+// closes, or on a GET of "/" when none are open, which covers a client that
+// fetches the page and runs no script; a new /alive stops it. A reload fetches "/" before the old page
 // unloads, and the new page's /alive has to arrive within opt.closeDelay of
 // the old one closing.
 func serveOn(ln net.Listener, page []byte, opt serveOptions) error {
@@ -111,6 +118,15 @@ func serveOn(ln net.Listener, page []byte, opt serveOptions) error {
 			return
 		}
 		timer.Reset(opt.closeDelay)
+	}
+	if opt.closeOnGet && opt.firstLoad > 0 {
+		wait := opt.firstLoad
+		if opt.closeDelay > wait {
+			wait = opt.closeDelay
+		}
+		// The first GET of "/" or /alive resets or stops this, and the close
+		// delay applies from then on.
+		timer = time.AfterFunc(wait, expire)
 	}
 
 	mux := http.NewServeMux()

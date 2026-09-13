@@ -246,6 +246,7 @@ func main() {
 			open:       open,
 			closeOnGet: opt.closeOnGet,
 			closeDelay: opt.closeDelay,
+			firstLoad:  firstLoadTimeout,
 			notice:     notice,
 			background: opt.child,
 		})

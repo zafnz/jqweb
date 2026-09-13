@@ -1,4 +1,4 @@
-package main
+package check
 
 import (
 	"bytes"
@@ -10,10 +10,10 @@ import (
 	"unicode/utf8"
 )
 
-// check reports whether data is a single well-formed JSON document. The page
+// Document reports whether data is a single well-formed JSON document. The page
 // embeds the document itself and renders it in the browser, so nothing is kept
 // from this pass but the error.
-func check(data []byte) error {
+func Document(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
 	if err := checkValue(dec); err != nil {

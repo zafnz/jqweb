@@ -13,11 +13,24 @@ import (
 	"runtime/debug"
 	"strings"
 	"time"
+
+	"github.com/zafnz/jqweb/internal/check"
+	"github.com/zafnz/jqweb/internal/page"
+	"github.com/zafnz/jqweb/internal/serve"
+	"github.com/zafnz/jqweb/internal/update"
 )
 
 // versionString is set by the linker at release time:
 // -X main.versionString=<tag>
 var versionString = ""
+
+// updateCheck is set by the linker to switch the update check off for good:
+//
+//	-X main.updateCheck=off
+//
+// It is there for downstream packagers, whose users upgrade through the
+// package manager rather than by being told to.
+var updateCheck = ""
 
 // releaseVersion reports the release tag when the linker set one, otherwise the
 // module version recorded by "go install", otherwise "dev" for a local build.
@@ -164,10 +177,10 @@ func main() {
 	// checks and the child does not.
 	var notice <-chan string
 	if !opt.child {
-		notice = checkForUpdate()
+		notice = update.Check(releaseVersion(), updateCheck == "off")
 	}
 	if opt.closeOnGet && !opt.child && (portSet || !outSet) {
-		os.Exit(runInBackground(notice))
+		os.Exit(serve.RunInBackground(notice))
 	}
 
 	var data []byte
@@ -205,21 +218,21 @@ func main() {
 		title = filepath.Base(inName)
 	}
 
-	if err := check(data); err != nil {
+	if err := check.Document(data); err != nil {
 		fmt.Fprintf(os.Stderr, "jqweb: %s: %s\n", displayName, err)
 		os.Exit(1)
 	}
 
 	// The page assembly asks for what to put in rather than what to leave out,
 	// so the flag is turned round here and nowhere else.
-	pageOpt := options{jq: !simple, theme: theme, query: query}
-	page := []byte(renderPage(data, title, pageOpt))
+	pageOpt := page.Options{JQ: !simple, Theme: theme, Query: query}
+	rendered := []byte(page.Render(data, title, pageOpt))
 
 	if outSet {
 		if output == "-" {
-			os.Stdout.Write(page)
+			os.Stdout.Write(rendered)
 		} else {
-			if err := os.WriteFile(output, page, 0o644); err != nil {
+			if err := os.WriteFile(output, rendered, 0o644); err != nil {
 				fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
 				os.Exit(1)
 			}
@@ -231,7 +244,7 @@ func main() {
 					os.Exit(1)
 				}
 				url := "file://" + output
-				if err := openBrowser(url); err != nil {
+				if err := serve.OpenBrowser(url); err != nil {
 					fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
 					os.Exit(1)
 				}
@@ -241,14 +254,14 @@ func main() {
 	if portSet {
 		// Only a served page holds /alive open, so -o and -p together
 		// render it twice.
-		pageOpt.served = true
-		err := serve(host, port, []byte(renderPage(data, title, pageOpt)), serveOptions{
-			open:       open,
-			closeOnGet: opt.closeOnGet,
-			closeDelay: opt.closeDelay,
-			firstLoad:  firstLoadTimeout,
-			notice:     notice,
-			background: opt.child,
+		pageOpt.Served = true
+		err := serve.Serve(host, port, []byte(page.Render(data, title, pageOpt)), serve.Options{
+			Open:       open,
+			CloseOnGet: opt.closeOnGet,
+			CloseDelay: opt.closeDelay,
+			FirstLoad:  serve.FirstLoadTimeout,
+			Notice:     notice,
+			Background: opt.child,
 		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
@@ -257,11 +270,11 @@ func main() {
 		return
 	}
 	if !outSet {
-		os.Stdout.Write(page) // stdout is not a tty here
+		os.Stdout.Write(rendered) // stdout is not a tty here
 	}
 	// Nothing follows but the exit, so this is the last chance to print an
 	// update notice, and the wait is what a check still in flight costs.
-	waitNotice(os.Stderr, notice, updateWait)
+	update.WaitNotice(os.Stderr, notice, update.ExitWait)
 }
 
 // valueFlags are the flags that take a value, by the name the flag package

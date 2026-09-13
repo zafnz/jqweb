@@ -1,4 +1,4 @@
-package main
+package serve
 
 import (
 	"context"
@@ -14,56 +14,58 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/zafnz/jqweb/internal/update"
 )
 
-// serveOptions are the parts of the command line that change how the server
+// Options are the parts of the command line that change how the server
 // behaves rather than what it serves.
-type serveOptions struct {
-	open       bool          // open the page in the browser once listening
-	closeOnGet bool          // stop serving once the last tab has closed
-	closeDelay time.Duration // how long after the last tab closes closeOnGet waits
-	firstLoad  time.Duration // how long closeOnGet waits for a page to open, from startup or a GET of "/"
-	notice     <-chan string // an update notice, printed whenever it arrives
-	background bool          // the -C child: detach from the parent once ready
+type Options struct {
+	Open       bool          // open the page in the browser once listening
+	CloseOnGet bool          // stop serving once the last tab has closed
+	CloseDelay time.Duration // how long after the last tab closes closeOnGet waits
+	FirstLoad  time.Duration // how long closeOnGet waits for a page to open, from startup or a GET of "/"
+	Notice     <-chan string // an update notice, printed whenever it arrives
+	Background bool          // the -C child: detach from the parent once ready
 }
 
-// firstLoadTimeout is how long -C serves before anything has loaded the page.
+// FirstLoadTimeout is how long -C serves before anything has loaded the page.
 // It is longer than --close-delay so there is time to find the link and click
 // it, and it ends a run whose link nobody clicked.
-const firstLoadTimeout = 300 * time.Second
+const FirstLoadTimeout = 300 * time.Second
 
-// readyLine starts the line the -C child prints once it is serving. The parent
+// ReadyLine starts the line the -C child prints once it is serving. The parent
 // watches for it to know the child did not fail.
-const readyLine = "jqweb: running in the background"
+const ReadyLine = "jqweb: running in the background"
 
-func serve(host string, port int, page []byte, opt serveOptions) error {
+func Serve(host string, port int, page []byte, opt Options) error {
 	ln, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if err != nil {
 		return err
 	}
 	stops := "Ctrl-C to stop"
-	if opt.closeOnGet {
+	if opt.CloseOnGet {
 		stops = "until the last tab closes"
 	}
 	fmt.Fprintf(os.Stderr, "jqweb: serving on http://%s/ (%s)\n", ln.Addr(), stops)
 	// After the serving line, and from a goroutine, so that a slow update
 	// check cannot hold up the server or the browser.
-	if opt.notice != nil {
-		printNotice(os.Stderr, opt.notice)
+	if opt.Notice != nil {
+		update.PrintNotice(os.Stderr, opt.Notice)
 	}
-	if opt.open {
-		if err := openBrowser(fmt.Sprintf("http://%s/", ln.Addr())); err != nil {
+	if opt.Open {
+		if err := OpenBrowser(fmt.Sprintf("http://%s/", ln.Addr())); err != nil {
 			fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
 			os.Exit(1)
 		}
 	}
-	if opt.background {
+	if opt.Background {
 		null, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Fprintf(os.Stderr, "%s, pid %d\n", readyLine, os.Getpid())
+		fmt.Fprintf(os.Stderr, "%s, pid %d\n", ReadyLine, os.Getpid())
 		// The parent exits once it reads that line, and nothing may be
 		// written to its pipes after it. detachOutputs owns null from here.
 		detachOutputs(null)
@@ -72,20 +74,20 @@ func serve(host string, port int, page []byte, opt serveOptions) error {
 }
 
 // serveOn serves the page on ln until the process is interrupted, or, with
-// opt.closeOnGet, until the timer runs out with no tab showing it.
+// opt.CloseOnGet, until the timer runs out with no tab showing it.
 //
 // A served page holds a request to /alive open for as long as it exists, and
 // the browser drops that connection when the tab unloads; a new /alive stops
 // the timer. While no tab has the page open, the timer waits for one to open
-// it, for opt.firstLoad or opt.closeDelay if that is longer. That wait starts
+// it, for opt.FirstLoad or opt.CloseDelay if that is longer. That wait starts
 // when jqweb starts, which leaves time to click the link, and again on a GET
 // of "/", which covers the page arriving and its script running however short
-// the close delay is. The last tab closing starts opt.closeDelay instead. A
+// the close delay is. The last tab closing starts opt.CloseDelay instead. A
 // reload fetches "/" while the old page still holds its connection, so the
-// new page's /alive has to arrive within opt.closeDelay of the old one closing.
-func serveOn(ln net.Listener, page []byte, opt serveOptions) error {
+// new page's /alive has to arrive within opt.CloseDelay of the old one closing.
+func serveOn(ln net.Listener, page []byte, opt Options) error {
 	srv := &http.Server{}
-	if opt.background {
+	if opt.Background {
 		// The default logger holds the stderr the process started with, which
 		// detachOutputs does not replace on every platform.
 		srv.ErrorLog = log.New(io.Discard, "", 0)
@@ -120,11 +122,11 @@ func serveOn(ln net.Listener, page []byte, opt serveOptions) error {
 		}
 		timer.Reset(d)
 	}
-	opening := opt.firstLoad
-	if opt.closeDelay > opening {
-		opening = opt.closeDelay
+	opening := opt.FirstLoad
+	if opt.CloseDelay > opening {
+		opening = opt.CloseDelay
 	}
-	if opt.closeOnGet {
+	if opt.CloseOnGet {
 		timer = time.AfterFunc(opening, expire)
 	}
 
@@ -138,7 +140,7 @@ func serveOn(ln net.Listener, page []byte, opt serveOptions) error {
 		w.Write(page)
 		// A HEAD is a check that the page is there, not a reading of it, and
 		// http.Server has discarded the body written above.
-		if opt.closeOnGet && r.Method == http.MethodGet {
+		if opt.CloseOnGet && r.Method == http.MethodGet {
 			mu.Lock()
 			if alive == 0 {
 				startTimer(opening)
@@ -149,7 +151,7 @@ func serveOn(ln net.Listener, page []byte, opt serveOptions) error {
 	// Every served page opens this, with or without -C, so it is always
 	// answered: an EventSource that got a 404 would log an error in the page.
 	mux.HandleFunc("/alive", func(w http.ResponseWriter, r *http.Request) {
-		if opt.closeOnGet {
+		if opt.CloseOnGet {
 			// Counted before the headers go out, so a client that has read
 			// the status line knows it is counted.
 			mu.Lock()
@@ -162,7 +164,7 @@ func serveOn(ln net.Listener, page []byte, opt serveOptions) error {
 				mu.Lock()
 				alive--
 				if alive == 0 {
-					startTimer(opt.closeDelay)
+					startTimer(opt.CloseDelay)
 				}
 				mu.Unlock()
 			}()
@@ -186,7 +188,7 @@ func serveOn(ln net.Listener, page []byte, opt serveOptions) error {
 	return nil
 }
 
-func openBrowser(url string) error {
+func OpenBrowser(url string) error {
 	return browserCommand(os.Getenv("BROWSER"), runtime.GOOS, url).Start()
 }
 

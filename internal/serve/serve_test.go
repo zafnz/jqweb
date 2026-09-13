@@ -1,4 +1,4 @@
-package main
+package serve
 
 import (
 	"bufio"
@@ -23,7 +23,7 @@ const closeTimerSlack = 50 * time.Millisecond
 
 // startServer serves page on a listener of its own, and returns the URL, the
 // listener, and a channel carrying what serveOn returned.
-func startServer(t *testing.T, page []byte, opt serveOptions) (url string, ln net.Listener, done <-chan error) {
+func startServer(t *testing.T, page []byte, opt Options) (url string, ln net.Listener, done <-chan error) {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -108,7 +108,7 @@ func stopsAfter(t *testing.T, done <-chan error, since time.Time, delay time.Dur
 
 func TestServeSendsThePage(t *testing.T) {
 	page := []byte("<html>the document</html>")
-	url, ln, done := startServer(t, page, serveOptions{})
+	url, ln, done := startServer(t, page, Options{})
 	defer func() {
 		ln.Close()
 		<-done
@@ -125,7 +125,7 @@ func TestServeSendsThePage(t *testing.T) {
 
 func TestServeStopsAfterTheFetch(t *testing.T) {
 	const delay = 300 * time.Millisecond
-	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay, firstLoad: delay})
+	url, ln, done := startServer(t, []byte("page"), Options{CloseOnGet: true, CloseDelay: delay, FirstLoad: delay})
 	defer ln.Close()
 
 	start := time.Now()
@@ -150,7 +150,7 @@ func TestServeStopsAfterTheFetch(t *testing.T) {
 // the fetches land within about 150ms of when they are asked for.
 func TestServeFetchRestartsTheWait(t *testing.T) {
 	const delay = 600 * time.Millisecond
-	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay, firstLoad: delay})
+	url, ln, done := startServer(t, []byte("page"), Options{CloseOnGet: true, CloseDelay: delay, FirstLoad: delay})
 	defer ln.Close()
 
 	if status, _ := fetch(t, http.MethodGet, url); status != http.StatusOK {
@@ -185,7 +185,7 @@ func TestServeFetchRestartsTheWait(t *testing.T) {
 
 func TestServeKeepsServingWithoutClose(t *testing.T) {
 	const delay = 100 * time.Millisecond
-	url, ln, done := startServer(t, []byte("page"), serveOptions{closeDelay: delay})
+	url, ln, done := startServer(t, []byte("page"), Options{CloseDelay: delay})
 	defer func() {
 		ln.Close()
 		<-done
@@ -205,7 +205,7 @@ func TestServeKeepsServingWithoutClose(t *testing.T) {
 func TestServeHeadDoesNotRestartTheWait(t *testing.T) {
 	const firstLoad = 400 * time.Millisecond
 	start := time.Now()
-	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: 50 * time.Millisecond, firstLoad: firstLoad})
+	url, ln, done := startServer(t, []byte("page"), Options{CloseOnGet: true, CloseDelay: 50 * time.Millisecond, FirstLoad: firstLoad})
 	defer ln.Close()
 
 	time.Sleep(firstLoad / 2)
@@ -249,7 +249,7 @@ func TestBrowserCommandFallsBackForOS(t *testing.T) {
 // starts the delay.
 func TestServeAliveKeepsServing(t *testing.T) {
 	const delay = 150 * time.Millisecond
-	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay, firstLoad: delay})
+	url, ln, done := startServer(t, []byte("page"), Options{CloseOnGet: true, CloseDelay: delay, FirstLoad: delay})
 	defer ln.Close()
 
 	fetch(t, http.MethodGet, url)
@@ -268,7 +268,7 @@ func TestServeAliveKeepsServing(t *testing.T) {
 
 func TestServeClosingOneOfTwoTabsKeepsServing(t *testing.T) {
 	const delay = 150 * time.Millisecond
-	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay, firstLoad: delay})
+	url, ln, done := startServer(t, []byte("page"), Options{CloseOnGet: true, CloseDelay: delay, FirstLoad: delay})
 	defer ln.Close()
 
 	first := hold(t, url)
@@ -285,7 +285,7 @@ func TestServeClosingOneOfTwoTabsKeepsServing(t *testing.T) {
 // its own connection. The gap between the last two is what the delay covers.
 func TestServeReloadKeepsServing(t *testing.T) {
 	const delay = 400 * time.Millisecond
-	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay, firstLoad: delay})
+	url, ln, done := startServer(t, []byte("page"), Options{CloseOnGet: true, CloseDelay: delay, FirstLoad: delay})
 	defer ln.Close()
 
 	old := hold(t, url)
@@ -307,7 +307,7 @@ func TestServeReloadKeepsServing(t *testing.T) {
 func TestServeStopsWhenThePageIsNeverLoaded(t *testing.T) {
 	const delay, firstLoad = 50 * time.Millisecond, 400 * time.Millisecond
 	start := time.Now()
-	_, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay, firstLoad: firstLoad})
+	_, ln, done := startServer(t, []byte("page"), Options{CloseOnGet: true, CloseDelay: delay, FirstLoad: firstLoad})
 	defer ln.Close()
 	stopsAfter(t, done, start, firstLoad)
 }
@@ -317,7 +317,7 @@ func TestServeStopsWhenThePageIsNeverLoaded(t *testing.T) {
 func TestServeWaitsForTheFirstLoad(t *testing.T) {
 	const delay, firstLoad = 150 * time.Millisecond, 5 * time.Second
 	start := time.Now()
-	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay, firstLoad: firstLoad})
+	url, ln, done := startServer(t, []byte("page"), Options{CloseOnGet: true, CloseDelay: delay, FirstLoad: firstLoad})
 	defer ln.Close()
 
 	time.Sleep(5 * delay)
@@ -336,7 +336,7 @@ func TestServeWaitsForTheFirstLoad(t *testing.T) {
 func TestServeFirstLoadWaitIsNoShorterThanTheCloseDelay(t *testing.T) {
 	const delay, firstLoad = 400 * time.Millisecond, 100 * time.Millisecond
 	start := time.Now()
-	_, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay, firstLoad: firstLoad})
+	_, ln, done := startServer(t, []byte("page"), Options{CloseOnGet: true, CloseDelay: delay, FirstLoad: firstLoad})
 	defer ln.Close()
 	stopsAfter(t, done, start, delay)
 }
@@ -345,7 +345,7 @@ func TestServeFirstLoadWaitIsNoShorterThanTheCloseDelay(t *testing.T) {
 // the /alive its head script sends arrives before anything stops.
 func TestServeZeroCloseDelayLetsThePageOpen(t *testing.T) {
 	const firstLoad = 400 * time.Millisecond
-	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: 0, firstLoad: firstLoad})
+	url, ln, done := startServer(t, []byte("page"), Options{CloseOnGet: true, CloseDelay: 0, FirstLoad: firstLoad})
 	defer ln.Close()
 
 	if status, _ := fetch(t, http.MethodGet, url); status != http.StatusOK {

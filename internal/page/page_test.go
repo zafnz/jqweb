@@ -1,4 +1,4 @@
-package main
+package page
 
 import (
 	"encoding/json"
@@ -28,7 +28,7 @@ func TestScriptSafe(t *testing.T) {
 // bytes of a page whose styling changes often.
 
 // dataBlock returns the contents of the <script id="data"> element, which is
-// where renderPage puts the document.
+// where Render puts the document.
 func dataBlock(t *testing.T, page string) string {
 	t.Helper()
 	const open = `<script id="data" type="application/json">`
@@ -45,14 +45,14 @@ func dataBlock(t *testing.T, page string) string {
 }
 
 func TestRenderPageSubstitutesEveryPlaceholder(t *testing.T) {
-	page := renderPage([]byte(`{"a":1}`), "doc.json", options{jq: false})
+	page := Render([]byte(`{"a":1}`), "doc.json", Options{JQ: false})
 	if i := strings.Index(page, "{{"); i >= 0 {
 		t.Errorf("page still contains a placeholder at offset %d: %.20q", i, page[i:])
 	}
 }
 
 func TestRenderPageInlinesAssets(t *testing.T) {
-	page := renderPage([]byte(`{}`), "t", options{jq: false})
+	page := Render([]byte(`{}`), "t", Options{JQ: false})
 	for _, want := range []string{
 		"<style>",      // the shell
 		"color-scheme", // from page.css
@@ -62,8 +62,8 @@ func TestRenderPageInlinesAssets(t *testing.T) {
 		`id="suggest"`, // the list of queries a line could mean
 		`id="mode"`,    // what the search box means
 		`id="stats"`,
-		inline("web/dist/theme.js"),
-		inline("web/dist/simple.js"),
+		inline("dist/theme.js"),
+		inline("dist/simple.js"),
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("page does not contain %q", want)
@@ -74,10 +74,10 @@ func TestRenderPageInlinesAssets(t *testing.T) {
 // The query engine is the largest part of the script, and the two committed
 // bundles keep it wholly out of a --simple page.
 func TestRenderPageSelectsTheCompiledScript(t *testing.T) {
-	full := renderPage([]byte(`{}`), "t", options{jq: true})
-	simple := renderPage([]byte(`{}`), "t", options{jq: false})
-	fullScript := inline("web/dist/full.js")
-	simpleScript := inline("web/dist/simple.js")
+	full := Render([]byte(`{}`), "t", Options{JQ: true})
+	simple := Render([]byte(`{}`), "t", Options{JQ: false})
+	fullScript := inline("dist/full.js")
+	simpleScript := inline("dist/simple.js")
 
 	if !strings.Contains(full, fullScript) {
 		t.Error("default page does not carry the full bundle")
@@ -112,7 +112,7 @@ func TestRenderPageRoundTripsTheDocument(t *testing.T) {
 		`{"big":123456789012345678901234567890}`,
 	}
 	for _, doc := range docs {
-		block := dataBlock(t, renderPage([]byte(doc), "t", options{jq: false}))
+		block := dataBlock(t, Render([]byte(doc), "t", Options{JQ: false}))
 		var got, want any
 		if err := json.Unmarshal([]byte(block), &got); err != nil {
 			t.Errorf("data block for %s does not parse: %v", doc, err)
@@ -131,7 +131,7 @@ func TestRenderPageRoundTripsTheDocument(t *testing.T) {
 // holding the document.
 func TestRenderPageDataCannotEscapeItsElement(t *testing.T) {
 	doc := `{"payload":"</script><script>alert(1)</script>"}`
-	page := renderPage([]byte(doc), "t", options{jq: false})
+	page := Render([]byte(doc), "t", Options{JQ: false})
 	block := dataBlock(t, page)
 	if strings.Contains(block, "</script") {
 		t.Errorf("data block contains a literal </script: %s", block)
@@ -151,19 +151,19 @@ func TestRenderPageDataCannotEscapeItsElement(t *testing.T) {
 // Substitution is a single pass, so placeholder text inside the document or
 // the title is data, not a placeholder to expand.
 func TestRenderPageDoesNotRescanSubstitutions(t *testing.T) {
-	page := renderPage([]byte(`{"a":"{{TITLE}}"}`), "t", options{jq: false})
+	page := Render([]byte(`{"a":"{{TITLE}}"}`), "t", Options{JQ: false})
 	if !strings.Contains(dataBlock(t, page), `{{TITLE}}`) {
 		t.Error("a document containing {{TITLE}} had it substituted away")
 	}
 
-	page = renderPage([]byte(`{"a":1}`), "{{DATA}}", options{jq: false})
+	page = Render([]byte(`{"a":1}`), "{{DATA}}", Options{JQ: false})
 	if strings.Count(page, `{{DATA}}`) != 2 { // the <title> and the header
 		t.Error("a title containing {{DATA}} had it substituted away")
 	}
 }
 
 func TestRenderPageEscapesTitle(t *testing.T) {
-	page := renderPage([]byte(`{}`), `<img src=x onerror="alert(1)">`, options{jq: false})
+	page := Render([]byte(`{}`), `<img src=x onerror="alert(1)">`, Options{JQ: false})
 	if strings.Contains(page, "<img src=x") {
 		t.Error("page contains an unescaped title")
 	}
@@ -174,14 +174,14 @@ func TestRenderPageEscapesTitle(t *testing.T) {
 
 func TestRenderPageStartsInTheThemeAskedFor(t *testing.T) {
 	for _, want := range []string{"auto", "light", "dark"} {
-		page := renderPage([]byte(`{}`), "t", options{theme: want})
+		page := Render([]byte(`{}`), "t", Options{Theme: want})
 		if got := `<html lang="en" data-pref="` + want + `">`; !strings.Contains(page, got) {
 			t.Errorf("page for --theme %s does not carry %q", want, got)
 		}
 	}
 	// The palette itself is settled before the body is parsed, so that a page
 	// never shows one theme and then swaps to the other.
-	page := renderPage([]byte(`{}`), "t", options{theme: "auto"})
+	page := Render([]byte(`{}`), "t", Options{Theme: "auto"})
 	head := page[:strings.Index(page, "</head>")]
 	if !strings.Contains(head, "prefers-color-scheme") {
 		t.Error("the theme is not settled in the head")
@@ -195,7 +195,7 @@ func TestRenderPageStartsInTheThemeAskedFor(t *testing.T) {
 // carry a comment into every rendered page.
 func TestPageCarriesNoComments(t *testing.T) {
 	for _, jq := range []bool{false, true} {
-		page := renderPage([]byte(`{"a":1}`), "t", options{jq: jq})
+		page := Render([]byte(`{"a":1}`), "t", Options{JQ: jq})
 		if i := strings.Index(page, "/*"); i >= 0 {
 			line := 1 + strings.Count(page[:i], "\n")
 			t.Errorf("page with jq=%v carries a comment at line %d: %.70q", jq, line, page[i:])
@@ -204,7 +204,7 @@ func TestPageCarriesNoComments(t *testing.T) {
 }
 
 func TestCompiledScriptsCannotCloseTheirElements(t *testing.T) {
-	for _, name := range []string{"web/dist/theme.js", "web/dist/simple.js", "web/dist/full.js"} {
+	for _, name := range []string{"dist/theme.js", "dist/simple.js", "dist/full.js"} {
 		if strings.Contains(strings.ToLower(asset(name)), "</script") {
 			t.Errorf("%s contains a closing script tag", name)
 		}
@@ -212,17 +212,17 @@ func TestCompiledScriptsCannotCloseTheirElements(t *testing.T) {
 }
 
 func TestInlineTrimsOnlyTheTrailingNewline(t *testing.T) {
-	css := asset("web/styles/page.css")
+	css := asset("styles/page.css")
 	if !strings.HasSuffix(css, "\n") {
-		t.Fatal("web/styles/page.css does not end with a newline")
+		t.Fatal("styles/page.css does not end with a newline")
 	}
-	if got, want := inline("web/styles/page.css"), strings.TrimSuffix(css, "\n"); got != want {
+	if got, want := inline("styles/page.css"), strings.TrimSuffix(css, "\n"); got != want {
 		t.Error("inline() did not trim exactly one trailing newline")
 	}
 }
 
 // boxValue returns the search box's value attribute, unescaped, which is where
-// renderPage puts the query.
+// Render puts the query.
 func boxValue(t *testing.T, page string) string {
 	t.Helper()
 	const open = `<input id="q" type="search" value="`
@@ -254,7 +254,7 @@ func TestRenderPageStartsWithTheQuery(t *testing.T) {
 	}
 	for _, jq := range []bool{true, false} {
 		for _, tt := range tests {
-			page := renderPage([]byte(`{}`), "t", options{jq: jq, query: tt.query})
+			page := Render([]byte(`{}`), "t", Options{JQ: jq, Query: tt.query})
 			if got := boxValue(t, page); got != tt.want {
 				t.Errorf("jq=%v: box value for %q = %q, want %q", jq, tt.query, got, tt.want)
 			}
@@ -266,7 +266,7 @@ func TestRenderPageStartsWithTheQuery(t *testing.T) {
 }
 
 func TestRenderPageDoesNotRescanTheQuery(t *testing.T) {
-	page := renderPage([]byte(`{"a":1}`), "t", options{query: "{{DATA}}"})
+	page := Render([]byte(`{"a":1}`), "t", Options{Query: "{{DATA}}"})
 	if got := boxValue(t, page); got != "{{DATA}}" {
 		t.Errorf("box value = %q, want {{DATA}} as written", got)
 	}
@@ -281,8 +281,8 @@ func TestRenderPageMarksOnlyAServedPage(t *testing.T) {
 		return page[i : i+j+1]
 	}
 	for _, jq := range []bool{true, false} {
-		written := root(renderPage([]byte(`{}`), "t", options{jq: jq}))
-		served := root(renderPage([]byte(`{}`), "t", options{jq: jq, served: true}))
+		written := root(Render([]byte(`{}`), "t", Options{JQ: jq}))
+		served := root(Render([]byte(`{}`), "t", Options{JQ: jq, Served: true}))
 		if strings.Contains(written, "data-served") {
 			t.Errorf("jq=%v: written page's root %q is marked as served", jq, written)
 		}

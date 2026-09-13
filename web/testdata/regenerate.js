@@ -7,13 +7,11 @@
    should follow. CI has no jq, which is why the answers are committed rather
    than worked out while the tests run. */
 
-'use strict';
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const { execFileSync } = require('node:child_process');
-const fs = require('node:fs');
-const path = require('node:path');
-
-const file = path.join(__dirname, 'jq-corpus.json');
+const file = path.join(import.meta.dirname, 'jq-corpus.json');
 const corpus = JSON.parse(fs.readFileSync(file, 'utf8'));
 const input = JSON.stringify(corpus.input);
 

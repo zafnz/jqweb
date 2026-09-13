@@ -3,9 +3,7 @@
    for room, so a long message made the box narrow while someone was still
    typing in it. */
 
-'use strict';
-
-const { test, expect, settle, type, near } = require('../fixtures.js');
+import { test, expect, settle, type, near } from '../fixtures.js';
 
 test.use({ variant: 'default' });
 

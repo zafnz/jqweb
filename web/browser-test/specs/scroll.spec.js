@@ -4,9 +4,7 @@
    the reader halfway down the file; and a path typed one character at a time
    dragged the page around on every keystroke. */
 
-'use strict';
-
-const { test, expect, settle, type, near } = require('../fixtures.js');
+import { test, expect, settle, type, near } from '../fixtures.js';
 
 test.use({ variant: 'default' });
 

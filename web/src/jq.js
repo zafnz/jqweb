@@ -15,13 +15,9 @@
    interpolation, format strings, and try/catch. Bare "?" is supported.
 
    Nothing here touches the DOM; page.js drives it. */
+import { leafOf, parseJSON, stringify } from './core.js';
+
 var jqjs = (function () {
-  'use strict';
-
-  /* core.js is a global in the page and a module under node. */
-  var core = typeof jqweb !== 'undefined' ? jqweb : require('./core.js');
-  var leafOf = core.leafOf, stringify = core.stringify;
-
   var NULL = leafOf(null), TRUE = leafOf(true), FALSE = leafOf(false);
 
   /* Evaluating a query that fans out -- ".. | select(...)" over a large
@@ -1756,7 +1752,7 @@ var jqjs = (function () {
       } catch (e) {
         throw runErr('cannot parse "' + s + '" as JSON');
       }
-      return [core.parseJSON(s)];
+      return [parseJSON(s)];
     },
 
     'floor/0': mathFilter(Math.floor),
@@ -2040,5 +2036,4 @@ var jqjs = (function () {
   return { compile: compile };
 })();
 
-/* Node loads this file directly to test it; browsers use the global above. */
-if (typeof module === 'object' && module.exports) module.exports = jqjs;
+export const { compile } = jqjs;

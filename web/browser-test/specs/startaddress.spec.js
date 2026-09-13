@@ -2,9 +2,7 @@
    carry. It is a jq query however it reads, so a bare word such as keys is run
    rather than searched for. */
 
-'use strict';
-
-const { test, expect } = require('../fixtures.js');
+import { test, expect } from '../fixtures.js';
 
 test.use({ variant: 'default', address: '?q=keys' });
 

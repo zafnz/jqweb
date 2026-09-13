@@ -7,16 +7,14 @@
    not include their own window chrome, and drawing this small frame keeps its
    layout independent of local browser configuration. */
 
-'use strict';
+import { chromium } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
-const { chromium } = require('@playwright/test');
-const { execFileSync } = require('node:child_process');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-const { pathToFileURL } = require('node:url');
-
-const repo = path.resolve(__dirname, '..', '..');
+const repo = path.resolve(import.meta.dirname, '..', '..');
 const output = path.resolve(process.argv[2] || path.join(repo, 'demo.png'));
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'jqweb-demo-'));
 

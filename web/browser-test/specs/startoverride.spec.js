@@ -2,9 +2,7 @@
    in the address runs, since whoever opened the page chose it after the page
    was built. */
 
-'use strict';
-
-const { test, expect } = require('../fixtures.js');
+import { test, expect } from '../fixtures.js';
 
 test.use({ variant: 'query', address: '?q=.kind' });
 

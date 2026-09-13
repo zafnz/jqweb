@@ -7,9 +7,7 @@
    the buttons on a line, the result gutter -- to 3:1, which is what WCAG asks
    of each. */
 
-'use strict';
-
-const { test, expect, settle, type } = require('../fixtures.js');
+import { test, expect, settle, type } from '../fixtures.js';
 
 test.use({ variant: 'default' });
 

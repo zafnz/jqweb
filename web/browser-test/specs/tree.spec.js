@@ -2,9 +2,7 @@
    again. What renderTree writes is markup rather than DOM calls, so nothing in
    core.test.js can say whether the browser makes a tree out of it. */
 
-'use strict';
-
-const { test, expect, settle } = require('../fixtures.js');
+import { test, expect, settle } from '../fixtures.js';
 
 test.use({ variant: 'default' });
 

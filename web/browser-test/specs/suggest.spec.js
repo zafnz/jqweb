@@ -3,9 +3,7 @@
    browser can say is whether the list is right about what they return, and
    whether picking one leaves you able to try the next. */
 
-'use strict';
-
-const { test, expect, settle, type, clickAway, refocus, near } = require('../fixtures.js');
+import { test, expect, settle, type, clickAway, refocus, near } from '../fixtures.js';
 
 test.use({ variant: 'default' });
 

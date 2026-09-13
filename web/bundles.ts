@@ -18,7 +18,7 @@ export function options(name: Bundle): BuildOptions {
     bundle: true,
     format: 'iife',
     platform: 'browser',
-    target: 'es2015',
+    target: 'es2022',
     charset: 'utf8',
     legalComments: 'none',
     minify: true,

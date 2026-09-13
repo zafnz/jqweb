@@ -1,10 +1,6 @@
 /* Regular expressions, for test, match, capture, scan, split/2, splits, sub
    and gsub. */
 
-/* exec reports where each capture matched only under the "d" flag, which is
-   ES2022's; this reference supplies the type of the indices it fills in. */
-/// <reference lib="es2022.regexp" />
-
 import { leafOf } from '../../model/node.ts';
 import type { Node, ObjectNode } from '../../model/node.ts';
 import { runErr } from './errors.ts';

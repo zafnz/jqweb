@@ -1,4 +1,4 @@
-package main
+package update
 
 import (
 	"encoding/json"
@@ -102,14 +102,14 @@ func TestWantUpdateCheck(t *testing.T) {
 		name    string
 		version string
 		tty     bool
-		ldflag  string
+		off     bool
 		env     map[string]string
 		want    bool
 	}{
 		{name: "a release on a terminal", version: "0.7.0", tty: true, want: true},
 		{name: "a local build", version: "dev", tty: true},
 		{name: "stderr is not a terminal", version: "0.7.0"},
-		{name: "switched off at build time", version: "0.7.0", tty: true, ldflag: "off"},
+		{name: "switched off at build time", version: "0.7.0", tty: true, off: true},
 		{name: "switched off by the user", version: "0.7.0", tty: true,
 			env: map[string]string{"JQWEB_NO_UPDATE_CHECK": "1"}},
 		{name: "running under CI", version: "0.7.0", tty: true,
@@ -123,12 +123,8 @@ func TestWantUpdateCheck(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			saved := updateCheck
-			updateCheck = tt.ldflag
-			t.Cleanup(func() { updateCheck = saved })
-
 			getenv := func(k string) string { return tt.env[k] }
-			if got := wantUpdateCheck(tt.version, tt.tty, getenv); got != tt.want {
+			if got := wantUpdateCheck(tt.version, tt.off, tt.tty, getenv); got != tt.want {
 				t.Errorf("wantUpdateCheck(%q, tty=%v) = %v, want %v", tt.version, tt.tty, got, tt.want)
 			}
 		})
@@ -466,11 +462,8 @@ func TestLatestVersionRejectsWhatNamesNoTag(t *testing.T) {
 
 // The check runs in a goroutine of its own, so a build from a working tree has
 // to be turned away before that goroutine starts rather than by it.
-func TestCheckForUpdateSkipsADevBuild(t *testing.T) {
-	if v := releaseVersion(); v != "dev" {
-		t.Skipf("this test binary reports version %q, not dev", v)
-	}
-	ch := checkForUpdate()
+func TestCheckSkipsADevBuild(t *testing.T) {
+	ch := Check("dev", false)
 	select {
 	case line, ok := <-ch:
 		if ok {
@@ -482,7 +475,7 @@ func TestCheckForUpdateSkipsADevBuild(t *testing.T) {
 }
 
 // lineWriter hands each write to a channel, so a test can wait for the
-// goroutine behind printNotice rather than sleeping and hoping.
+// goroutine behind PrintNotice rather than sleeping and hoping.
 type lineWriter chan string
 
 func (w lineWriter) Write(p []byte) (int, error) {
@@ -493,7 +486,7 @@ func (w lineWriter) Write(p []byte) (int, error) {
 func TestPrintNoticePrintsTheLine(t *testing.T) {
 	ch := make(chan string, 1)
 	w := make(lineWriter, 1)
-	printNotice(w, ch)
+	PrintNotice(w, ch)
 	ch <- "jqweb: 0.9.0 is available"
 	select {
 	case got := <-w:
@@ -501,14 +494,14 @@ func TestPrintNoticePrintsTheLine(t *testing.T) {
 			t.Errorf("printed %q, want the line and a newline", got)
 		}
 	case <-time.After(5 * time.Second):
-		t.Error("printNotice printed nothing")
+		t.Error("PrintNotice printed nothing")
 	}
 }
 
 func TestPrintNoticeIsSilentWithNoAnswer(t *testing.T) {
 	ch := make(chan string, 1)
 	w := make(lineWriter, 1)
-	printNotice(w, ch)
+	PrintNotice(w, ch)
 	close(ch)
 	select {
 	case got := <-w:
@@ -517,14 +510,18 @@ func TestPrintNoticeIsSilentWithNoAnswer(t *testing.T) {
 	}
 }
 
+// timerSlack is how far ahead of its delay a timer can appear to fire when it
+// is timed from outside.
+const timerSlack = 50 * time.Millisecond
+
 func TestWaitNoticeGivesUpAfterTheDelay(t *testing.T) {
 	const delay = 150 * time.Millisecond
 	ch := make(chan string) // never answered
 	w := make(lineWriter, 1)
 
 	start := time.Now()
-	waitNotice(w, ch, delay)
-	if waited := time.Since(start); waited+closeTimerSlack < delay {
+	WaitNotice(w, ch, delay)
+	if waited := time.Since(start); waited+timerSlack < delay {
 		t.Errorf("gave up after %s, before the %s delay", waited, delay)
 	}
 	select {
@@ -539,13 +536,13 @@ func TestWaitNoticePrintsAnAnswerThatArrives(t *testing.T) {
 	ch <- "jqweb: 0.9.0 is available"
 	w := make(lineWriter, 1)
 
-	waitNotice(w, ch, 5*time.Second)
+	WaitNotice(w, ch, 5*time.Second)
 	select {
 	case got := <-w:
 		if got != "jqweb: 0.9.0 is available\n" {
 			t.Errorf("printed %q, want the line and a newline", got)
 		}
 	default:
-		t.Error("waitNotice printed nothing for an answer that was already there")
+		t.Error("WaitNotice printed nothing for an answer that was already there")
 	}
 }

@@ -6,7 +6,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +17,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/zafnz/jqweb/internal/serve"
 )
 
 // TestMain runs jqweb's main instead of the tests when JQWEB_TEST_MAIN is set.
@@ -40,25 +44,33 @@ func jqweb(t *testing.T, args ...string) *exec.Cmd {
 	return cmd
 }
 
-func TestRelayLinesSeesTheReadyLine(t *testing.T) {
-	var out bytes.Buffer
-	in := "jqweb: serving on http://127.0.0.1:1/ (until the last tab closes)\n" +
-		readyLine + ", pid 12\n"
-	if !relayLines(&out, strings.NewReader(in), readyLine) {
-		t.Error("relayLines did not report the ready line")
-	}
-	if out.String() != in {
-		t.Errorf("relayed %q, want %q", out.String(), in)
-	}
+// testClient talks to the background server without keeping connections
+// alive, so that an idle connection cannot hold up its shutdown.
+var testClient = &http.Client{
+	Timeout:   5 * time.Second,
+	Transport: &http.Transport{DisableKeepAlives: true},
+}
 
-	out.Reset()
-	in = "jqweb: bad.json: unexpected end of input" // no trailing newline
-	if relayLines(&out, strings.NewReader(in), readyLine) {
-		t.Error("relayLines reported a ready line that was not there")
+const closeTimerSlack = 50 * time.Millisecond
+
+// fetch performs one request and reads the body to the end, so the connection
+// is not left active behind it.
+func fetch(t *testing.T, method, url string) (status int, body string) {
+	t.Helper()
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		t.Fatalf("%s %s: %v", method, url, err)
 	}
-	if out.String() != in {
-		t.Errorf("relayed %q, want %q", out.String(), in)
+	resp, err := testClient.Do(req)
+	if err != nil {
+		t.Fatalf("%s %s: %v", method, url, err)
 	}
+	defer resp.Body.Close()
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("reading %s: %v", url, err)
+	}
+	return resp.StatusCode, string(b)
 }
 
 func TestBackgroundReportsABadDocument(t *testing.T) {
@@ -78,7 +90,7 @@ func TestBackgroundReportsABadDocument(t *testing.T) {
 	if got := stderr.String(); !strings.Contains(got, "jqweb: "+bad+": ") {
 		t.Errorf("stderr = %q, want the error naming %s", got, bad)
 	}
-	if strings.Contains(stderr.String(), readyLine) {
+	if strings.Contains(stderr.String(), serve.ReadyLine) {
 		t.Errorf("stderr = %q, which says it is running for a document it rejected", stderr.String())
 	}
 }
@@ -102,7 +114,7 @@ func TestBackgroundOutlivesTheParentUntilTheTabCloses(t *testing.T) {
 	}
 
 	addr := regexp.MustCompile(`serving on http://(\S+)/`).FindStringSubmatch(stderr.String())
-	pid := regexp.MustCompile(regexp.QuoteMeta(readyLine) + `, pid (\d+)\n`).FindStringSubmatch(stderr.String())
+	pid := regexp.MustCompile(regexp.QuoteMeta(serve.ReadyLine) + `, pid (\d+)\n`).FindStringSubmatch(stderr.String())
 	if addr == nil || pid == nil {
 		t.Fatalf("stderr = %q, want the serving line and the ready line", stderr.String())
 	}

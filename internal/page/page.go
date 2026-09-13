@@ -1,29 +1,30 @@
-package main
+package page
 
 import (
 	"bytes"
-	"embed"
 	"encoding/json"
 	"html"
 	"strings"
 	"sync"
+
+	"github.com/zafnz/jqweb/web"
 )
 
-// options are the parts of the command line that change the page rather than
+// Options are the parts of the command line that change the page rather than
 // where it goes.
-type options struct {
-	jq     bool   // inline the query engine, which --simple turns off
-	theme  string // auto, light or dark
-	query  string // what the search box starts with, if anything
-	served bool   // the page is served, so it holds /alive open
+type Options struct {
+	JQ     bool   // inline the query engine, which --simple turns off
+	Theme  string // auto, light or dark
+	Query  string // what the search box starts with, if anything
+	Served bool   // the page is served, so it holds /alive open
 }
 
-// renderPage embeds the document in the page as compact JSON; the script in
-// the template parses it and builds the tree in the browser. opt.jq selects
-// the template that carries the query engine, and opt.theme is the palette the
-// page starts in, which the reader can change afterwards. opt.query goes in the
+// Render embeds the document in the page as compact JSON; the script in
+// the template parses it and builds the tree in the browser. opt.JQ selects
+// the template that carries the query engine, and opt.Theme is the palette the
+// page starts in, which the reader can change afterwards. opt.Query goes in the
 // search box, which the page runs once it has built the tree.
-func renderPage(data []byte, title string, opt options) string {
+func Render(data []byte, title string, opt Options) string {
 	var buf bytes.Buffer
 	if err := json.Compact(&buf, data); err != nil {
 		// check has already accepted the document, so this cannot fail.
@@ -32,11 +33,11 @@ func renderPage(data []byte, title string, opt options) string {
 	}
 	return strings.NewReplacer(
 		"{{TITLE}}", html.EscapeString(title),
-		"{{PREF}}", opt.theme,
-		"{{SERVED}}", servedAttr(opt.served),
-		"{{QUERY}}", html.EscapeString(boxText(opt.query)),
+		"{{PREF}}", opt.Theme,
+		"{{SERVED}}", servedAttr(opt.Served),
+		"{{QUERY}}", html.EscapeString(boxText(opt.Query)),
 		"{{DATA}}", scriptSafe(buf.String()),
-	).Replace(pageTemplate(opt.jq))
+	).Replace(pageTemplate(opt.JQ))
 }
 
 // servedAttr marks the root element of a page jqweb serves. The page script
@@ -64,11 +65,8 @@ func boxText(q string) string {
 	return strings.NewReplacer("\r\n", " ", "\r", " ", "\n", " ").Replace(q)
 }
 
-//go:embed web/page.html web/styles/page.css web/styles/query.css web/dist/theme.js web/dist/simple.js web/dist/full.js
-var assets embed.FS
-
 // pageTemplate returns the page shell with its stylesheet and script inlined,
-// leaving {{TITLE}} and {{DATA}} for renderPage to fill in. A page with the
+// leaving {{TITLE}} and {{DATA}} for Render to fill in. A page with the
 // query engine and one without are two different scripts, so there is a
 // template for each, built the first time it is wanted.
 func pageTemplate(jq bool) string {
@@ -84,32 +82,32 @@ var withoutJQ = sync.OnceValue(func() string { return buildTemplate(false) })
 func buildTemplate(jq bool) string {
 	return strings.NewReplacer(
 		"{{STYLE}}", style(jq),
-		"{{HEAD}}", inline("web/dist/theme.js"),
+		"{{HEAD}}", inline("dist/theme.js"),
 		"{{SCRIPT}}", script(jq),
-	).Replace(asset("web/page.html"))
+	).Replace(asset("page.html"))
 }
 
 // style returns the page's CSS. query.css styles what only a page with the
 // query engine has, so it goes in only alongside it.
 func style(jq bool) string {
 	if !jq {
-		return inline("web/styles/page.css")
+		return inline("styles/page.css")
 	}
-	return inline("web/styles/page.css") + "\n" + inline("web/styles/query.css")
+	return inline("styles/page.css") + "\n" + inline("styles/query.css")
 }
 
 // script returns the compiled page JavaScript. The two bundles are built and
 // committed separately so a --simple page carries none of the query engine.
 func script(jq bool) string {
 	if jq {
-		return inline("web/dist/full.js")
+		return inline("dist/full.js")
 	}
-	return inline("web/dist/simple.js")
+	return inline("dist/simple.js")
 }
 
 // asset returns the contents of an embedded file.
 func asset(name string) string {
-	b, err := assets.ReadFile(name)
+	b, err := web.Assets.ReadFile(name)
 	if err != nil {
 		panic(err) // embedded at build time, so this cannot fail.
 	}

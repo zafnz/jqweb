@@ -85,26 +85,29 @@ keyword in the PR body too: `Closes #123`, `Fixes #223` or similar.
 A Go binary that turns a JSON document into one self-contained HTML page, and
 either serves it or writes it to a file. Everything interesting is in the page.
 
-The Go side is these files, all `package main`:
+The Go side is `main.go` at the root and four packages under `internal`:
 
 | file | what it holds |
 |---|---|
-| `main.go` | the flag definitions, `reorderArgs`, and the flow of `main` |
-| `check.go` | `check` and the error messages it builds for input that is not one well-formed JSON document |
-| `serve.go` | the HTTP server, the `/alive` count behind `-C`, and `openBrowser` |
-| `background.go` | the `-C` parent: starts itself again with `--child` and relays its output until it is ready |
-| `detach_*.go`, `dup2_*.go` | per-platform: how the child is started detached and how it lets go of its outputs |
-| `page.go` | the embedded `web/*` assets, compiled-script selection, and template assembly |
-| `update.go` | the once-a-day release check, its state file, and the upgrade command it names |
+| `main.go` | the flag definitions, `reorderArgs`, the variables the linker sets, and the flow of `main` |
+| `internal/check` | `Document` and the error messages it builds for input that is not one well-formed JSON document |
+| `internal/serve` | the HTTP server, the `/alive` count behind `-C`, and `OpenBrowser` |
+| `internal/serve/background.go` | the `-C` parent: starts itself again with `--child` and relays its output until it is ready |
+| `internal/serve/detach_*.go`, `dup2_*.go` | per-platform: how the child is started detached and how it lets go of its outputs |
+| `internal/page` | compiled-script selection and template assembly |
+| `internal/update` | the once-a-day release check, its state file, and the upgrade command it names |
+| `web/assets.go` | the `//go:embed` of the page assets, which cannot name a file outside its own directory |
 
 Each apart from the per-platform files has a `_test.go` of its own along the
-same lines.
+same lines. The tests that run jqweb as a process stay in `background_test.go`
+at the root, because they reach `main` through `TestMain`.
 
 `web/build.ts` bundles the entry points in `web/src/entries` into the
-committed files under `web/dist`, and `page.go` assembles those with the HTML
-and CSS. The document goes in as compact JSON inside `<script id="data">`; the
-tree is built in the browser, not in Go. That is why `renderPage` is cheap on a
-5MB document and why the page scripts are where the work is.
+committed files under `web/dist`, and `internal/page` assembles those with the
+HTML and CSS. The document goes in as compact JSON inside
+`<script id="data">`; the tree is built in the browser, not in Go. That is why
+`page.Render` is cheap on a 5MB document and why the page scripts are where the
+work is.
 
 There are two page builds. The default carries the jq engine; `--simple` leaves
 it out. `script()` picks `web/dist/full.js` or `web/dist/simple.js`, `style()`
@@ -226,16 +229,22 @@ The key is the name the `flag` package knows, without dashes: one dash and two
 mean the same thing there, and `flagName` strips them so `-host` and `--host`
 are one entry.
 
+**`versionString` and `updateCheck` stay in `main.go`.** GoReleaser sets the
+first and packagers set the second with `-X main.<name>`, and the linker
+ignores `-X` for a name that does not exist. Moved into a package, either one
+leaves a build that succeeds with no version in it, or with the update check
+still on.
+
 **`-OC` and `-CO` are flags, not bundling.** The `flag` package has no notion
 of a bundle, so the one combination worth writing as a bundle is registered
 under those two names and sets `open` and `closeOnGet` itself. No other pair
 works: `-vO` is rejected as an unknown flag.
 
-**The update check never delays anything.** `checkForUpdate` hands back a
-channel; `serve` prints from a goroutine of its own after the "serving on"
-line, and only an exit waits, for `updateWait`: in `-o` mode, and in the `-C`
-parent once the child is ready. A check that has not answered by then is
-dropped. `wantUpdateCheck` is where the skips live. The `-C` child never
+**The update check never delays anything.** `update.Check` hands back a
+channel; `serve.Serve` prints from a goroutine of its own after the "serving
+on" line, and only an exit waits, for `update.ExitWait`: in `-o` mode, and in
+the `-C` parent once the child is ready. A check that has not answered by then
+is dropped. `wantUpdateCheck` is where the skips live. The `-C` child never
 checks.
 
 **The `-C` child writes nothing after its ready line.** The parent exits on

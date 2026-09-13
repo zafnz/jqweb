@@ -1,4 +1,4 @@
-package main
+package check
 
 import (
 	"strings"
@@ -20,8 +20,8 @@ func TestCheckAccepts(t *testing.T) {
 		`{"unicode":"  😀"}`,
 	}
 	for _, in := range valid {
-		if err := check([]byte(in)); err != nil {
-			t.Errorf("check(%q) = %v, want nil", in, err)
+		if err := Document([]byte(in)); err != nil {
+			t.Errorf("Document(%q) = %v, want nil", in, err)
 		}
 	}
 }
@@ -62,12 +62,12 @@ func TestCheckErrors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := check([]byte(tt.in))
+			err := Document([]byte(tt.in))
 			if err == nil {
-				t.Fatalf("check(%q) = nil, want an error containing %q", tt.in, tt.want)
+				t.Fatalf("Document(%q) = nil, want an error containing %q", tt.in, tt.want)
 			}
 			if !strings.Contains(err.Error(), tt.want) {
-				t.Errorf("check(%q) = %q, want it to contain %q", tt.in, err, tt.want)
+				t.Errorf("Document(%q) = %q, want it to contain %q", tt.in, err, tt.want)
 			}
 		})
 	}
@@ -76,12 +76,12 @@ func TestCheckErrors(t *testing.T) {
 // A syntax error should be reported at the line and column of the offending
 // byte, not at the end of the last token the decoder consumed.
 func TestCheckReportsPosition(t *testing.T) {
-	err := check([]byte("{\n  \"a\": 1,\n  \"b\": oops\n}"))
+	err := Document([]byte("{\n  \"a\": 1,\n  \"b\": oops\n}"))
 	if err == nil {
-		t.Fatal("check() = nil, want an error")
+		t.Fatal("Document() = nil, want an error")
 	}
 	if !strings.Contains(err.Error(), "line 3") {
-		t.Errorf("check() = %q, want it to report line 3", err)
+		t.Errorf("Document() = %q, want it to report line 3", err)
 	}
 }
 
@@ -140,7 +140,7 @@ func TestSniff(t *testing.T) {
 		{"nul byte", "ab\x00cd", "binary data", true},
 		{"invalid utf-8", "\xff\xfe\xfd", "binary data", true},
 		{"valid utf-8 is not binary", "héllo 😀", "", false},
-		// sniff recognizes Python repr output, but check() never asks: the
+		// sniff recognizes Python repr output, but Document() never asks: the
 		// input starts with "{", so startsJSON accepts it and the parser's
 		// single-quote hint is what a user actually sees.
 		{"python repr", "{'a': 1}", "Python repr output; JSON strings need double quotes", false},

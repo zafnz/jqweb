@@ -1,4 +1,4 @@
-package main
+package update
 
 import (
 	"context"
@@ -12,14 +12,6 @@ import (
 	"strings"
 	"time"
 )
-
-// updateCheck is set by the linker to switch the check off for good:
-//
-//	-X main.updateCheck=off
-//
-// It is there for downstream packagers, whose users upgrade through the
-// package manager rather than by being told to.
-var updateCheck = ""
 
 const (
 	// The latest release redirects to /releases/tag/<tag>. install.sh reads
@@ -41,7 +33,7 @@ const (
 	updateTimeout = 2 * time.Second
 
 	// How long -o mode waits at exit for an answer. Serving waits for nothing.
-	updateWait = time.Second
+	ExitWait = time.Second
 
 	installCommand = "curl -fsSL https://raw.githubusercontent.com/zafnz/jqweb/main/install.sh | sh"
 )
@@ -68,15 +60,14 @@ type updater struct {
 	exe       func() (string, error)
 }
 
-// checkForUpdate starts the check and returns a channel carrying the line to
-// print. The channel is closed with nothing on it when there is nothing to
+// Check starts the check for a release newer than version, unless off is
+// set, and returns a channel carrying the line to print. The channel is closed with nothing on it when there is nothing to
 // say, and closed before it is returned when no check is wanted, so a receive
 // never waits on a check that is not happening.
-func checkForUpdate() <-chan string {
+func Check(version string, off bool) <-chan string {
 	ch := make(chan string, 1)
-	version := releaseVersion()
 	state, err := stateFilePath()
-	if err != nil || !wantUpdateCheck(version, isTTY(os.Stderr), os.Getenv) {
+	if err != nil || !wantUpdateCheck(version, off, isTTY(os.Stderr), os.Getenv) {
 		close(ch)
 		return ch
 	}
@@ -101,9 +92,9 @@ func checkForUpdate() <-chan string {
 // wantUpdateCheck reports whether to check at all. Each of these is a case
 // where the answer would go unread, be unwelcome, or be acted on by something
 // other than the person running jqweb.
-func wantUpdateCheck(version string, stderrIsTTY bool, getenv func(string) string) bool {
+func wantUpdateCheck(version string, off, stderrIsTTY bool, getenv func(string) string) bool {
 	switch {
-	case updateCheck == "off":
+	case off:
 		return false
 	case version == "dev":
 		// A build from a working tree has no release to be behind.
@@ -386,10 +377,10 @@ func parseVersion(v string) (nums [3]int, prerelease bool) {
 	return nums, prerelease
 }
 
-// printNotice prints the line from ch when it arrives, and nothing when ch
+// PrintNotice prints the line from ch when it arrives, and nothing when ch
 // closes without one. It returns at once: the waiting is done in a goroutine,
 // so a slow check never holds up the server.
-func printNotice(w io.Writer, ch <-chan string) {
+func PrintNotice(w io.Writer, ch <-chan string) {
 	go func() {
 		if line := <-ch; line != "" {
 			fmt.Fprintln(w, line)
@@ -397,9 +388,9 @@ func printNotice(w io.Writer, ch <-chan string) {
 	}()
 }
 
-// waitNotice prints the line if it arrives within d. Nothing is behind this
+// WaitNotice prints the line if it arrives within d. Nothing is behind this
 // but the process exiting, so a check that has not answered is dropped.
-func waitNotice(w io.Writer, ch <-chan string, d time.Duration) {
+func WaitNotice(w io.Writer, ch <-chan string, d time.Duration) {
 	if ch == nil {
 		return
 	}
@@ -410,4 +401,10 @@ func waitNotice(w io.Writer, ch <-chan string, d time.Duration) {
 		}
 	case <-time.After(d):
 	}
+}
+
+// isTTY reports whether f is a terminal.
+func isTTY(f *os.File) bool {
+	fi, err := f.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }

@@ -20,9 +20,9 @@ Playwright Test, driving the Chrome already installed rather than downloading
 one, so `npm --prefix web ci` is the whole install.
 
 The code that starts the `-C` child detached is split by build tag, in
-`detach_unix.go` and `detach_windows.go`, with `dup2_linux.go` and
-`dup2_other.go` under the first. CI builds on Linux only, so check the rest
-with `GOOS=windows go vet .` and `GOOS=darwin go vet .`.
+`internal/serve/detach_unix.go` and `detach_windows.go`, with `dup2_linux.go`
+and `dup2_other.go` under the first. CI builds on Linux only, so check the
+rest with `GOOS=windows go vet ./...` and `GOOS=darwin go vet ./...`.
 
 CI runs the same commands on every push and fails when rebuilding `web/dist`
 changes it. The Go job runs against both the `go.mod` floor and the current
@@ -140,7 +140,7 @@ one means adding a query for it.
 
 ## The update check
 
-`update.go` asks github.com for the latest release once a day. Build with
+`internal/update` asks github.com for the latest release once a day. Build with
 `-X main.updateCheck=off` to leave it out; `JQWEB_NO_UPDATE_CHECK`, `CI` or
 `SNAP` in the environment turns it off at runtime, as does a stderr that is not
 a terminal.

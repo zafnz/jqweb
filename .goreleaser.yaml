@@ -95,7 +95,7 @@ homebrew_casks:
       - jqweb
     directory: Casks
     homepage: https://github.com/zafnz/jqweb
-    description: Renders JSON like jq, but as a webpage
+    description: Turn JSON into an interactive webpage with one pipe.
     license: MIT
     repository:
       owner: zafnz
@@ -112,7 +112,7 @@ nfpms:
     vendor: Nick Clifford
     maintainer: Nick Clifford <nick@nickclifford.com>
     homepage: https://github.com/zafnz/jqweb
-    description: Renders JSON like jq, but as a webpage
+    description: Turn JSON into an interactive webpage with one pipe.
     license: MIT
     formats:
       - deb
@@ -151,7 +151,7 @@ winget:
   - name: jqweb
     publisher: zafnz
     package_identifier: zafnz.jqweb
-    short_description: Renders JSON like jq, but as a webpage
+    short_description: Turn JSON into an interactive webpage with one pipe.
     license: MIT
     homepage: https://github.com/zafnz/jqweb
     publisher_url: https://github.com/zafnz
@@ -175,5 +175,5 @@ scoops:
       token: "{{ .Env.PACKAGE_REPOS_TOKEN }}"
     directory: bucket
     homepage: https://github.com/zafnz/jqweb
-    description: Renders JSON like jq, but as a webpage
+    description: Turn JSON into an interactive webpage with one pipe.
     license: MIT

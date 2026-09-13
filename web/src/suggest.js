@@ -16,12 +16,9 @@
 
    Everything here is text in, text out, over the node form core.js parses to.
    Nothing touches the DOM and nothing runs a query. */
+import { pathText, stringify } from './core.js';
+
 var jqsuggest = (function () {
-  'use strict';
-
-  var core = typeof jqweb !== 'undefined' ? jqweb : require('./core.js');
-  var pathText = core.pathText, stringify = core.stringify;
-
   /* How many ancestors to offer a pivot on. The outermost are the ones worth
      asking about -- they are where "the others like this" live -- and a deeply
      nested value would otherwise fill the list with narrow readings that all
@@ -243,5 +240,4 @@ var jqsuggest = (function () {
   return { suggest: suggest, splitPartial: splitPartial, completions: completions };
 })();
 
-/* Node loads this file directly to test it; browsers use the global above. */
-if (typeof module === 'object' && module.exports) module.exports = jqsuggest;
+export const { suggest, splitPartial, completions } = jqsuggest;

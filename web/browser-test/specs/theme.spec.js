@@ -1,8 +1,6 @@
 /* The palette in force, and the button that changes it. */
 
-'use strict';
-
-const { test, expect, settle } = require('../fixtures.js');
+import { test, expect, settle } from '../fixtures.js';
 
 test.use({ variant: 'default' });
 

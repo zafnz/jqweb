@@ -5,14 +5,13 @@
    cover what a corpus cannot -- the queries that must fail, and the stream
    behaviour that is easy to get subtly wrong. */
 
-'use strict';
+import test from 'node:test';
+import assert from 'node:assert';
+import fs from 'node:fs';
+import { parseJSON, parsePath, stringify } from './src/core.js';
+import { compile } from './src/jq.js';
 
-const test = require('node:test');
-const assert = require('node:assert');
-const fs = require('node:fs');
-const { parseJSON, stringify } = require('./core.js');
-const { compile } = require('./jq.js');
-const corpus = require('./testdata/jq-corpus.json');
+const corpus = JSON.parse(fs.readFileSync(new URL('./testdata/jq-corpus.json', import.meta.url), 'utf8'));
 
 /* Runs a query over a JSON document and returns its outputs as JSON text, so
    that a test can talk about values rather than nodes. */
@@ -42,7 +41,7 @@ test('the corpus exercises every builtin', () => {
   /* A builtin no corpus case runs is one whose answer has never been compared
      with jq's. The names are read back out of the table in jq.js, so adding a
      builtin without a case for it fails here. */
-  const table = fs.readFileSync(require.resolve('./jq.js'), 'utf8');
+  const table = fs.readFileSync(new URL('./src/jq.js', import.meta.url), 'utf8');
   const names = new Set();
   for (const m of table.slice(table.indexOf('var builtins = {'))
     .matchAll(/^ {4}'([a-z_0-9]+)\/\d+':/gm)) names.add(m[1]);
@@ -192,7 +191,6 @@ test('anything more than walking down has no path', () => {
 test('a path query agrees with parsePath on the same text', () => {
   /* page.js hands a pasted path to whichever of the two is available, so the
      segments they produce have to match. */
-  const { parsePath } = require('./core.js');
   for (const q of ['.a', '.a.b', '.a[0]', '.a[-1]', '.["x y"]', '.']) {
     assert.deepStrictEqual(compile(q).path, parsePath(q), `path ${q}`);
   }

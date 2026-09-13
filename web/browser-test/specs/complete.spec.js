@@ -5,9 +5,7 @@
    browser can say is that the view survives the typing and that the run really
    is held back. */
 
-'use strict';
-
-const { test, expect, settle, type } = require('../fixtures.js');
+import { test, expect, settle, type } from '../fixtures.js';
 
 test.use({ variant: 'default' });
 

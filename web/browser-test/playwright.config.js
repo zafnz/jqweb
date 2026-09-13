@@ -9,16 +9,14 @@
    global-setup.js builds jqweb and renders the pages first. Everything either
    of them writes goes under .out, which is not committed. */
 
-'use strict';
+import { defineConfig } from '@playwright/test';
+import path from 'node:path';
 
-const { defineConfig } = require('@playwright/test');
-const path = require('node:path');
+const out = path.join(import.meta.dirname, '.out');
 
-const out = path.join(__dirname, '.out');
-
-module.exports = defineConfig({
-  testDir: path.join(__dirname, 'specs'),
-  globalSetup: require.resolve('./global-setup.js'),
+export default defineConfig({
+  testDir: path.join(import.meta.dirname, 'specs'),
+  globalSetup: path.join(import.meta.dirname, 'global-setup.js'),
   outputDir: path.join(out, 'results'),
 
   /* The pages are rendered once and only read, so nothing here shares state

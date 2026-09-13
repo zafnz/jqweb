@@ -2,9 +2,7 @@
    page reads it the way it reads anything typed, and .items[3] is a path to
    look up. */
 
-'use strict';
-
-const { test, expect } = require('../fixtures.js');
+import { test, expect } from '../fixtures.js';
 
 test.use({ variant: 'simplequery' });
 

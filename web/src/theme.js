@@ -9,8 +9,7 @@
    Where the page can store the choice it outlasts a reload. A page opened from
    a file:// URL may have no storage at all, and then the choice lasts as long
    as the tab, which is why every use of it is guarded. */
-var jqtheme = (function () {
-  'use strict';
+export function startTheme() {
   var KEY = 'jqweb-theme';
   var ORDER = ['auto', 'light', 'dark'];
   var root = document.documentElement;
@@ -45,4 +44,4 @@ var jqtheme = (function () {
   paint();
 
   return { cycle: cycle, current: function () { return pref; } };
-})();
+}

@@ -1,9 +1,7 @@
 /* A page built with a query on the command line opens on that query, run as
    though it had been typed into the box. */
 
-'use strict';
-
-const { test, expect, type } = require('../fixtures.js');
+import { test, expect, type } from '../fixtures.js';
 
 test.use({ variant: 'query' });
 

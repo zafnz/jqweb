@@ -1,9 +1,7 @@
 /* Builds jqweb and renders the pages before any spec runs. */
 
-'use strict';
+import { renderAll } from './pages.js';
 
-const { renderAll } = require('./pages.js');
-
-module.exports = function globalSetup() {
+export default function globalSetup() {
   renderAll();
-};
+}

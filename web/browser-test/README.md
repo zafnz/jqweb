@@ -23,9 +23,7 @@ leaves behind.
 A spec is one file in `specs/`, named for the area it covers. `test.use` says
 which page it wants and how big a window to open it in:
 
-    'use strict';
-
-    const { test, expect } = require('../fixtures.js');
+    import { test, expect } from '../fixtures.js';
 
     test.use({ variant: 'simple', viewport: { width: 460, height: 800 } });
 

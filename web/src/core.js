@@ -3,7 +3,6 @@
    touches the DOM, so it can be exercised outside a browser (see
    core.test.js). */
 var jqweb = (function () {
-  'use strict';
 
   /* ---- parse ---- */
 
@@ -344,5 +343,4 @@ var jqweb = (function () {
   };
 })();
 
-/* Node loads this file directly to test it; browsers use the global above. */
-if (typeof module === 'object' && module.exports) module.exports = jqweb;
+export const { parseJSON, leafOf, stringify, renderTree, parsePath, pathText, quote, esc } = jqweb;

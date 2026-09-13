@@ -73,8 +73,8 @@ jobs:
       - name: The compiled scripts are committed and current
         run: git diff --exit-code -- web/dist
 
-      # web/core.js is the DOM-free half of the page script, so node runs its
-      # tests directly.
+      # The DOM-free modules under web/src, and the module graph each bundle is
+      # built from, need no browser, so node runs their tests directly.
       - run: npm --prefix web test
 
   # The other half of the page only exists in a browser: the tree, the search

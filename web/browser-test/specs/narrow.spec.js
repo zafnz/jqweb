@@ -5,9 +5,7 @@
    The window is just wider than a phone. At 600px and below the toolbar loses
    the search box altogether, which phone.spec.js covers. */
 
-'use strict';
-
-const { test, expect, settle, type, clickAway, near } = require('../fixtures.js');
+import { test, expect, settle, type, clickAway, near } from '../fixtures.js';
 
 test.use({ variant: 'default', viewport: { width: 640, height: 800 } });
 

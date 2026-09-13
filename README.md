@@ -1,19 +1,19 @@
+[![jqweb — turn JSON into an interactive webpage](docs/banner.png)](https://zafnz.github.io/jqweb/)
+<br/>
 ![Release](https://github.com/zafnz/jqweb/workflows/release/badge.svg)
-![GitHub Release](https://img.shields.io/github/v/release/zafnz/jqweb)
-![GitHub Issues](https://img.shields.io/github/issues/zafnz/jqweb)
-![GitHub License](https://img.shields.io/github/license/zafnz/jqweb)
+[![GitHub Release](https://img.shields.io/github/v/release/zafnz/jqweb)](https://github.com/zafnz/jqweb/releases)
+[![GitHub Issues](https://img.shields.io/github/issues/zafnz/jqweb)](https://github.com/zafnz/jqweb/issues)
+[![GitHub License](https://img.shields.io/github/license/zafnz/jqweb)](https://github.com/zafnz/jqweb/blob/main/LICENSE)
 
-# jqweb
-
-jqweb turns any JSON into an interactive webpage with one pipe. Run
+**jqweb** turns any JSON into an interactive webpage with one pipe. Run
 `cat data.json | jqweb -O` and it opens locally in your browser as a navigable
 tree with instant text search and jq-style queries—no upload and no server to
 configure.
 
+
 ```bash
 $ kubectl get pods -o json | jqweb -O
 ```
-
 [Try the live demo](https://zafnz.github.io/jqweb/).
 
 ## Install
@@ -39,7 +39,7 @@ $ curl -s https://zafnz.github.io/jqweb/k8s.json | jqweb -O
 jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)
 ```
 
-<img src="demo.png" alt="jqweb filtering running pods in a Kubernetes resource list" width="580">
+[<img src="demo.png" alt="jqweb filtering running pods in a Kubernetes resource list" width="580">](https://zafnz.github.io/jqweb/)
 
 *Filtering running Kubernetes pods with a jq-style query.*
 

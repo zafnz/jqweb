@@ -19,8 +19,8 @@ export function parseJSON(src: string): Node {
   let i = 0;
 
   /* Skips whitespace by advancing the shared i. Every JSON space character
-     (space, tab, CR, LF) is <= 32, and past the end of src charCodeAt gives
-     NaN, which fails the comparison and stops the loop. */
+     (space, tab, CR, LF) is <= 32, and nothing else in a well-formed document
+     is. */
   function ws(): void { while (i < src.length && src.charCodeAt(i) <= 32) i++; }
 
   /* Reads a string literal starting at src[i] and returns its value. Walks

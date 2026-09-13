@@ -8,13 +8,15 @@ export function span(cls: 'str' | 'num' | 'bool' | 'null', text: string): string
   return '<span class="v ' + cls + '">' + text + '</span>';
 }
 
+/* The glyph on a copy button, here and on the rows of the suggestion list. */
+export const COPY_GLYPH = '⧉';
+
 /* The buttons at the end of every line. The second one only goes into a page
    that can act on it -- it opens a list of queries built from the line, which
    needs the query engine -- so renderTree is told whether to emit it, and the
-   pair is worked out once per tree rather than once per line. */
-const CP = '<button class="cp" title="Copy path">&#x29C9;</button>';
+   pair is worked out once per tree and handed down to every line. */
+const CP = '<button class="cp" title="Copy path">' + COPY_GLYPH + '</button>';
 const FQ = '<button class="fq" title="Filter on this value">&#x2261;</button>';
-let buttons = CP;
 
 /* Renders a parsed document as the markup for the whole tree. The caller
    assigns it to innerHTML in one go: for a large document that is around
@@ -22,13 +24,13 @@ let buttons = CP;
    this file free of the DOM. */
 export function renderTree(root: Node, withFilter?: boolean): string {
   const out: string[] = [];
-  buttons = withFilter ? CP + FQ : CP;
-  emit(out, root, null, -1, false);
+  emit(out, root, null, -1, false, withFilter ? CP + FQ : CP);
   return out.join('');
 }
 
 /* Emits one tree node. key is non-null for object members, idx >= 0 for
-   array elements; the root has neither. comma appends a trailing comma.
+   array elements; the root has neither. comma appends a trailing comma, and
+   buttons is the markup for the buttons on the line.
 
    Fragments are pushed onto out rather than concatenated, and children are
    emitted between their parent's opening and closing fragments, so the
@@ -38,12 +40,12 @@ export function renderTree(root: Node, withFilter?: boolean): string {
    branch adds <div class="kids"> for its children and a <div class="closer">
    for the bracket that follows them. The key or index is repeated in a data
    attribute, which is what page/tree.ts reads back to reconstruct a path. */
-function emit(out: string[], node: Node, key: string | null, idx: number, comma: boolean): void {
+function emit(out: string[], node: Node, key: string | null, idx: number, comma: boolean, buttons: string): void {
   const attrs = key !== null ? ' data-key="' + esc(key) + '"'
     : idx >= 0 ? ' data-index="' + idx + '"' : '';
-  /* A member's copy button sits right after its key; an array element or
-     the root has no key to sit after, so its button goes at the end. */
-  let keyPart = '', endBtn = buttons;   /* unkeyed nodes get the buttons at the end of the line */
+  /* A member's buttons sit right after its key; an array element or the
+     root has no key to sit after, so they go at the end of the line. */
+  let keyPart = '', endBtn = buttons;
   if (key !== null) {
     keyPart = '<span class="key">' + esc(quote(key)) + '</span>' + buttons +
       '<span class="pn">: </span>';
@@ -81,7 +83,7 @@ function emit(out: string[], node: Node, key: string | null, idx: number, comma:
   /* Children carry their own key or index, and every child but the last is
      followed by a comma. */
   for (let j = 0; j < n; j++) {
-    emit(out, node.v[j], obj ? node.k[j] : null, obj ? -1 : j, j < n - 1);
+    emit(out, node.v[j], obj ? node.k[j] : null, obj ? -1 : j, j < n - 1, buttons);
   }
   out.push('</div><div class="closer"><span class="p">' + close + '</span>' + c + '</div></div>');
 }

@@ -85,7 +85,7 @@ keyword in the PR body too: `Closes #123`, `Fixes #223` or similar.
 A Go binary that turns a JSON document into one self-contained HTML page, and
 either serves it or writes it to a file. Everything interesting is in the page.
 
-The Go side is `main.go` at the root and four packages under `internal`:
+The Go side is `main.go` at the root and five packages under `internal`:
 
 | file | what it holds |
 |---|---|
@@ -96,11 +96,13 @@ The Go side is `main.go` at the root and four packages under `internal`:
 | `internal/serve/detach_*.go`, `dup2_*.go` | per-platform: how the child is started detached and how it lets go of its outputs |
 | `internal/page` | compiled-script selection and template assembly |
 | `internal/update` | the once-a-day release check, its state file, and the upgrade command it names |
+| `internal/testutil` | the HTTP client, request and timer slack the server tests share; nothing outside a test imports it |
 | `web/assets.go` | the `//go:embed` of the page assets, which cannot name a file outside its own directory |
 
-Each apart from the per-platform files has a `_test.go` of its own along the
-same lines. The tests that run jqweb as a process stay in `background_test.go`
-at the root, because they reach `main` through `TestMain`.
+Each apart from the per-platform files and `testutil` has a `_test.go` of its
+own along the same lines. The tests that run jqweb as a process stay in
+`background_test.go` at the root, because they reach `main` through
+`TestMain`.
 
 `web/build.ts` bundles the entry points in `web/src/entries` into the
 committed files under `web/dist`, and `internal/page` assembles those with the

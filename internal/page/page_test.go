@@ -186,7 +186,7 @@ func TestRenderPageStartsInTheThemeAskedFor(t *testing.T) {
 	if !strings.Contains(head, "prefers-color-scheme") {
 		t.Error("the theme is not settled in the head")
 	}
-	if !strings.Contains(page, `--theme="light"`) && !strings.Contains(page, `[data-theme="light"]`) {
+	if !strings.Contains(page, `[data-theme="light"]`) {
 		t.Error("the page has no light palette")
 	}
 }

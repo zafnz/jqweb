@@ -9,12 +9,14 @@
 import { esc } from '../model/escape.ts';
 import type { Node as ValueNode } from '../model/node.ts';
 import { pathText } from '../model/path.ts';
-import { renderTree } from '../model/render.ts';
+import { COPY_GLYPH, renderTree } from '../model/render.ts';
+import { copy } from '../page/clipboard.ts';
 import { find } from '../page/dom.ts';
 import type { QueryHost, QueryUI } from '../page/search.ts';
+import { segsOf } from '../page/tree.ts';
 import { compile, isJqError } from './engine/index.ts';
 import type { Query } from './engine/index.ts';
-import { completions, splitPartial, suggest } from './suggest.ts';
+import { completions, countOf, splitPartial, suggest } from './suggest.ts';
 import type { Candidate, Shape } from './suggest.ts';
 
 /* A row of the suggestion list: a reading of the clicked line, with count
@@ -34,12 +36,28 @@ export function jqui(page: QueryHost): QueryUI {
   const input = find('#q', HTMLInputElement);
   const mode = find('#mode', HTMLSelectElement);
   const stats = find('#stats', HTMLElement);
+  const suggestions = find('#suggest', HTMLElement);
+  const faultBox = find('#fault', HTMLElement);
 
-  /* Both of these are meaningless without the engine, so the shell ships them
-     hidden and unexplained and they are turned on here. */
+  /* The select and the placeholder are meaningless without the engine, so the
+     shell ships them hidden and unexplained and they are turned on here. */
   mode.hidden = false;
   input.placeholder = 'Text to find, a path, or a jq query such as .items[] | select(.n > 3)';
   mode.addEventListener('change', function () { input.focus(); page.rerun(); });
+
+  /* The rows on the suggestion list, whichever of the two things below filled
+     it, and whether the last run was held back to offer completions. */
+  let rows: Row[] = [];
+  let completing = false;
+
+  /* Building the markup for a query's whole output is what would stall the
+     page, so only this many are rendered; the count still reports them all. */
+  const RESULT_CAP = 500;
+
+  /* Running every candidate against a large document could take longer than
+     anyone will wait for a menu, so counting stops after this and the rest of
+     the rows are offered without one. */
+  const COUNT_BUDGET_MS = 300;
 
   /* The characters a path or a jq expression can start with. In auto mode they
      are what tells a query from plain text, so that typing a word still
@@ -123,10 +141,6 @@ export function jqui(page: QueryHost): QueryUI {
     faultBox.textContent = '';
   }
 
-  /* Building the markup for a query's whole output is what would stall the
-     page, so only this many are rendered; the count still reports them all. */
-  const RESULT_CAP = 500;
-
   /* Shows a query's outputs in place of the document. Each carries its
      position, which the stylesheet puts in the gutter, because a query
      produces a list of values rather than one document; a single value is left
@@ -184,19 +198,10 @@ export function jqui(page: QueryHost): QueryUI {
      it comes back when the box is focused again and goes away when attention
      moves elsewhere. */
 
-  const suggestions = find('#suggest', HTMLElement);
-  const faultBox = find('#fault', HTMLElement);
-  let rows: Row[] = [];
-
-  /* Running every candidate against a large document could take longer than
-     anyone will wait for a menu, so counting stops after this and the rest of
-     the rows are offered without one. */
-  const COUNT_BUDGET_MS = 300;
-
   /* Builds the list for one line of the document, puts the widest reading in
      the box, and runs it. */
   function filter(node: HTMLElement): void {
-    const segs = page.segsOf(node);
+    const segs = segsOf(node);
     const deadline = Date.now() + COUNT_BUDGET_MS;
     const counted = suggest(page.value, segs).map(function (c) {
       return Object.assign(c, { count: Date.now() > deadline ? null : count(c) });
@@ -233,9 +238,8 @@ export function jqui(page: QueryHost): QueryUI {
     show();
   }
 
-  /* How much one candidate returns, or 0 if it will not run at all. What to
-     count depends on the query rather than on its output: with_entries hands
-     back a single object and the answer is how many members it kept. */
+  /* How much one candidate returns, counted the way its shape says, or 0 if
+     it will not run at all. */
   function count(c: Candidate): number {
     let out: ValueNode[];
     try {
@@ -244,9 +248,7 @@ export function jqui(page: QueryHost): QueryUI {
       if (isJqError(e)) return 0;
       throw e;
     }
-    if (c.shape !== 'keys') return out.length;
-    const first = out[0];
-    return out.length && first.t === 'o' ? first.k.length : 0;
+    return countOf(c.shape, out);
   }
 
   function label(c: Row): string {
@@ -263,7 +265,6 @@ export function jqui(page: QueryHost): QueryUI {
      the view keeps showing whatever last ran. A name that matches a whole key
      runs -- ".items[].kind" behaves as it always did -- and one that no key
      starts with runs too, nulls and all. */
-  let completing = false;
 
   /* Offers completions for raw instead of running it, when there are any.
      True means it did and the caller has nothing to run. */
@@ -273,7 +274,7 @@ export function jqui(page: QueryHost): QueryUI {
     let out: ValueNode[];
     try {
       out = compile(split.ctx).run(page.value);
-    } catch (e) {
+    } catch {
       return false;
     }
     const comp = completions(out, split.partial);
@@ -299,7 +300,7 @@ export function jqui(page: QueryHost): QueryUI {
       parts.push('<div class="sg"><button class="sgq" type="button">' +
         '<span class="sgt">' + esc(rows[i].q) + '</span>' +
         '<span class="sgn">' + esc(label(rows[i])) + '</span></button>' +
-        '<button class="sgc" type="button" title="Copy this query">&#x29C9;</button></div>');
+        '<button class="sgc" type="button" title="Copy this query">' + COPY_GLYPH + '</button></div>');
     }
     suggestions.innerHTML = parts.join('');
   }
@@ -340,9 +341,9 @@ export function jqui(page: QueryHost): QueryUI {
     if (!(e.target instanceof Element)) return;
     const row = e.target.closest('.sg');
     if (!row) return;
-    const i = Array.prototype.indexOf.call(suggestions.children, row);
+    const i = Array.from(suggestions.children).indexOf(row);
     const cp = e.target.closest('.sgc');
-    if (cp) { page.copy(rows[i].q, cp); return; }
+    if (cp) { copy(rows[i].q, cp); return; }
     pick(i);
     input.focus();
   });

@@ -34,7 +34,8 @@ const (
 	// A check that has not answered by then is abandoned.
 	updateTimeout = 2 * time.Second
 
-	// How long -o mode waits at exit for an answer. Serving waits for nothing.
+	// ExitWait is how long -o mode waits at exit for an answer. Serving waits
+	// for nothing.
 	ExitWait = time.Second
 
 	installCommand = "curl -fsSL https://raw.githubusercontent.com/zafnz/jqweb/main/install.sh | sh"
@@ -72,14 +73,15 @@ type updater struct {
 	packaged  func(exe string) string
 }
 
-// Check starts the check for a release newer than version, unless off is
-// set, and returns a channel carrying the line to print. The channel is closed with nothing on it when there is nothing to
+// Check starts the check for a release newer than version, unless off is set
+// or stderr is not a terminal, and returns a channel carrying the line to
+// print. The channel is closed with nothing on it when there is nothing to
 // say, and closed before it is returned when no check is wanted, so a receive
 // never waits on a check that is not happening.
-func Check(version string, off bool) <-chan string {
+func Check(version string, off, stderrIsTTY bool) <-chan string {
 	ch := make(chan string, 1)
 	state, err := stateFilePath()
-	if err != nil || !wantUpdateCheck(version, off, isTTY(os.Stderr), os.Getenv) {
+	if err != nil || !wantUpdateCheck(version, off, stderrIsTTY, os.Getenv) {
 		close(ch)
 		return ch
 	}
@@ -162,8 +164,12 @@ func (u *updater) notice() string {
 	if u.now().Sub(state.FirstSeen) < minTagAge {
 		return ""
 	}
+	exe, err := u.exe()
+	if err != nil {
+		exe = ""
+	}
 	return fmt.Sprintf("jqweb: %s is available (running %s): %s",
-		latest, u.version, u.upgradeHint())
+		latest, u.version, upgradeHint(exe, runtime.GOOS, u.getenv, u.packaged))
 }
 
 // latestVersion asks github.com for the latest release tag by reading where
@@ -178,7 +184,6 @@ func (u *updater) latestVersion() (string, error) {
 		return "", err
 	}
 	client := &http.Client{
-		Timeout: u.timeout,
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
@@ -188,7 +193,6 @@ func (u *updater) latestVersion() (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body)
 	if resp.StatusCode < 300 || resp.StatusCode >= 400 {
 		return "", fmt.Errorf("%s: %s", u.url, resp.Status)
 	}
@@ -248,17 +252,10 @@ func (u *updater) writeState(state updateState) {
 	}
 }
 
-// upgradeHint is the command that fetches the new release. GoReleaser wraps
-// the same binary for every channel, so there is no ldflag to tell them apart
-// and where the binary sits is the only thing left to read.
-func (u *updater) upgradeHint() string {
-	exe, err := u.exe()
-	if err != nil {
-		exe = ""
-	}
-	return upgradeHint(exe, runtime.GOOS, u.getenv, u.packaged)
-}
-
+// upgradeHint is the command that fetches the new release, given the resolved
+// path of the running binary, or "" when it could not be read. GoReleaser
+// wraps the same binary for every channel, so there is no ldflag to tell them
+// apart and where the binary sits is the only thing left to read.
 func upgradeHint(exe, goos string, getenv, packaged func(string) string) string {
 	// A Homebrew cask keeps the binary in the Caskroom and links it onto the
 	// path; executablePath resolves the link, which is the only way the
@@ -477,10 +474,4 @@ func WaitNotice(w io.Writer, ch <-chan string, d time.Duration) {
 		}
 	case <-time.After(d):
 	}
-}
-
-// isTTY reports whether f is a terminal.
-func isTTY(f *os.File) bool {
-	fi, err := f.Stat()
-	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }

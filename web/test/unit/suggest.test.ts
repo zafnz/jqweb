@@ -14,7 +14,7 @@ import type { Node } from '../../src/model/node.ts';
 import { parseJSON } from '../../src/model/parse.ts';
 import type { Segment } from '../../src/model/path.ts';
 import { compile, isJqError } from '../../src/query/engine/index.ts';
-import { suggest, splitPartial, completions } from '../../src/query/suggest.ts';
+import { completions, countOf, splitPartial, suggest } from '../../src/query/suggest.ts';
 import type { Candidate } from '../../src/query/suggest.ts';
 
 /* A document with the shapes that have caught the generator out: an object
@@ -42,10 +42,7 @@ const queries = (segs: Segment[]) => suggest(DOC, segs).map((c) => c.q);
 
 /* What one candidate returns, counted the way its shape says to count it. */
 function yields(c: Candidate, doc?: Node): number {
-  const out = compile(c.q).run(doc || DOC);
-  if (c.shape !== 'keys') return out.length;
-  const first = out[0];
-  return out.length && first.t === 'o' ? first.k.length : 0;
+  return countOf(c.shape, compile(c.q).run(doc || DOC));
 }
 
 test('a value in an array is asked about with index, not equality', () => {

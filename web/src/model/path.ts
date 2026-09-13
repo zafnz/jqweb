@@ -70,7 +70,7 @@ export function parsePath(str: string): Segment[] | null {
           /* Double quotes are JSON, so JSON.parse handles the escapes --
              and rejects the ones that are not valid JSON. */
           try { segs.push({ key: JSON.parse(s.slice(i + 1, j + 1)) }); }
-          catch (e) { return null; }
+          catch { return null; }
         } else {
           /* Single quotes are not JSON; only \' and \\ mean anything. */
           segs.push({ key: s.slice(i + 2, j).replace(/\\(['\\])/g, '$1') });

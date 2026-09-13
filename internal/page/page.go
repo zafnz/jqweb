@@ -20,16 +20,17 @@ type Options struct {
 }
 
 // Render embeds the document in the page as compact JSON; the script in
-// the template parses it and builds the tree in the browser. opt.JQ selects
-// the template that carries the query engine, and opt.Theme is the palette the
-// page starts in, which the reader can change afterwards. opt.Query goes in the
-// search box, which the page runs once it has built the tree.
+// the template parses it and builds the tree in the browser. data has to be
+// one well-formed JSON document, which check.Document establishes, and Render
+// panics on anything else rather than embed it. opt.JQ selects the template
+// that carries the query engine, and opt.Theme is the palette the page starts
+// in, which the reader can change afterwards. opt.Query goes in the search
+// box, which the page runs once it has built the tree, and opt.Served marks a
+// page that holds /alive open.
 func Render(data []byte, title string, opt Options) string {
 	var buf bytes.Buffer
 	if err := json.Compact(&buf, data); err != nil {
-		// check has already accepted the document, so this cannot fail.
-		buf.Reset()
-		buf.Write(data)
+		panic("page.Render: " + err.Error())
 	}
 	return strings.NewReplacer(
 		"{{TITLE}}", html.EscapeString(title),
@@ -65,10 +66,11 @@ func boxText(q string) string {
 	return strings.NewReplacer("\r\n", " ", "\r", " ", "\n", " ").Replace(q)
 }
 
-// pageTemplate returns the page shell with its stylesheet and script inlined,
-// leaving {{TITLE}} and {{DATA}} for Render to fill in. A page with the
-// query engine and one without are two different scripts, so there is a
-// template for each, built the first time it is wanted.
+// pageTemplate returns the page shell with its stylesheets and scripts
+// inlined, leaving the placeholders that change per document -- {{TITLE}},
+// {{PREF}}, {{SERVED}}, {{QUERY}} and {{DATA}} -- for Render to fill in. A
+// page with the query engine and one without are two different scripts, so
+// there is a template for each, built the first time it is wanted.
 func pageTemplate(jq bool) string {
 	if jq {
 		return withJQ()
@@ -79,6 +81,8 @@ func pageTemplate(jq bool) string {
 var withJQ = sync.OnceValue(func() string { return buildTemplate(true) })
 var withoutJQ = sync.OnceValue(func() string { return buildTemplate(false) })
 
+// buildTemplate inlines the stylesheets, the head script and the page script
+// into the shell.
 func buildTemplate(jq bool) string {
 	return strings.NewReplacer(
 		"{{STYLE}}", style(jq),

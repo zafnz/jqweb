@@ -17,7 +17,7 @@ func Document(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
 	if err := checkValue(dec); err != nil {
-		return describeErr(data, err)
+		return describe(data, err)
 	}
 	if dec.More() {
 		off := dec.InputOffset()
@@ -31,6 +31,8 @@ func Document(data []byte) error {
 	return nil
 }
 
+// checkValue reads one JSON value from dec, recursing into containers, and
+// returns the decoder's error if it is not well formed.
 func checkValue(dec *json.Decoder) error {
 	tok, err := dec.Token()
 	if err != nil {
@@ -75,18 +77,22 @@ func moreValues(dec *json.Decoder) bool {
 	return dec.Decode(&raw) == nil
 }
 
-func describeErr(data []byte, err error) error {
+// describe turns the decoder's error into the message the user sees: what
+// kind of input this is when it is not JSON at all, and the line and column
+// of the fault, with a hint for the common near-JSON dialects, when it is.
+func describe(data []byte, err error) error {
 	if isTruncated(err) {
 		if len(bytes.TrimSpace(data)) == 0 {
 			return fmt.Errorf("empty input")
 		}
 		return fmt.Errorf("unexpected end of input; the document is truncated")
 	}
-	if what, binary := sniff(data); binary {
+	what, binary := sniff(data)
+	if binary {
 		return fmt.Errorf("input is not JSON; it is %s", what)
 	}
 	if !startsJSON(data) {
-		return notJSON(data)
+		return notJSON(data, what)
 	}
 	// The streaming Token API reports the offset of the last token it
 	// consumed, not of the character it choked on, so re-parse the whole
@@ -151,13 +157,15 @@ func syntaxHint(data []byte, i int) string {
 		bytes.HasPrefix(rest, []byte("-Infinity")), bytes.HasPrefix(rest, []byte("undefined")):
 		return "JSON has no NaN, Infinity or undefined; use null or a string"
 	case isIdentStart(data[i]):
-		if j := i; identEnd(data, j) < len(data) && data[identEnd(data, j)] == ':' {
+		if end := identEnd(data, i); end < len(data) && data[end] == ':' {
 			return "object keys must be double-quoted strings"
 		}
 	}
 	return ""
 }
 
+// lastNonSpace is the index of the last byte of b that is not JSON
+// whitespace, or -1.
 func lastNonSpace(b []byte) int {
 	for i := len(b) - 1; i >= 0; i-- {
 		switch b[i] {
@@ -169,10 +177,13 @@ func lastNonSpace(b []byte) int {
 	return -1
 }
 
+// isIdentStart reports whether c can begin a JavaScript identifier, which is
+// what an unquoted key in near-JSON looks like.
 func isIdentStart(c byte) bool {
 	return c == '_' || c == '$' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 }
 
+// identEnd is the index just past the identifier starting at data[i].
 func identEnd(data []byte, i int) int {
 	for i < len(data) && (isIdentStart(data[i]) || (data[i] >= '0' && data[i] <= '9')) {
 		i++
@@ -202,10 +213,9 @@ func startsJSON(data []byte) bool {
 }
 
 // notJSON builds the error for input that never starts a JSON value, naming
-// the format when it is recognizable and quoting the start of the input
-// otherwise.
-func notJSON(data []byte) error {
-	what, _ := sniff(data)
+// the format sniff guessed when it made one and quoting the start of the
+// input otherwise.
+func notJSON(data []byte, what string) error {
 	msg := "input does not look like JSON"
 	if what != "" {
 		msg += "; it looks like " + what
@@ -225,9 +235,12 @@ func sniff(data []byte) (what string, binary bool) {
 		return "gzip-compressed data; decompress it first, e.g. with gunzip or curl --compressed", true
 	}
 	head := s[:min(len(s), 1024)]
-	// A cut at 1024 bytes can land mid-rune; drop the partial one.
-	for i := 0; i < 3 && len(head) < len(s) && len(head) > 0 && !utf8.Valid(head); i++ {
-		head = head[:len(head)-1]
+	if len(head) < len(s) {
+		// The cut can land inside a rune, which is at most four bytes; drop
+		// the partial one rather than call the input binary for it.
+		for n := 0; n < utf8.UTFMax-1 && !utf8.Valid(head); n++ {
+			head = head[:len(head)-1]
+		}
 	}
 	if bytes.IndexByte(head, 0) >= 0 || !utf8.Valid(head) {
 		return "binary data", true
@@ -271,6 +284,8 @@ func preview(data []byte) string {
 	return s
 }
 
+// lineCol is the one-based line and column of the byte at off, with off
+// clamped to the end of data. The column counts bytes.
 func lineCol(data []byte, off int64) (int, int) {
 	if off > int64(len(data)) {
 		off = int64(len(data))

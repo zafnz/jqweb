@@ -29,17 +29,29 @@ function legacyCopy(t: string): boolean {
   document.body.appendChild(ta);
   ta.select();
   let ok = false;
-  try { ok = document.execCommand('copy'); } catch (e) {}
+  try { ok = document.execCommand('copy'); } catch {}
   ta.remove();
   return ok;
 }
 
-/* Briefly turns a copy button into a tick or a cross, then restores it. */
+/* The buttons mid-flash: what each showed before, and the timer that puts it
+   back. A second copy from the same button before the first has settled
+   restarts the timer rather than taking the tick for the thing to restore. */
+const flashing = new WeakMap<Element, { text: string | null; timer: ReturnType<typeof setTimeout> }>();
+
+/* Briefly turns a button into a tick or a cross, then restores what it
+   showed. */
 function flash(btn: Element, ok: boolean): void {
+  const was = flashing.get(btn);
+  if (was) clearTimeout(was.timer);
+  const text = was ? was.text : btn.textContent;
+  btn.classList.remove('ok', 'fail');
   btn.classList.add(ok ? 'ok' : 'fail');
   btn.textContent = ok ? '✓' : '✗';
-  setTimeout(function () {
+  const timer = setTimeout(function () {
     btn.classList.remove('ok', 'fail');
-    btn.textContent = '⧉';
+    btn.textContent = text;
+    flashing.delete(btn);
   }, 900);
+  flashing.set(btn, { text: text, timer: timer });
 }

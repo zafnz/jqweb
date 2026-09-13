@@ -28,6 +28,15 @@ import { pathText } from '../model/path.ts';
    A single object out of ".. | objects" is one result, not six keys. */
 export type Shape = 'keys' | 'results';
 
+/* How much a query returned, counted the way its shape says: the members of
+   the one object a 'keys' query hands back, or the length of the stream. A
+   'keys' query that produced no object counts as nothing. */
+export function countOf(shape: Shape, out: Node[]): number {
+  if (shape !== 'keys') return out.length;
+  const first = out[0];
+  return out.length && first.t === 'o' ? first.k.length : 0;
+}
+
 /* One query a line might have meant: q is its text, why says in a few words
    what it reads the line as, and rank is the RANK below it was given. plain
    marks the reading of the line itself. */

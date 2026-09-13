@@ -75,10 +75,12 @@ func RunInBackground(notice <-chan string) int {
 	if ready {
 		return 0
 	}
+	err = cmd.Wait()
 	var exit *exec.ExitError
-	if err := cmd.Wait(); errors.As(err, &exit) && exit.ExitCode() > 0 {
+	if errors.As(err, &exit) && exit.ExitCode() > 0 {
 		return exit.ExitCode()
-	} else if err != nil {
+	}
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
 		return 1
 	}

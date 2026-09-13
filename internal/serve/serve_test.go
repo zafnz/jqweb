@@ -3,23 +3,15 @@ package serve
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/zafnz/jqweb/internal/testutil"
 )
-
-// testClient talks to the servers below without keeping connections alive, so
-// that an idle connection cannot hold up Shutdown and make the timing wrong.
-var testClient = &http.Client{
-	Timeout:   5 * time.Second,
-	Transport: &http.Transport{DisableKeepAlives: true},
-}
-
-const closeTimerSlack = 50 * time.Millisecond
 
 // startServer serves page on a listener of its own, and returns the URL, the
 // listener, and a channel carrying what serveOn returned.
@@ -32,26 +24,6 @@ func startServer(t *testing.T, page []byte, opt Options) (url string, ln net.Lis
 	ch := make(chan error, 1)
 	go func() { ch <- serveOn(ln, page, opt) }()
 	return "http://" + ln.Addr().String() + "/", ln, ch
-}
-
-// fetch performs one request and reads the body to the end, so the connection
-// is not left active behind it.
-func fetch(t *testing.T, method, url string) (status int, body string) {
-	t.Helper()
-	req, err := http.NewRequest(method, url, nil)
-	if err != nil {
-		t.Fatalf("%s %s: %v", method, url, err)
-	}
-	resp, err := testClient.Do(req)
-	if err != nil {
-		t.Fatalf("%s %s: %v", method, url, err)
-	}
-	defer resp.Body.Close()
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("reading %s: %v", url, err)
-	}
-	return resp.StatusCode, string(b)
 }
 
 // hold opens /alive the way a served page does and keeps the connection until
@@ -98,7 +70,7 @@ func stopsAfter(t *testing.T, done <-chan error, since time.Time, delay time.Dur
 		if err != nil {
 			t.Errorf("serveOn returned %v, want nil for a shutdown that was asked for", err)
 		}
-		if waited := time.Since(since); waited+closeTimerSlack < delay {
+		if waited := time.Since(since); waited+testutil.TimerSlack < delay {
 			t.Errorf("stopped %s after the last tab closed, before the %s delay", waited, delay)
 		}
 	case <-time.After(10 * time.Second):
@@ -114,11 +86,11 @@ func TestServeSendsThePage(t *testing.T) {
 		<-done
 	}()
 
-	status, body := fetch(t, http.MethodGet, url)
+	status, body := testutil.Fetch(t, http.MethodGet, url)
 	if status != http.StatusOK || body != string(page) {
 		t.Errorf("GET / = %d %q, want 200 and the page", status, body)
 	}
-	if status, _ := fetch(t, http.MethodGet, url+"elsewhere"); status != http.StatusNotFound {
+	if status, _ := testutil.Fetch(t, http.MethodGet, url+"elsewhere"); status != http.StatusNotFound {
 		t.Errorf("GET /elsewhere = %d, want 404", status)
 	}
 }
@@ -129,7 +101,7 @@ func TestServeStopsAfterTheFetch(t *testing.T) {
 	defer ln.Close()
 
 	start := time.Now()
-	if status, _ := fetch(t, http.MethodGet, url); status != http.StatusOK {
+	if status, _ := testutil.Fetch(t, http.MethodGet, url); status != http.StatusOK {
 		t.Fatalf("GET / = %d, want 200", status)
 	}
 	select {
@@ -137,7 +109,7 @@ func TestServeStopsAfterTheFetch(t *testing.T) {
 		if err != nil {
 			t.Errorf("serveOn returned %v, want nil for a shutdown that was asked for", err)
 		}
-		if waited := time.Since(start); waited+closeTimerSlack < delay {
+		if waited := time.Since(start); waited+testutil.TimerSlack < delay {
 			t.Errorf("stopped %s after the fetch, before the %s delay", waited, delay)
 		}
 	case <-time.After(10 * time.Second):
@@ -153,18 +125,18 @@ func TestServeFetchRestartsTheWait(t *testing.T) {
 	url, ln, done := startServer(t, []byte("page"), Options{CloseOnGet: true, CloseDelay: delay, FirstLoad: delay})
 	defer ln.Close()
 
-	if status, _ := fetch(t, http.MethodGet, url); status != http.StatusOK {
+	if status, _ := testutil.Fetch(t, http.MethodGet, url); status != http.StatusOK {
 		t.Fatalf("first GET / = %d, want 200", status)
 	}
 	time.Sleep(delay / 2)
-	if status, _ := fetch(t, http.MethodGet, url); status != http.StatusOK {
+	if status, _ := testutil.Fetch(t, http.MethodGet, url); status != http.StatusOK {
 		t.Fatalf("second GET / = %d, want 200", status)
 	}
 
 	// Past one delay since the first fetch: reachable only because the second
 	// one restarted the timer.
 	time.Sleep(delay * 3 / 4)
-	status, _ := fetch(t, http.MethodGet, url)
+	status, _ := testutil.Fetch(t, http.MethodGet, url)
 	last := time.Now()
 	if status != http.StatusOK {
 		t.Fatalf("third GET / = %d, want 200: the fetches did not restart the wait", status)
@@ -175,7 +147,7 @@ func TestServeFetchRestartsTheWait(t *testing.T) {
 		if err != nil {
 			t.Errorf("serveOn returned %v, want nil", err)
 		}
-		if waited := time.Since(last); waited+closeTimerSlack < delay {
+		if waited := time.Since(last); waited+testutil.TimerSlack < delay {
 			t.Errorf("stopped %s after the last fetch, before the %s delay", waited, delay)
 		}
 	case <-time.After(10 * time.Second):
@@ -191,11 +163,11 @@ func TestServeKeepsServingWithoutClose(t *testing.T) {
 		<-done
 	}()
 
-	fetch(t, http.MethodGet, url)
+	testutil.Fetch(t, http.MethodGet, url)
 	hold(t, url)()
 	time.Sleep(5 * delay)
 	stillServing(t, done, "without -C after a tab closed; a delay alone must not end the server")
-	if status, _ := fetch(t, http.MethodGet, url); status != http.StatusOK {
+	if status, _ := testutil.Fetch(t, http.MethodGet, url); status != http.StatusOK {
 		t.Errorf("GET / = %d after the delay passed, want 200", status)
 	}
 }
@@ -209,7 +181,7 @@ func TestServeHeadDoesNotRestartTheWait(t *testing.T) {
 	defer ln.Close()
 
 	time.Sleep(firstLoad / 2)
-	fetch(t, http.MethodHead, url)
+	testutil.Fetch(t, http.MethodHead, url)
 	stopsAfter(t, done, start, firstLoad)
 	// Restarted by the HEAD, the wait would have run to 600ms.
 	if took := time.Since(start); took > firstLoad+firstLoad/3 {
@@ -252,11 +224,11 @@ func TestServeAliveKeepsServing(t *testing.T) {
 	url, ln, done := startServer(t, []byte("page"), Options{CloseOnGet: true, CloseDelay: delay, FirstLoad: delay})
 	defer ln.Close()
 
-	fetch(t, http.MethodGet, url)
+	testutil.Fetch(t, http.MethodGet, url)
 	release := hold(t, url)
 	time.Sleep(5 * delay)
 	stillServing(t, done, "with a tab open")
-	if status, _ := fetch(t, http.MethodGet, url); status != http.StatusOK {
+	if status, _ := testutil.Fetch(t, http.MethodGet, url); status != http.StatusOK {
 		t.Fatalf("GET / = %d with a tab open, want 200", status)
 	}
 	time.Sleep(5 * delay)
@@ -289,7 +261,7 @@ func TestServeReloadKeepsServing(t *testing.T) {
 	defer ln.Close()
 
 	old := hold(t, url)
-	if status, _ := fetch(t, http.MethodGet, url); status != http.StatusOK {
+	if status, _ := testutil.Fetch(t, http.MethodGet, url); status != http.StatusOK {
 		t.Fatalf("GET / = %d, want 200", status)
 	}
 	old()
@@ -322,7 +294,7 @@ func TestServeWaitsForTheFirstLoad(t *testing.T) {
 
 	time.Sleep(5 * delay)
 	stillServing(t, done, "before the page was first loaded")
-	if status, _ := fetch(t, http.MethodGet, url); status != http.StatusOK {
+	if status, _ := testutil.Fetch(t, http.MethodGet, url); status != http.StatusOK {
 		t.Fatalf("GET / = %d, want 200", status)
 	}
 	hold(t, url)()
@@ -348,7 +320,7 @@ func TestServeZeroCloseDelayLetsThePageOpen(t *testing.T) {
 	url, ln, done := startServer(t, []byte("page"), Options{CloseOnGet: true, CloseDelay: 0, FirstLoad: firstLoad})
 	defer ln.Close()
 
-	if status, _ := fetch(t, http.MethodGet, url); status != http.StatusOK {
+	if status, _ := testutil.Fetch(t, http.MethodGet, url); status != http.StatusOK {
 		t.Fatalf("GET / = %d, want 200", status)
 	}
 	time.Sleep(firstLoad / 4)

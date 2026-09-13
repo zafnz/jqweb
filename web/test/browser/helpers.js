@@ -7,9 +7,8 @@
    such a body; only what the body returns has to be a number, a string or an
    object of them.
 
-   Nothing here ships in a rendered page. It runs in whatever Chrome the runner
-   found, so it is written in the JavaScript that browser has rather than the
-   ES5 the page scripts keep to. */
+   Nothing here ships in a rendered page. It is plain JavaScript because
+   Playwright injects the file as written, with nothing compiling it first. */
 
 (() => {
   'use strict';
@@ -18,7 +17,11 @@
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 
   /* The node in the document tree at a jq-style path, found the way the page
-     finds it: by the data attributes emit() wrote. */
+     finds it: by the data attributes emit() wrote. It is the walk resolvePath
+     in src/page/tree.ts does, written again here because the page does not
+     export that one and a walk of its own is what makes this a check of the
+     markup rather than of tree.ts. fixtures.js has a third copy, for the same
+     reason. */
   function at(path) {
     const segs = window.jqweb.parsePath(path);
     if (!segs) throw new Error('at: ' + path + ' is not a path');

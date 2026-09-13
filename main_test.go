@@ -290,3 +290,15 @@ func TestIsFile(t *testing.T) {
 		}
 	}
 }
+
+// README.md carries the usage text as jqweb prints it, so a flag added to one
+// and not the other fails here rather than going unnoticed.
+func TestReadmeCarriesUsage(t *testing.T) {
+	readme, err := os.ReadFile("README.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(readme), usageText) {
+		t.Error("README.md does not carry the usage text in main.go; copy usageText into its Usage section")
+	}
+}

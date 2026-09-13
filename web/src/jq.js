@@ -14,7 +14,7 @@
    "as", def, reduce, foreach, assignment, path expressions, string
    interpolation, format strings, and try/catch. Bare "?" is supported.
 
-   Nothing here touches the DOM; page.js drives it. */
+   Nothing here touches the DOM; query.js drives it. */
 import { leafOf, stringify } from './model/node.ts';
 import { parseJSON } from './model/parse.ts';
 
@@ -677,7 +677,7 @@ var jqjs = (function () {
   }
 
   /* The segments of a query that is only a walk down the document, in the
-     form parsePath produces, or null for anything else. page.js uses it to
+     form parsePath produces, or null for anything else. query.js uses it to
      keep the old behaviour for a pasted path: highlight the node in the
      document rather than replacing the view with a copy of it. */
   function pathSegs(a) {

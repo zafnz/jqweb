@@ -8,7 +8,7 @@ import { test, expect, settle, type, near } from '../fixtures.js';
 
 test.use({ variant: 'default' });
 
-/* Scrolling is instant -- page.js asks for block: 'center' and no behaviour --
+/* Scrolling is instant -- the page asks for block: 'center' and no behaviour --
    so this only has to put the page somewhere and let the handlers run. */
 async function scrollTo(page, y) {
   await page.evaluate((to) => window.scrollTo(0, to === 'bottom'

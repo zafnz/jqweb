@@ -1,6 +1,6 @@
-/* The page --simple builds. page.js ships in it and query.js does not, so
-   everything that reads the box as a query has to be absent without leaving a
-   hole where it was. */
+/* The page --simple builds. The modules in src/page ship in it and query.js
+   does not, so everything that reads the box as a query has to be absent
+   without leaving a hole where it was. */
 
 import { test, expect, settle, type } from '../fixtures.js';
 

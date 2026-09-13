@@ -1,10 +1,10 @@
 /* The half of the page that reads the search box as a query and shows what one
    produces. --simple leaves it out.
 
-   It is kept apart from page.js because page.js is inlined into every page
-   whether or not the engine is, and none of this means anything without it.
-   page.js calls jqui() once, with the few things it cannot look up for
-   itself, and gets back the entry points it needs. */
+   It is kept apart from the modules in page/ because those are inlined into
+   every page whether or not the engine is, and none of this means anything
+   without it. page/search.ts calls jqui() once, with the few things it
+   cannot look up for itself, and gets back the entry points it needs. */
 import { esc } from './model/escape.ts';
 import { pathText } from './model/path.ts';
 import { renderTree } from './model/render.ts';
@@ -141,7 +141,7 @@ export function jqui(page) {
   function plural(n, noun) { return n + ' ' + noun + (n === 1 ? '' : 's'); }
 
   /* Puts the document back. Without the engine nothing ever replaces it, so
-     page.js only has this to call when there is a jqui at all. */
+     the page only has this to call when there is a jqui at all. */
   function showDocument() {
     if (results.hidden) return;
     results.hidden = true;

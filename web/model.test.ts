@@ -1,6 +1,6 @@
 /* Tests for the value model in src/model: the parser, the HTML renderer,
    escaping and the path reader. Run with:  node --test
-   The DOM wiring in page.js is not exercised here. */
+   The DOM wiring in src/page is not exercised here. */
 
 import test from 'node:test';
 import assert from 'node:assert';
@@ -183,7 +183,7 @@ test('parsePath rejects text that is not a path', () => {
 });
 
 test('a copied path round-trips through parsePath', () => {
-  // pathOf() in page.js emits .key for identifiers and ["key"] otherwise;
+  // pathOf() in page/tree.ts emits .key for identifiers and ["key"] otherwise;
   // both forms have to read back.
   const cases: [string, ReturnType<typeof parsePath>][] = [
     ['.items[302].item', [{ key: 'items' }, { index: 302 }, { key: 'item' }]],

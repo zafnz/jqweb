@@ -143,8 +143,8 @@
   const prop = (name) =>
     getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
-  /* Repaints the page in one palette. theme.js settled this before the body
-     parsed; a spec checking both has to ask for the other one. */
+  /* Repaints the page in one palette. page/theme.ts settled this before the
+     body parsed; a spec checking both has to ask for the other one. */
   const paint = (theme) => document.documentElement.setAttribute('data-theme', theme);
 
   window.__t = {

@@ -21,6 +21,16 @@ $ kubectl get pods -o json | jqweb -O
     brew install zafnz/tap/jqweb              # macOS, Linux
     go install github.com/zafnz/jqweb@latest  # with Go installed
 
+On Debian and Ubuntu:
+
+    echo 'deb [trusted=yes] https://apt.fury.io/zafnz/ /' | sudo tee /etc/apt/sources.list.d/jqweb.list
+    sudo apt update && sudo apt install jqweb
+
+On Fedora and RHEL:
+
+    printf '[jqweb]\nname=jqweb\nbaseurl=https://yum.fury.io/zafnz/\nenabled=1\ngpgcheck=0\n' | sudo tee /etc/yum.repos.d/jqweb.repo
+    sudo dnf install jqweb
+
 On Linux or macOS without Homebrew, this puts the latest release in
 `~/.local/bin`:
 
@@ -28,7 +38,8 @@ On Linux or macOS without Homebrew, this puts the latest release in
 
 Or download a binary for macOS, Linux or Windows from
 [Releases](https://github.com/zafnz/jqweb/releases) and put it on your `$PATH`.
-The macOS builds are signed and notarized.
+The macOS builds are signed and notarized. The .deb and .rpm packages are there
+too.
 
 ## Example usage
 

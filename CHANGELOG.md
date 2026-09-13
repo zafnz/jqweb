@@ -9,6 +9,12 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+### apt and dnf packages
+
+jqweb installs from an apt or dnf repository on Debian, Ubuntu, Fedora and
+RHEL; the commands are under Install in the README. A packaged jqweb names the
+apt or dnf command in its update notice.
+
 ### `-C` serves from the background until the last tab closes
 
 `-C` and `-OC` return the prompt straight away and keep serving while any tab

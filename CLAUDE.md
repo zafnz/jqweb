@@ -208,6 +208,11 @@ than the look on one screen: dimming a grey with `opacity` once gave 1.6:1.
 rendered, so rebuild `web/dist` and then regenerate it after any change under
 `web/`, with the commands in `CONTRIBUTING.md`.
 
+**The packages' install path is written twice.** `bindir` in the `nfpms`
+section of `.goreleaser.yaml` and `packagedPath` in `internal/update` both
+name `/usr/bin/jqweb`, and the update notice names apt or dnf only for a binary
+there. Change one and change the other.
+
 **`docs/k8s.json` is the example document.** It is a generated `kubectl get all
 -o json` listing, committed and served at https://zafnz.github.io/jqweb/k8s.json,
 and the `curl` in `README.md` fetches it from there. Examples that need a

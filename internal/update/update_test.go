@@ -48,6 +48,7 @@ func newTestUpdater(t *testing.T, version, url string) (*updater, *time.Time) {
 		now:       func() time.Time { return clock },
 		getenv:    func(string) string { return "" },
 		exe:       func() (string, error) { return "/usr/local/bin/jqweb", nil },
+		packaged:  func(string) string { return "" },
 	}
 	return u, &clock
 }
@@ -136,8 +137,21 @@ func TestUpgradeHint(t *testing.T) {
 		name string
 		exe  string
 		env  map[string]string
+		// What the package manager answers for exe.
+		pkg  string
 		want string
 	}{
+		{
+			name: "a .deb package",
+			exe:  "/usr/bin/jqweb",
+			pkg:  "sudo apt update && sudo apt install --only-upgrade jqweb",
+			want: "sudo apt update && sudo apt install --only-upgrade jqweb",
+		},
+		{
+			name: "/usr/bin with no package behind it",
+			exe:  "/usr/bin/jqweb",
+			want: installCommand,
+		},
 		{
 			name: "a Homebrew cask",
 			exe:  "/opt/homebrew/Caskroom/jqweb/0.7.0/jqweb",
@@ -192,10 +206,20 @@ func TestUpgradeHint(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			getenv := func(k string) string { return tt.env[k] }
-			if got := upgradeHint(tt.exe, getenv); got != tt.want {
+			packaged := func(string) string { return tt.pkg }
+			if got := upgradeHint(tt.exe, getenv, packaged); got != tt.want {
 				t.Errorf("upgradeHint(%q) = %q, want %q", tt.exe, got, tt.want)
 			}
 		})
+	}
+}
+
+// Only the path the packages install to reaches dpkg or rpm.
+func TestSystemPackageUpgradeIgnoresOtherPaths(t *testing.T) {
+	for _, exe := range []string{"", "/usr/local/bin/jqweb", "/home/nick/.local/bin/jqweb", "/usr/bin/jqweb2"} {
+		if got := systemPackageUpgrade(exe); got != "" {
+			t.Errorf("systemPackageUpgrade(%q) = %q, want \"\"", exe, got)
+		}
 	}
 }
 
@@ -221,7 +245,7 @@ func TestUpgradeHintMatchesASymlinkedGoBin(t *testing.T) {
 	}
 	exe := filepath.Join(gobin, "jqweb")
 	const want = "go install github.com/zafnz/jqweb@latest"
-	if got := upgradeHint(exe, getenv); got != want {
+	if got := upgradeHint(exe, getenv, func(string) string { return "" }); got != want {
 		t.Errorf("upgradeHint(%q) with GOBIN=%q = %q, want %q", exe, getenv("GOBIN"), got, want)
 	}
 }

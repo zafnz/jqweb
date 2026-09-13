@@ -105,3 +105,34 @@ homebrew_casks:
     commit_author:
       name: goreleaserbot
       email: goreleaserbot@users.noreply.github.com
+
+nfpms:
+  - id: packages
+    package_name: jqweb
+    vendor: Nick Clifford
+    maintainer: Nick Clifford <nick@nickclifford.com>
+    homepage: https://github.com/zafnz/jqweb
+    description: Renders JSON like jq, but as a webpage
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    # internal/update names the apt or dnf command only for a binary at
+    # /usr/bin/jqweb. Change packagedPath there along with this.
+    bindir: /usr/bin
+    contents:
+      - src: LICENSE
+        dst: /usr/share/doc/jqweb/copyright
+
+# GoReleaser's own Gemfury publisher is Pro-only, so this calls the push API
+# that publisher wraps. Gemfury hosts the apt and yum repositories.
+publishers:
+  - name: gemfury
+    ids:
+      - packages
+    dir: "{{ dir .ArtifactPath }}"
+    # GoReleaser redacts the values in env from what it logs of the command,
+    # and the token is in the URL.
+    env:
+      - FURY_TOKEN={{ .Env.FURY_TOKEN }}
+    cmd: curl -fsS -F package=@{{ .ArtifactName }} https://{{ .Env.FURY_TOKEN }}@push.fury.io/zafnz/

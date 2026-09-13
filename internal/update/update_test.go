@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -135,6 +136,7 @@ func TestWantUpdateCheck(t *testing.T) {
 func TestUpgradeHint(t *testing.T) {
 	tests := []struct {
 		name string
+		goos string
 		exe  string
 		env  map[string]string
 		// What the package manager answers for exe.
@@ -202,13 +204,71 @@ func TestUpgradeHint(t *testing.T) {
 			exe:  "",
 			want: installCommand,
 		},
+		{
+			name: "winget for the user",
+			goos: "windows",
+			exe:  `C:\Users\nick\AppData\Local\Microsoft\WinGet\Packages\zafnz.jqweb_Microsoft.Winget.Source_8wekyb3d8bbwe\jqweb.exe`,
+			want: "winget upgrade zafnz.jqweb",
+		},
+		{
+			name: "winget for the machine",
+			goos: "windows",
+			exe:  `C:\Program Files\WinGet\Packages\zafnz.jqweb_Microsoft.Winget.Source_8wekyb3d8bbwe\jqweb.exe`,
+			want: "winget upgrade zafnz.jqweb",
+		},
+		{
+			name: "Scoop for the user",
+			goos: "windows",
+			exe:  `C:\Users\nick\scoop\apps\jqweb\current\jqweb.exe`,
+			want: "scoop update jqweb",
+		},
+		{
+			name: "Scoop with SCOOP set",
+			goos: "windows",
+			exe:  `D:\Tools\apps\jqweb\0.9.0\jqweb.exe`,
+			env:  map[string]string{"SCOOP": `d:\tools\`},
+			want: "scoop update jqweb",
+		},
+		{
+			name: "Scoop for the machine",
+			goos: "windows",
+			exe:  `C:\ProgramData\scoop\apps\jqweb\current\jqweb.exe`,
+			want: "scoop update jqweb --global",
+		},
+		{
+			name: "Scoop for the machine with SCOOP_GLOBAL set",
+			goos: "windows",
+			exe:  `E:\Shared\apps\jqweb\current\jqweb.exe`,
+			env:  map[string]string{"SCOOP_GLOBAL": `E:\Shared`},
+			want: "scoop update jqweb --global",
+		},
+		{
+			name: "SCOOP set but the binary is elsewhere",
+			goos: "windows",
+			exe:  `D:\Downloads\jqweb.exe`,
+			env:  map[string]string{"SCOOP": `D:\Tools`},
+			want: releasesPage,
+		},
+		{
+			name: "a release downloaded by hand on Windows",
+			goos: "windows",
+			exe:  `C:\Tools\jqweb.exe`,
+			want: releasesPage,
+		},
+		{
+			// The Windows directory names mean nothing on another system.
+			name: "a scoop directory on Linux",
+			goos: "linux",
+			exe:  "/home/nick/scoop/apps/jqweb/current/jqweb",
+			want: installCommand,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			getenv := func(k string) string { return tt.env[k] }
 			packaged := func(string) string { return tt.pkg }
-			if got := upgradeHint(tt.exe, getenv, packaged); got != tt.want {
-				t.Errorf("upgradeHint(%q) = %q, want %q", tt.exe, got, tt.want)
+			if got := upgradeHint(tt.exe, tt.goos, getenv, packaged); got != tt.want {
+				t.Errorf("upgradeHint(%q, %q) = %q, want %q", tt.exe, tt.goos, got, tt.want)
 			}
 		})
 	}
@@ -245,7 +305,7 @@ func TestUpgradeHintMatchesASymlinkedGoBin(t *testing.T) {
 	}
 	exe := filepath.Join(gobin, "jqweb")
 	const want = "go install github.com/zafnz/jqweb@latest"
-	if got := upgradeHint(exe, getenv, func(string) string { return "" }); got != want {
+	if got := upgradeHint(exe, runtime.GOOS, getenv, func(string) string { return "" }); got != want {
 		t.Errorf("upgradeHint(%q) with GOBIN=%q = %q, want %q", exe, getenv("GOBIN"), got, want)
 	}
 }

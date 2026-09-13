@@ -213,6 +213,13 @@ section of `.goreleaser.yaml` and `packagedPath` in `internal/update` both
 name `/usr/bin/jqweb`, and the update notice names apt or dnf only for a binary
 there. Change one and change the other.
 
+**The Windows package names are written twice.** `upgradeHint` recognises a
+winget install by the `WinGet\Packages\zafnz.jqweb_` directory, which comes from
+`package_identifier` in the `winget` section, and a Scoop install by
+`apps\jqweb`, which comes from the `scoops` name defaulting to the project
+name. Renaming either package leaves Windows users with the releases page as
+their upgrade hint.
+
 **`docs/k8s.json` is the example document.** It is a generated `kubectl get all
 -o json` listing, committed and served at https://zafnz.github.io/jqweb/k8s.json,
 and the `curl` in `README.md` fetches it from there. Examples that need a

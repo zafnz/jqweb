@@ -4,13 +4,21 @@
    to the import statements. Run with:  node --test */
 
 import assert from 'node:assert';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import test from 'node:test';
 import { build } from 'esbuild';
-import { options } from './bundles.ts';
+import { options, root } from './bundles.ts';
 import type { Bundle } from './bundles.ts';
 
-/* The query half of the page, which only the full script may reach. */
-const QUERY = ['src/jq.js', 'src/query.js', 'src/suggest.js'];
+/* The query half of the page, which only the full script may reach: every
+   module under src/query, read from the directory so that a new one is
+   covered without being listed here. */
+const QUERY = 'src/query/';
+const queryModules = readdirSync(join(root, QUERY), { recursive: true, encoding: 'utf8' })
+  .filter((f) => /\.[jt]s$/.test(f) && !f.endsWith('.d.ts'))
+  .map((f) => QUERY + f)
+  .sort();
 
 async function modules(name: Bundle): Promise<string[]> {
   const result = await build({ ...options(name), metafile: true });
@@ -20,19 +28,20 @@ async function modules(name: Bundle): Promise<string[]> {
 
 test('the simple script reaches none of the query modules', async () => {
   const simple = await modules('simple');
-  assert.deepStrictEqual(simple.filter((m) => QUERY.includes(m)), []);
+  assert.deepStrictEqual(simple.filter((m) => m.startsWith(QUERY)), []);
   assert.ok(simple.includes('src/page/bootstrap.ts'), 'the simple script does not reach page/bootstrap.ts');
 });
 
 test('the full script reaches the simple modules and the query modules', async () => {
   const simple = await modules('simple');
   const full = await modules('full');
-  const shared = simple.filter((m) => m !== 'src/entries/simple.js');
+  const shared = simple.filter((m) => m !== 'src/entries/simple.ts');
   assert.deepStrictEqual(shared.filter((m) => !full.includes(m)), []);
-  assert.deepStrictEqual(QUERY.filter((m) => !full.includes(m)), []);
+  assert.ok(queryModules.length > 2, `only ${queryModules.length} modules under ${QUERY}`);
+  assert.deepStrictEqual(queryModules.filter((m) => !full.includes(m)), []);
 });
 
 test('the head script reaches only the theme and the /alive request', async () => {
   assert.deepStrictEqual(await modules('theme'),
-    ['src/entries/theme.js', 'src/page/alive.ts', 'src/page/theme.ts']);
+    ['src/entries/theme.ts', 'src/page/alive.ts', 'src/page/theme.ts']);
 });

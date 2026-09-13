@@ -101,22 +101,23 @@ now if the breakpoint ever moves.
 
 ## The jq subset
 
-`web/src/jq.js` is the query engine, `web/src/suggest.js` builds the queries a
-line of the document could have meant, `web/src/query.js` is the search box
-wiring that drives both, and `web/query.css` styles what only they put on the
-page. Those four are what `--simple` leaves out, so none of them costs anything
-in a page built with it; the modules in `web/src/page` ship either way and work
-without them, calling the `jqui` that `web/src/entries/full.js` passes it, and
-falling back to the path lookup when `web/src/entries/simple.js` passes null.
-Anything that reads the box as a query, or renders what one produced, belongs
-in `query.js` rather than `web/src/page`.
+`web/src/query/engine` is the query engine, `web/src/query/suggest.ts` builds
+the queries a line of the document could have meant, `web/src/query/ui.ts` is
+the search box wiring that drives both, and `web/query.css` styles what only
+they put on the page. Those four are what `--simple` leaves out, so none of them
+costs anything in a page built with it; the modules in `web/src/page` ship
+either way and work without them, calling the `jqui` that
+`web/src/entries/full.ts` passes it, and falling back to the path lookup when
+`web/src/entries/simple.ts` passes null. Anything that reads the box as a
+query, or renders what one produced, belongs in `query/ui.ts` rather than
+`web/src/page`.
 
-`suggest.js` is text in, text out -- segments and a parsed document give back
-query strings -- so `web/suggest.test.js` can check it without a browser. The
-test that matters most runs every query it offers for every line of a fixture
-and fails if any of them will not compile or will not run: a suggestion that
-errors is worse than no suggestion, and the shapes that cause one are easy to
-miss by hand.
+`query/suggest.ts` is text in, text out -- segments and a parsed document give
+back query strings -- so `web/suggest.test.ts` can check it without a browser.
+The test that matters most runs every query it offers for every line of a
+fixture and fails if any of them will not compile or will not run: a suggestion
+that errors is worse than no suggestion, and the shapes that cause one are easy
+to miss by hand.
 
 The engine works on the nodes `web/src/model/parse.ts` builds for rendering, so
 a result goes straight back to `renderTree` with key order and number text
@@ -125,7 +126,7 @@ leaf.
 
 Its answers are checked against jq itself rather than against what anyone
 believed jq does. `web/testdata/jq-corpus.json` holds a fixture document, a
-list of queries and the output jq gave for each, and `web/jq.test.js` runs
+list of queries and the output jq gave for each, and `web/jq.test.ts` runs
 every one through the engine. After adding a query, or after a jq upgrade whose
 behaviour the tests should follow:
 
@@ -133,7 +134,7 @@ behaviour the tests should follow:
 
 That needs `jq` on the path. CI has none, which is why the answers are
 committed rather than worked out while the tests run. A builtin with no case in
-the corpus fails the test that reads the table back out of `jq.js`, so adding
+the corpus fails the test that reads the names in the builtin table, so adding
 one means adding a query for it.
 
 ## The update check

@@ -1,5 +1,5 @@
-/* Tests for suggest.js: the queries offered when you click the filter button
-   on a line, and the completions of a key name still being typed.
+/* Tests for query/suggest.ts: the queries offered when you click the filter
+   button on a line, and the completions of a key name still being typed.
    Run with:  node --test
 
    The property that matters most is near the bottom: every query offered for
@@ -10,9 +10,12 @@
 
 import test from 'node:test';
 import assert from 'node:assert';
+import type { Node } from './src/model/node.ts';
 import { parseJSON } from './src/model/parse.ts';
-import { compile } from './src/jq.js';
-import { suggest, splitPartial, completions } from './src/suggest.js';
+import type { Segment } from './src/model/path.ts';
+import { compile, isJqError } from './src/query/engine/index.ts';
+import { suggest, splitPartial, completions } from './src/query/suggest.ts';
+import type { Candidate } from './src/query/suggest.ts';
 
 /* A document with the shapes that have caught the generator out: an object
    used as a map, records reached through a second map level, an array of
@@ -33,15 +36,16 @@ const DOC = parseJSON(JSON.stringify({
 }));
 
 /* Where "Page content" sits in .paths["/page/"].get.tags. */
-const TAG = [{ key: 'paths' }, { key: '/page/' }, { key: 'get' }, { key: 'tags' }, { index: 0 }];
+const TAG: Segment[] = [{ key: 'paths' }, { key: '/page/' }, { key: 'get' }, { key: 'tags' }, { index: 0 }];
 
-const queries = (segs) => suggest(DOC, segs).map((c) => c.q);
+const queries = (segs: Segment[]) => suggest(DOC, segs).map((c) => c.q);
 
 /* What one candidate returns, counted the way its shape says to count it. */
-function yields(c, doc) {
+function yields(c: Candidate, doc?: Node): number {
   const out = compile(c.q).run(doc || DOC);
   if (c.shape !== 'keys') return out.length;
-  return out.length && out[0].t === 'o' ? out[0].k.length : 0;
+  const first = out[0];
+  return out.length && first.t === 'o' ? first.k.length : 0;
 }
 
 test('a value in an array is asked about with index, not equality', () => {
@@ -68,10 +72,11 @@ test('the line itself is always offered', () => {
 test('the reading of the line itself is marked', () => {
   /* The caller puts it first when nothing else narrows the document down, so
      it has to be findable without matching on the label. */
-  for (const segs of [TAG, [{ key: 'version' }], [{ key: 'rows' }, { index: 0 }]]) {
+  const lines: Segment[][] = [TAG, [{ key: 'version' }], [{ key: 'rows' }, { index: 0 }]];
+  for (const segs of lines) {
     const plain = suggest(DOC, segs).filter((c) => c.plain);
     assert.strictEqual(plain.length, 1, `for ${JSON.stringify(segs)}`);
-    assert.strictEqual(plain[0].q, suggest(DOC, segs).find((c) => c.why === 'this line').q);
+    assert.strictEqual(plain[0].q, suggest(DOC, segs).find((c) => c.why === 'this line')?.q);
   }
 });
 
@@ -120,10 +125,12 @@ test('shape says how to count what comes back', () => {
      else returns a stream and the answer is its length. */
   const all = suggest(DOC, TAG);
   const kept = all.find((c) => c.q === '.paths | with_entries(select(.value.get.tags? | index("Page content")?))');
+  assert.ok(kept, 'expected the with_entries reading');
   assert.strictEqual(kept.shape, 'keys');
   assert.strictEqual(yields(kept), 2);
 
   const stream = all.find((c) => c.q === '.. | objects | select(.tags? | index("Page content")?)');
+  assert.ok(stream, 'expected the reading from anywhere');
   assert.strictEqual(stream.shape, 'results');
   assert.strictEqual(yields(stream), 3);
 });
@@ -138,13 +145,13 @@ test('the same query is never offered twice', () => {
 test('a deeply nested line does not fill the list', () => {
   /* Every ancestor is a candidate pivot, so without a cap a value twenty
      levels down would offer forty readings. */
-  let deep = { end: 1 };
+  let deep: unknown = { end: 1 };
   for (let i = 0; i < 20; i++) deep = { down: deep };
   const doc = parseJSON(JSON.stringify(deep));
-  const segs = [];
+  const segs: Segment[] = [];
   for (let i = 0; i < 20; i++) segs.push({ key: 'down' });
   segs.push({ key: 'end' });
-  assert.ok(suggest(doc, segs).length <= 16, suggest(doc, segs).length);
+  assert.ok(suggest(doc, segs).length <= 16, String(suggest(doc, segs).length));
 });
 
 test('a line that is not in the document is offered nothing', () => {
@@ -153,7 +160,7 @@ test('a line that is not in the document is offered nothing', () => {
 });
 
 /* Every segment list in a document, root included. */
-function allPaths(node, at = []) {
+function allPaths(node: Node, at: Segment[] = []): Segment[][] {
   const out = [at];
   if (node.t === 'a') {
     node.v.forEach((child, i) => out.push(...allPaths(child, at.concat({ index: i }))));
@@ -172,7 +179,8 @@ test('every query offered for every line runs against the document it came from'
       try {
         compile(c.q).run(DOC);
       } catch (e) {
-        assert.fail(`${c.q}\n  offered for ${JSON.stringify(segs)}\n  ${e.jq}: ${e.message}`);
+        const why = isJqError(e) ? `${e.jq}: ${e.message}` : String(e);
+        assert.fail(`${c.q}\n  offered for ${JSON.stringify(segs)}\n  ${why}`);
       }
       checked++;
     }
@@ -220,7 +228,7 @@ test('splitPartial leaves whole queries alone', () => {
   }
 });
 
-const stream = (...texts) => texts.map((t) => parseJSON(t));
+const stream = (...texts: string[]) => texts.map((t) => parseJSON(t));
 
 test('completions gathers the keys that continue the name', () => {
   const out = stream('{"kind":"Pod","kindle":1}', '{"kind":"Job"}', '{"phase":"x"}', '[1]', '"s"');
@@ -248,7 +256,7 @@ test('completions survives keys named after Object.prototype members', () => {
 });
 
 test('completions caps the list', () => {
-  const keys = [];
+  const keys: string[] = [];
   for (let i = 0; i < 250; i++) keys.push(`"k${String(i).padStart(3, '0')}":1`);
   const got = completions(stream('{' + keys.join(',') + '}'), 'k');
   assert.strictEqual(got.keys.length, 200);

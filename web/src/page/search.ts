@@ -33,8 +33,8 @@ export interface QueryUI {
   showDocument(): void;
 }
 
-/* jqui from query.js, which the full entry passes to startPage and the simple
-   entry replaces with null. */
+/* jqui from query/ui.ts, which the full entry passes to startPage and the
+   simple entry replaces with null. */
 export type StartQuery = (host: QueryHost) => QueryUI;
 
 /* Wires up the search box over the document value, rendered as the tree whose
@@ -87,7 +87,7 @@ export function startSearch(jqui: StartQuery | null, value: ValueNode, root: HTM
     if (phone.matches && input.value) { input.value = ''; run(); }
   });
 
-  /* Runs whatever is in the box. Without query.js that is text to find or a
+  /* Runs whatever is in the box. Without query/ui.ts that is text to find or a
      path, as it has always been; with it, the mode decides. force runs a
      half-typed name as written rather than completing it, which is what the
      query the page opened with is given, since nobody is part way through

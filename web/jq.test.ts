@@ -11,23 +11,31 @@ import fs from 'node:fs';
 import { stringify } from './src/model/node.ts';
 import { parseJSON } from './src/model/parse.ts';
 import { parsePath } from './src/model/path.ts';
-import { compile } from './src/jq.js';
+import { builtins } from './src/query/engine/builtins.ts';
+import { compile, isJqError } from './src/query/engine/index.ts';
 
-const corpus = JSON.parse(fs.readFileSync(new URL('./testdata/jq-corpus.json', import.meta.url), 'utf8'));
+/* The corpus file: a fixture document, and each query with the output jq gave
+   for it, one JSON text per output. */
+interface Corpus {
+  input: unknown;
+  cases: { q: string; out: string[] }[];
+}
+
+const corpus: Corpus = JSON.parse(fs.readFileSync(new URL('./testdata/jq-corpus.json', import.meta.url), 'utf8'));
 
 /* Runs a query over a JSON document and returns its outputs as JSON text, so
    that a test can talk about values rather than nodes. */
-function run(query, doc) {
+function run(query: string, doc: string): string[] {
   return compile(query).run(parseJSON(doc)).map((n) => stringify(n));
 }
 
 /* The error a query raises, as "<kind>: <message>". */
-function error(query, doc) {
+function error(query: string, doc?: string): string {
   try {
     const out = run(query, doc === undefined ? 'null' : doc);
     assert.fail(`${query} did not fail; it returned ${JSON.stringify(out)}`);
   } catch (e) {
-    if (!e.jq) throw e;
+    if (!isJqError(e)) throw e;
     return `${e.jq}: ${e.message}`;
   }
 }
@@ -41,16 +49,9 @@ test('every corpus query agrees with jq', () => {
 
 test('the corpus exercises every builtin', () => {
   /* A builtin no corpus case runs is one whose answer has never been compared
-     with jq's. The names are read back out of the table in jq.js, so adding a
-     builtin without a case for it fails here. */
-  const table = fs.readFileSync(new URL('./src/jq.js', import.meta.url), 'utf8');
-  const names = new Set();
-  for (const m of table.slice(table.indexOf('var builtins = {'))
-    .matchAll(/^ {4}'([a-z_0-9]+)\/\d+':/gm)) names.add(m[1]);
-  /* The format strings are put into the table by name, so they are read out
-     of the object that declares them instead. */
-  for (const m of table.slice(table.indexOf('var FORMATS = {'), table.indexOf('function asText'))
-    .matchAll(/^ {4}'(@[a-z0-9]+)':/gm)) names.add(m[1]);
+     with jq's. The names are read out of the builtin table, format strings
+     included, so adding a builtin without a case for it fails here. */
+  const names = new Set(Object.keys(builtins).map((key) => key.slice(0, key.lastIndexOf('/'))));
   assert.ok(names.size > 80, `only found ${names.size} builtins to check`);
 
   const queries = corpus.cases.map((c) => c.q).join('\n');
@@ -199,7 +200,7 @@ test('a path query agrees with parsePath on the same text', () => {
 });
 
 test('syntax the subset leaves out is named, not mis-parsed', () => {
-  const cases = {
+  const cases: Record<string, string> = {
     '.a = 1': 'assignment is not supported',
     '.a |= 1': 'assignment is not supported',
     '.a += 1': 'assignment is not supported',
@@ -238,12 +239,14 @@ test('the filters that change a document are not here', () => {
 });
 
 test('a malformed query reports where it gave up', () => {
-  for (const [q, pos] of [['', 0], ['.a |', 4], ['(.a', 3], ['{a', 2], ['..a', 2],
-    ['.a[', 3], ['"unclosed', 0], ['1 +', 3]]) {
+  const cases: [string, number][] = [['', 0], ['.a |', 4], ['(.a', 3], ['{a', 2], ['..a', 2],
+    ['.a[', 3], ['"unclosed', 0], ['1 +', 3]];
+  for (const [q, pos] of cases) {
     try {
       compile(q);
       assert.fail(`${q} compiled`);
     } catch (e) {
+      if (!isJqError(e)) throw e;
       assert.strictEqual(e.jq, 'parse', `query ${q}`);
       assert.strictEqual(e.pos, pos, `position for ${q}`);
       assert.ok(e.message.length > 0, `message for ${q}`);

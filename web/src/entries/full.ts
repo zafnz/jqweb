@@ -6,15 +6,15 @@ import { leafOf, stringify } from '../model/node.ts';
 import { parseJSON } from '../model/parse.ts';
 import { parsePath, pathText } from '../model/path.ts';
 import { renderTree } from '../model/render.ts';
-import { compile } from '../jq.js';
-import { completions, splitPartial, suggest } from '../suggest.js';
+import { compile } from '../query/engine/index.ts';
+import { completions, splitPartial, suggest } from '../query/suggest.ts';
 import { startPage } from '../page/bootstrap.ts';
-import { jqui } from '../query.js';
+import { jqui } from '../query/ui.ts';
 
 /* The browser specs find a line of the tree with jqweb.parsePath, run the
    queries a suggestion offers with jqjs, and check that --simple leaves both
    engine globals out. The objects are written out for the reason given in
-   simple.js. */
+   simple.ts. */
 window.jqweb = { parseJSON, leafOf, stringify, renderTree, parsePath, pathText, quote, esc };
 window.jqjs = { compile };
 window.jqsuggest = { suggest, splitPartial, completions };

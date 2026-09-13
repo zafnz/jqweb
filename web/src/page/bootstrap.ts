@@ -3,10 +3,10 @@
    button and the search box. Everything under page/ needs the DOM; the
    parsing, rendering and path reading it calls live in model/.
 
-   Reading the box as a jq query lives in query.js, which every page has unless
-   --simple left it out. These modules are in every page either way, so they
-   work without it: the full entry passes jqui from query.js to startPage, and
-   the simple entry passes null. */
+   Reading the box as a jq query lives in query/ui.ts, which every page has
+   unless --simple left it out. These modules are in every page either way, so
+   they work without it: the full entry passes jqui from query/ui.ts to
+   startPage, and the simple entry passes null. */
 
 import { parseJSON } from '../model/parse.ts';
 import { renderTree } from '../model/render.ts';

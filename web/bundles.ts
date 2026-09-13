@@ -14,7 +14,7 @@ export type Bundle = (typeof bundles)[number];
 export function options(name: Bundle): BuildOptions {
   return {
     absWorkingDir: root,
-    entryPoints: [`src/entries/${name}.js`],
+    entryPoints: [`src/entries/${name}.ts`],
     bundle: true,
     format: 'iife',
     platform: 'browser',

@@ -17,7 +17,7 @@ jobs:
   goreleaser:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -58,14 +58,14 @@ jobs:
           fi
           echo "release notes for ${version}: $(wc -l < "$RUNNER_TEMP/release-header.md") lines"
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: stable
 
       # The page scripts are embedded in the binary, so a JavaScript
       # regression ships in a release too. GoReleaser runs the Go tests
       # itself, from its before hooks.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -80,7 +80,7 @@ jobs:
 
       - run: npm --prefix web test
 
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: "~> v2"

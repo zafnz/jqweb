@@ -85,8 +85,8 @@ test('the example page still works at that size', async ({ page }) => {
     hidden: __t.$('#suggest').hidden,
     rows: __t.$$('#suggest .sg').length,
     /* Counting every reading against a document this size is what the budget
-       in query.js exists for: a row it ran out of time on is offered without a
-       count rather than not offered. */
+       in query/ui.ts exists for: a row it ran out of time on is offered
+       without a count rather than not offered. */
     counted: __t.$$('#suggest .sgn').map((n) => __t.text(n))
       .every((l) => l === '' || /^\d+ (result|key)s?$/.test(l))
   }));

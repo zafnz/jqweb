@@ -10,7 +10,7 @@ import { options } from './bundles.ts';
 import type { Bundle } from './bundles.ts';
 
 /* The query half of the page, which only the full script may reach. */
-const QUERY = ['src/jq.js', 'src/query.js', 'src/suggest.js'];
+const QUERY = ['src/jq.js', 'src/query/suggest.ts', 'src/query/ui.ts'];
 
 async function modules(name: Bundle): Promise<string[]> {
   const result = await build({ ...options(name), metafile: true });
@@ -27,12 +27,12 @@ test('the simple script reaches none of the query modules', async () => {
 test('the full script reaches the simple modules and the query modules', async () => {
   const simple = await modules('simple');
   const full = await modules('full');
-  const shared = simple.filter((m) => m !== 'src/entries/simple.js');
+  const shared = simple.filter((m) => m !== 'src/entries/simple.ts');
   assert.deepStrictEqual(shared.filter((m) => !full.includes(m)), []);
   assert.deepStrictEqual(QUERY.filter((m) => !full.includes(m)), []);
 });
 
 test('the head script reaches only the theme and the /alive request', async () => {
   assert.deepStrictEqual(await modules('theme'),
-    ['src/entries/theme.js', 'src/page/alive.ts', 'src/page/theme.ts']);
+    ['src/entries/theme.ts', 'src/page/alive.ts', 'src/page/theme.ts']);
 });

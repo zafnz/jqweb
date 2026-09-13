@@ -5,18 +5,35 @@
    every page whether or not the engine is, and none of this means anything
    without it. page/search.ts calls jqui() once, with the few things it
    cannot look up for itself, and gets back the entry points it needs. */
-import { esc } from './model/escape.ts';
-import { pathText } from './model/path.ts';
-import { renderTree } from './model/render.ts';
-import { compile } from './jq.js';
-import { completions, splitPartial, suggest } from './suggest.js';
 
-export function jqui(page) {
-  var tree = document.getElementById('tree');
-  var results = document.getElementById('results');
-  var input = document.getElementById('q');
-  var mode = document.getElementById('mode');
-  var stats = document.getElementById('stats');
+import { compile, isJqError } from '../jq.js';
+import type { Query } from '../jq.js';
+import { esc } from '../model/escape.ts';
+import type { Node as ValueNode } from '../model/node.ts';
+import { pathText } from '../model/path.ts';
+import { renderTree } from '../model/render.ts';
+import { find } from '../page/dom.ts';
+import type { QueryHost, QueryUI } from '../page/search.ts';
+import { completions, splitPartial, suggest } from './suggest.ts';
+import type { Candidate, Shape } from './suggest.ts';
+
+/* A row of the suggestion list: a reading of the clicked line, with count
+   saying how much it returned, or a completion of a half-typed name, with a
+   label of its own. count is null for a row nothing was counted for. */
+interface Row {
+  q: string;
+  count: number | null;
+  label?: string;
+  shape?: Shape;
+  plain?: boolean;
+}
+
+export function jqui(page: QueryHost): QueryUI {
+  const tree = find('#tree', HTMLElement);
+  const results = find('#results', HTMLElement);
+  const input = find('#q', HTMLInputElement);
+  const mode = find('#mode', HTMLSelectElement);
+  const stats = find('#stats', HTMLElement);
 
   /* Both of these are meaningless without the engine, so the shell ships them
      hidden and unexplained and they are turned on here. */
@@ -31,16 +48,16 @@ export function jqui(page) {
      The select offers Auto, Text and jq, all three naming how the box is read
      rather than what happens next; the option value is still "filter", which
      is what the text half of the page has always been called. */
-  var QUERY_START = '.[($|';
+  const QUERY_START = '.[($|';
 
   /* A name with an argument list after it -- with_entries(...), select(...) --
      which no one types meaning to search for that text. A bare name is left
      alone: "keys" is far more likely to be a search for the word than a call,
      which is what the mode select is for. */
-  var CALL = /^[a-z_][a-z0-9_]*\s*\(/;
+  const CALL = /^[a-z_][a-z0-9_]*\s*\(/;
 
   /* Whether the box should be read as a query rather than as text to find. */
-  function wants(raw) {
+  function wants(raw: string): boolean {
     if (mode.value === 'jq') return true;
     if (mode.value !== 'auto') return false;
     return QUERY_START.indexOf(raw.charAt(0)) >= 0 || CALL.test(raw);
@@ -50,7 +67,7 @@ export function jqui(page) {
      command line or in the page's address, and either is a jq query. One that
      auto reads as text, such as keys, starts the select on jq so that it runs
      as one. */
-  var start = input.value.trim();
+  const start = input.value.trim();
   if (start && !wants(start)) mode.value = 'jq';
 
   /* Compiles and runs the box as a query. One that only walks down the
@@ -61,22 +78,25 @@ export function jqui(page) {
      A query still being typed is not run at all: while its trailing name is
      a prefix of keys that are really there, complete() offers those instead
      and the view stays as it was. force is Enter saying run it anyway. */
-  function run(raw, force) {
-    var query, out;
+  function run(raw: string, force?: boolean): void {
     clearFault();
     completing = !force && complete(raw);
     if (completing) return;
     showDocument();
+    let query: Query;
     try {
       query = compile(raw);
     } catch (e) {
-      fault(e.message, e.pos);
+      if (!(e instanceof Error)) throw e;
+      fault(e.message, isJqError(e) ? e.pos : undefined);
       return;
     }
     if (query.path) { page.showFound(page.resolve(query.path), query.path.length); return; }
+    let out: ValueNode[];
     try {
       out = query.run(page.value);
     } catch (e) {
+      if (!(e instanceof Error)) throw e;
       fault(e.message);
       return;
     }
@@ -87,7 +107,7 @@ export function jqui(page) {
      under the box: in the toolbar it was a flex item competing with the box for
      room, so a long message made the box narrow while you were still typing in
      it. */
-  function fault(message, pos) {
+  function fault(message: string, pos?: number): void {
     input.classList.add('bad');
     stats.textContent = '';
     faultBox.textContent = pos === undefined ? message : message + ' (at ' + (pos + 1) + ')';
@@ -97,7 +117,7 @@ export function jqui(page) {
 
   /* Takes the message away again, which every path that reaches a result does
      before it says anything. */
-  function clearFault() {
+  function clearFault(): void {
     input.classList.remove('bad');
     faultBox.hidden = true;
     faultBox.textContent = '';
@@ -105,7 +125,7 @@ export function jqui(page) {
 
   /* Building the markup for a query's whole output is what would stall the
      page, so only this many are rendered; the count still reports them all. */
-  var RESULT_CAP = 500;
+  const RESULT_CAP = 500;
 
   /* Shows a query's outputs in place of the document. Each carries its
      position, which the stylesheet puts in the gutter, because a query
@@ -113,9 +133,10 @@ export function jqui(page) {
      unnumbered. The document tree is hidden rather than thrown away, so it
      comes back with its collapsed state intact and without being rendered
      again. */
-  function showResults(out) {
-    var shown = Math.min(out.length, RESULT_CAP), parts = [], i;
-    for (i = 0; i < shown; i++) {
+  function showResults(out: ValueNode[]): void {
+    const shown = Math.min(out.length, RESULT_CAP);
+    const parts: string[] = [];
+    for (let i = 0; i < shown; i++) {
       parts.push('<div class="result" data-n="' + i + '">' + renderTree(out[i]) + '</div>');
     }
     results.innerHTML = parts.join('');
@@ -131,18 +152,19 @@ export function jqui(page) {
      much is inside it is the interesting number -- and it is the one the
      suggestion list counted, so saying only "1 result" would contradict the
      row that was just picked. */
-  function describe(out) {
+  function describe(out: ValueNode[]): string {
     if (out.length !== 1) return plural(out.length, 'result');
-    if (out[0].t === 'o') return '1 result, ' + plural(out[0].k.length, 'key');
-    if (out[0].t === 'a') return '1 result, ' + plural(out[0].v.length, 'item');
+    const only = out[0];
+    if (only.t === 'o') return '1 result, ' + plural(only.k.length, 'key');
+    if (only.t === 'a') return '1 result, ' + plural(only.v.length, 'item');
     return '1 result';
   }
 
-  function plural(n, noun) { return n + ' ' + noun + (n === 1 ? '' : 's'); }
+  function plural(n: number, noun: string): string { return n + ' ' + noun + (n === 1 ? '' : 's'); }
 
   /* Puts the document back. Without the engine nothing ever replaces it, so
      the page only has this to call when there is a jqui at all. */
-  function showDocument() {
+  function showDocument(): void {
     if (results.hidden) return;
     results.hidden = true;
     results.innerHTML = '';
@@ -162,40 +184,44 @@ export function jqui(page) {
      it comes back when the box is focused again and goes away when attention
      moves elsewhere. */
 
-  var suggestions = document.getElementById('suggest');
-  var faultBox = document.getElementById('fault');
-  var rows = [];
+  const suggestions = find('#suggest', HTMLElement);
+  const faultBox = find('#fault', HTMLElement);
+  let rows: Row[] = [];
 
   /* Running every candidate against a large document could take longer than
      anyone will wait for a menu, so counting stops after this and the rest of
      the rows are offered without one. */
-  var COUNT_BUDGET_MS = 300;
+  const COUNT_BUDGET_MS = 300;
 
   /* Builds the list for one line of the document, puts the widest reading in
      the box, and runs it. */
-  function filter(node) {
-    var segs = page.segsOf(node);
-    var deadline = Date.now() + COUNT_BUDGET_MS;
-    rows = suggest(page.value, segs).map(function (c) {
-      c.count = Date.now() > deadline ? null : count(c);
-      return c;
+  function filter(node: HTMLElement): void {
+    const segs = page.segsOf(node);
+    const deadline = Date.now() + COUNT_BUDGET_MS;
+    const counted = suggest(page.value, segs).map(function (c) {
+      return Object.assign(c, { count: Date.now() > deadline ? null : count(c) });
     }).filter(function (c) {
       return c.count !== 0;
     });
     /* Most results first, which is what "the others like this one" means, and
        between readings that return the same number the one that reads best.
        A row left uncounted keeps its place at the end. */
-    rows.sort(function (a, b) {
-      var an = a.count === null ? -1 : a.count, bn = b.count === null ? -1 : b.count;
+    counted.sort(function (a, b) {
+      const an = a.count === null ? -1 : a.count;
+      const bn = b.count === null ? -1 : b.count;
       return an === bn ? a.rank - b.rank : bn - an;
     });
+    rows = counted;
     /* Nothing on the list narrowing anything means every reading found the one
        line that was clicked, and then the line itself is what was meant --
        where it otherwise sorts last, being the least general reading. */
-    var narrows = false, i;
-    for (i = 0; i < rows.length; i++) if (rows[i].count > 1) narrows = true;
+    let narrows = false;
+    for (let i = 0; i < rows.length; i++) {
+      const n = rows[i].count;
+      if (n !== null && n > 1) narrows = true;
+    }
     if (!narrows) {
-      for (i = 1; i < rows.length; i++) {
+      for (let i = 1; i < rows.length; i++) {
         if (rows[i].plain) {
           rows.unshift(rows.splice(i, 1)[0]);
           break;
@@ -207,22 +233,23 @@ export function jqui(page) {
     show();
   }
 
-  /* How much one candidate returns, or null if it will not run at all. What to
+  /* How much one candidate returns, or 0 if it will not run at all. What to
      count depends on the query rather than on its output: with_entries hands
      back a single object and the answer is how many members it kept. */
-  function count(c) {
-    var out;
+  function count(c: Candidate): number {
+    let out: ValueNode[];
     try {
       out = compile(c.q).run(page.value);
     } catch (e) {
-      if (e.jq) return 0;
+      if (isJqError(e)) return 0;
       throw e;
     }
     if (c.shape !== 'keys') return out.length;
-    return out.length && out[0].t === 'o' ? out[0].k.length : 0;
+    const first = out[0];
+    return out.length && first.t === 'o' ? first.k.length : 0;
   }
 
-  function label(c) {
+  function label(c: Row): string {
     if (c.label !== undefined) return c.label;
     return c.count === null ? '' : plural(c.count, c.shape === 'keys' ? 'key' : 'result');
   }
@@ -236,24 +263,25 @@ export function jqui(page) {
      the view keeps showing whatever last ran. A name that matches a whole key
      runs -- ".items[].kind" behaves as it always did -- and one that no key
      starts with runs too, nulls and all. */
-  var completing = false;
+  let completing = false;
 
   /* Offers completions for raw instead of running it, when there are any.
      True means it did and the caller has nothing to run. */
-  function complete(raw) {
-    var split = splitPartial(raw), out, comp;
+  function complete(raw: string): boolean {
+    const split = splitPartial(raw);
     if (!split) return false;
+    let out: ValueNode[];
     try {
       out = compile(split.ctx).run(page.value);
     } catch (e) {
       return false;
     }
-    comp = completions(out, split.partial);
+    const comp = completions(out, split.partial);
     if (comp.exact || !comp.keys.length) return false;
-    rows = comp.keys.map(function (k) {
+    rows = comp.keys.map(function (k): Row {
       /* pathText writes the segment as jq would -- .name, or ["a b"] for a
          key that needs quoting, whose leading dot goes when it is a suffix. */
-      var seg = pathText([{ key: k.key }]);
+      const seg = pathText([{ key: k.key }]);
       return {
         q: split.lead ? split.lead + seg.replace(/^\.\[/, '[') : seg,
         label: k.n === comp.objects ? '' : 'on ' + k.n + ' of ' + comp.objects,
@@ -265,9 +293,9 @@ export function jqui(page) {
     return true;
   }
 
-  function draw() {
-    var parts = [], i;
-    for (i = 0; i < rows.length; i++) {
+  function draw(): void {
+    const parts: string[] = [];
+    for (let i = 0; i < rows.length; i++) {
       parts.push('<div class="sg"><button class="sgq" type="button">' +
         '<span class="sgt">' + esc(rows[i].q) + '</span>' +
         '<span class="sgn">' + esc(label(rows[i])) + '</span></button>' +
@@ -279,18 +307,18 @@ export function jqui(page) {
   /* Highlights the row the box is holding. Nothing else can put text there
      that matches a row -- typing drops the list -- so it is the row that was
      picked rather than whatever happens to match. */
-  function mark(at) {
-    var kids = suggestions.children, i;
-    for (i = 0; i < kids.length; i++) kids[i].classList.toggle('on', i === at);
+  function mark(at: number): void {
+    const kids = suggestions.children;
+    for (let i = 0; i < kids.length; i++) kids[i].classList.toggle('on', i === at);
   }
 
-  function show() {
+  function show(): void {
     if (rows.length && faultBox.hidden) suggestions.hidden = false;
   }
-  function hide() { suggestions.hidden = true; }
+  function hide(): void { suggestions.hidden = true; }
 
   /* Put the list away and drop what was in it. */
-  function forget() {
+  function forget(): void {
     rows = [];
     suggestions.innerHTML = '';
     hide();
@@ -302,17 +330,19 @@ export function jqui(page) {
      It runs the query itself rather than going back through the box, because
      every row is a query by construction and nothing about it should depend on
      what the mode select would have guessed. */
-  function pick(i) {
+  function pick(i: number): void {
     input.value = rows[i].q;
     mark(i);
     run(rows[i].q);
   }
 
   suggestions.addEventListener('click', function (e) {
-    var row = e.target.closest('.sg');
+    if (!(e.target instanceof Element)) return;
+    const row = e.target.closest('.sg');
     if (!row) return;
-    var i = Array.prototype.indexOf.call(suggestions.children, row);
-    if (e.target.closest('.sgc')) { page.copy(rows[i].q, e.target.closest('.sgc')); return; }
+    const i = Array.prototype.indexOf.call(suggestions.children, row);
+    const cp = e.target.closest('.sgc');
+    if (cp) { page.copy(rows[i].q, cp); return; }
     pick(i);
     input.focus();
   });
@@ -351,8 +381,8 @@ export function jqui(page) {
     if (suggestions.hidden || !rows.length) return;
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     e.preventDefault();
-    var at = -1, i;
-    for (i = 0; i < rows.length; i++) if (rows[i].q === input.value.trim()) at = i;
+    let at = -1;
+    for (let i = 0; i < rows.length; i++) if (rows[i].q === input.value.trim()) at = i;
     at = e.key === 'ArrowDown' ? Math.min(at + 1, rows.length - 1) : Math.max(at - 1, 0);
     pick(at);
   });
@@ -360,7 +390,8 @@ export function jqui(page) {
   /* Anywhere else in the page puts it away. mousedown rather than click, so it
      is gone before whatever was clicked responds. */
   document.addEventListener('mousedown', function (e) {
-    if (!suggestions.contains(e.target) && e.target !== input) hide();
+    const target = e.target instanceof Node ? e.target : null;
+    if (!suggestions.contains(target) && target !== input) hide();
   });
 
   return {

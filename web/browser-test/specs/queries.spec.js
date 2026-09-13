@@ -5,7 +5,7 @@ import { test, expect, settle, type } from '../fixtures.js';
 
 test.use({ variant: 'default' });
 
-/* Picking a value out of the mode select the way a person does: query.js
+/* Picking a value out of the mode select the way a person does: query/ui.ts
    listens for the change event, and assigning value fires nothing. */
 async function mode(page, value) {
   await page.locator('#mode').selectOption(value);

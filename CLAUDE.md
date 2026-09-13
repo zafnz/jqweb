@@ -116,15 +116,15 @@ head before the body is parsed.
 
 | source asset | included in | what it is |
 |---|---|---|
-| `src/entries/*.js` | one each | what each bundle imports, whether `startPage` gets `jqui`, and the page globals |
+| `src/entries/*.ts` | one each | what each bundle imports, whether `startPage` gets `jqui`, and the page globals |
 | `src/model/*.ts` | simple and full | the node types, parse, render, escaping, path text. No DOM, no jq. |
 | `src/page/*.ts` except `theme.ts` and `alive.ts` | simple and full | the tree, search box, text filter, path lookup, copy, folding, theme button |
 | `src/page/theme.ts` | theme | runs in `<head>`, picks the palette before the body parses |
 | `src/page/alive.ts` | theme | runs in `<head>`, holds `/alive` open on a served page |
 | `page.css` | both | the palette, both themes |
 | `src/jq.js` | full only | the jq engine |
-| `src/suggest.js` | full only | builds the queries a clicked line could mean, and the key completions of a half-typed one. No DOM. |
-| `src/query.js` | full only | search box as a query, results view, suggestion list |
+| `src/query/suggest.ts` | full only | builds the queries a clicked line could mean, and the key completions of a half-typed one. No DOM. |
+| `src/query/ui.ts` | full only | search box as a query, results view, suggestion list |
 | `query.css` | default only | mode select, suggestion list, error box, results |
 
 The three files under `web/dist` are generated, minified and committed. Never
@@ -136,12 +136,12 @@ tree is what lets a module fetched by `go install` build without Node.
 in-page helpers they measure with, the fixtures that open a page and the setup
 that renders one. No rendered page has ever seen any of it.
 
-`src/page` must work with the query modules absent. `entries/full.js` passes
-`startPage` the `jqui` from `query.js` and `entries/simple.js` passes null, which
-falls back to path lookup. Nothing reachable from `entries/simple.js` may import
-`jq.js`, `suggest.js` or `query.js`; `web/bundles.test.ts` reads esbuild's module
-graph and fails when one does. Anything that reads the box as a query, or
-renders what a query produced, belongs in `query.js`.
+`src/page` must work with the query modules absent. `entries/full.ts` passes
+`startPage` the `jqui` from `query/ui.ts` and `entries/simple.ts` passes null,
+which falls back to path lookup. Nothing reachable from `entries/simple.ts` may
+import `jq.js` or a module under `src/query`; `web/bundles.test.ts` reads
+esbuild's module graph and fails when one does. Anything that reads the box as
+a query, or renders what a query produced, belongs in `query/ui.ts`.
 
 ## The value model
 

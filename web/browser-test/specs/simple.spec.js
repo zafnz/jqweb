@@ -1,4 +1,4 @@
-/* The page --simple builds. The modules in src/page ship in it and query.js
+/* The page --simple builds. The modules in src/page ship in it and query/ui.ts
    does not, so everything that reads the box as a query has to be absent
    without leaving a hole where it was. */
 
@@ -8,7 +8,7 @@ test.use({ variant: 'simple' });
 
 test('the query half of the page is absent', async ({ page }) => {
   const got = await page.evaluate(() => ({
-    /* The engine and the suggestion builder are not in the page. query.js
+    /* The engine and the suggestion builder are not in the page. query/ui.ts
        has no global of its own, so the mode select below is what says it is
        absent. */
     engine: typeof window.jqjs,

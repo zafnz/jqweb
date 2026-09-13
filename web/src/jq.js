@@ -14,7 +14,7 @@
    "as", def, reduce, foreach, assignment, path expressions, string
    interpolation, format strings, and try/catch. Bare "?" is supported.
 
-   Nothing here touches the DOM; query.js drives it. */
+   Nothing here touches the DOM; query/ui.ts drives it. */
 import { leafOf, stringify } from './model/node.ts';
 import { parseJSON } from './model/parse.ts';
 
@@ -41,6 +41,10 @@ var jqjs = (function () {
   }
   function parseErr(msg, pos) { return fail('parse', msg, pos); }
   function runErr(msg) { return fail('run', msg); }
+
+  /* Whether a thrown value is one of the errors above, rather than a fault in
+     the engine or the page. */
+  function isJqError(e) { return e instanceof Error && 'jq' in e; }
 
   /* ---- values ---- */
 
@@ -677,7 +681,7 @@ var jqjs = (function () {
   }
 
   /* The segments of a query that is only a walk down the document, in the
-     form parsePath produces, or null for anything else. query.js uses it to
+     form parsePath produces, or null for anything else. query/ui.ts uses it to
      keep the old behaviour for a pasted path: highlight the node in the
      document rather than replacing the view with a copy of it. */
   function pathSegs(a) {
@@ -2034,7 +2038,7 @@ var jqjs = (function () {
     };
   }
 
-  return { compile: compile };
+  return { compile: compile, isJqError: isJqError };
 })();
 
-export const { compile } = jqjs;
+export const { compile, isJqError } = jqjs;

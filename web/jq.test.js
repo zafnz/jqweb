@@ -191,7 +191,7 @@ test('anything more than walking down has no path', () => {
 });
 
 test('a path query agrees with parsePath on the same text', () => {
-  /* page.js hands a pasted path to whichever of the two is available, so the
+  /* The page hands a pasted path to whichever of the two is available, so the
      segments they produce have to match. */
   for (const q of ['.a', '.a.b', '.a[0]', '.a[-1]', '.["x y"]', '.']) {
     assert.deepStrictEqual(compile(q).path, parsePath(q), `path ${q}`);

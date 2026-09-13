@@ -37,7 +37,7 @@ export function renderTree(root: Node, withFilter?: boolean): string {
    Every node is <div class="node ..."> wrapping a <div class="line">, and a
    branch adds <div class="kids"> for its children and a <div class="closer">
    for the bracket that follows them. The key or index is repeated in a data
-   attribute, which is what page.js reads back to reconstruct a path. */
+   attribute, which is what page/tree.ts reads back to reconstruct a path. */
 function emit(out: string[], node: Node, key: string | null, idx: number, comma: boolean): void {
   const attrs = key !== null ? ' data-key="' + esc(key) + '"'
     : idx >= 0 ? ' data-index="' + idx + '"' : '';

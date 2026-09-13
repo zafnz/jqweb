@@ -21,7 +21,7 @@ async function modules(name: Bundle): Promise<string[]> {
 test('the simple script reaches none of the query modules', async () => {
   const simple = await modules('simple');
   assert.deepStrictEqual(simple.filter((m) => QUERY.includes(m)), []);
-  assert.ok(simple.includes('src/page.js'), 'the simple script does not reach page.js');
+  assert.ok(simple.includes('src/page/bootstrap.ts'), 'the simple script does not reach page/bootstrap.ts');
 });
 
 test('the full script reaches the simple modules and the query modules', async () => {
@@ -33,5 +33,5 @@ test('the full script reaches the simple modules and the query modules', async (
 });
 
 test('the head script reaches only the theme', async () => {
-  assert.deepStrictEqual(await modules('theme'), ['src/entries/theme.js', 'src/theme.js']);
+  assert.deepStrictEqual(await modules('theme'), ['src/entries/theme.js', 'src/page/theme.ts']);
 });

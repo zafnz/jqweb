@@ -14,7 +14,7 @@ import { pageURL } from './pages.js';
 
 const helpers = path.join(import.meta.dirname, 'helpers.js');
 
-/* How far to wind the clock after an action. page.js waits 120ms for a pause
+/* How far to wind the clock after an action. The page waits 120ms for a pause
    in typing and leaves a copy button ticked for 900ms, so this covers both.
    The clock is under the test's control, so winding it costs nothing. */
 const SETTLE = 1000;
@@ -82,7 +82,7 @@ async function settle(page, ms) {
 }
 
 /* Typing into the search box. fill() sets the value and fires the input event
-   page.js debounces, which is what a person typing produces. */
+   the page debounces, which is what a person typing produces. */
 async function type(page, text) {
   await page.locator('#q').fill(text);
   await settle(page);

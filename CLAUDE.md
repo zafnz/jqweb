@@ -115,8 +115,8 @@ head before the body is parsed.
 |---|---|---|
 | `src/entries/*.js` | one each | what each bundle imports, whether `startPage` gets `jqui`, and the page globals |
 | `src/model/*.ts` | simple and full | the node types, parse, render, escaping, path text. No DOM, no jq. |
-| `src/page.js` | simple and full | the tree, text filter, path lookup, copy, folding, theme button |
-| `src/theme.js` | theme | runs in `<head>`, picks the palette before the body parses |
+| `src/page/*.ts` except `theme.ts` | simple and full | the tree, search box, text filter, path lookup, copy, folding, theme button |
+| `src/page/theme.ts` | theme | runs in `<head>`, picks the palette before the body parses |
 | `page.css` | both | the palette, both themes |
 | `src/jq.js` | full only | the jq engine |
 | `src/suggest.js` | full only | builds the queries a clicked line could mean, and the key completions of a half-typed one. No DOM. |
@@ -132,7 +132,7 @@ tree is what lets a module fetched by `go install` build without Node.
 in-page helpers they measure with, the fixtures that open a page and the setup
 that renders one. No rendered page has ever seen any of it.
 
-`page.js` must work with the query modules absent. `entries/full.js` passes
+`src/page` must work with the query modules absent. `entries/full.js` passes
 `startPage` the `jqui` from `query.js` and `entries/simple.js` passes null, which
 falls back to path lookup. Nothing reachable from `entries/simple.js` may import
 `jq.js`, `suggest.js` or `query.js`; `web/bundles.test.ts` reads esbuild's module
@@ -165,9 +165,9 @@ short-circuits as a result, so no builtin may produce an endless stream.
 ## Rules that bite
 
 **The phone breakpoint is written twice.** `@media (max-width: 600px)` in
-`page.css` hides the search box and the line buttons, and `page.js` runs
-`matchMedia` on the same query to clear a search when the window crosses it.
-Change one and change the other. `phone.spec.js` runs at 500px and
+`page.css` hides the search box and the line buttons, and `page/search.ts`
+runs `matchMedia` on the same query to clear a search when the window crosses
+it. Change one and change the other. `phone.spec.js` runs at 500px and
 `narrow.spec.js` at 640px, so a breakpoint moved outside that range fails one of
 them. The viewport is set exactly now rather than being whatever headless Chrome
 would open, so a spec at a real phone width is available if one is wanted.
@@ -178,10 +178,10 @@ is inline SVG for this reason. (The `--cdn` issue would change this on
 purpose, for people who want the opposite.)
 
 **Page globals are set in `web/src/entries` and nowhere else.** A bundle's
-modules are private to it. `page.js` reaches the head script's theme through
-`window.jqtheme`, and the browser specs reach the parser and engine through
-`window.jqweb`, `jqjs` and `jqsuggest`, so dropping one from an entry breaks
-whichever of them reads it.
+modules are private to it. `page/bootstrap.ts` reaches the head script's
+theme through `window.jqtheme`, and the browser specs reach the parser and
+engine through `window.jqweb`, `jqjs` and `jqsuggest`, so dropping one from
+an entry breaks whichever of them reads it.
 
 **Build dependencies do not become install dependencies.** `go.mod` requires
 nothing, the JavaScript tests use Node's built-in runner, and the TypeScript and

@@ -8,7 +8,7 @@ import { parsePath, pathText } from '../model/path.ts';
 import { renderTree } from '../model/render.ts';
 import { compile } from '../jq.js';
 import { completions, splitPartial, suggest } from '../suggest.js';
-import { startPage } from '../page.js';
+import { startPage } from '../page/bootstrap.ts';
 import { jqui } from '../query.js';
 
 /* The browser specs find a line of the tree with jqweb.parsePath, run the

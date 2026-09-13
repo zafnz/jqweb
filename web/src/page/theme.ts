@@ -9,26 +9,39 @@
    Where the page can store the choice it outlasts a reload. A page opened from
    a file:// URL may have no storage at all, and then the choice lasts as long
    as the tab, which is why every use of it is guarded. */
-export function startTheme() {
-  var KEY = 'jqweb-theme';
-  var ORDER = ['auto', 'light', 'dark'];
-  var root = document.documentElement;
-  var light = window.matchMedia('(prefers-color-scheme: light)');
-  var pref = root.getAttribute('data-pref') || 'auto';
+
+export type Preference = 'auto' | 'light' | 'dark';
+
+/* What the head script leaves for the body script, as window.jqtheme. */
+export interface Theme {
+  cycle(): Preference;
+  current(): Preference;
+}
+
+declare global {
+  var jqtheme: Theme;
+}
+
+export function startTheme(): Theme {
+  const KEY = 'jqweb-theme';
+  const ORDER: Preference[] = ['auto', 'light', 'dark'];
+  const root = document.documentElement;
+  const light = window.matchMedia('(prefers-color-scheme: light)');
+  let asked = root.getAttribute('data-pref');
 
   try {
-    pref = localStorage.getItem(KEY) || pref;
+    asked = localStorage.getItem(KEY) || asked;
   } catch (e) { /* no storage here, so the flag stands */ }
-  if (ORDER.indexOf(pref) < 0) pref = 'auto';
+  let pref: Preference = asked === 'light' || asked === 'dark' ? asked : 'auto';
 
   /* data-theme is the palette in force and what the stylesheet reads;
      data-pref is what was asked for, which the button reports. */
-  function paint() {
+  function paint(): void {
     root.setAttribute('data-theme', pref === 'auto' ? (light.matches ? 'light' : 'dark') : pref);
     root.setAttribute('data-pref', pref);
   }
 
-  function cycle() {
+  function cycle(): Preference {
     pref = ORDER[(ORDER.indexOf(pref) + 1) % ORDER.length];
     try {
       localStorage.setItem(KEY, pref);

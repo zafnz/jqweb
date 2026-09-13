@@ -7,7 +7,7 @@ import { leafOf, stringify } from '../model/node.ts';
 import { parseJSON } from '../model/parse.ts';
 import { parsePath, pathText } from '../model/path.ts';
 import { renderTree } from '../model/render.ts';
-import { startPage } from '../page.js';
+import { startPage } from '../page/bootstrap.ts';
 
 /* The browser specs find a line of the tree with jqweb.parsePath. The object is
    written out rather than imported as a namespace, which esbuild builds with a

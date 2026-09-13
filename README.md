@@ -43,12 +43,18 @@ jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)
 
 *Filtering running Kubernetes pods with a jq-style query.*
 
-Add `-C` (or `--close`) and jqweb stops once the browser has the page, instead
-of serving until Ctrl-C. `-OC` does both:
+Add `-C` (or `--close`) and jqweb returns the prompt straight away, serving
+from the background until the last tab showing the page is closed. Reloading
+the page keeps it running. `-OC` does both:
 
 ```
-jqweb -OC myfile.json
+$ jqweb -OC myfile.json
+jqweb: serving on http://127.0.0.1:52748/ (until the last tab closes)
+jqweb: running in the background, pid 48213
 ```
+
+Browsers may unload a tab left unused for an hour or so, which counts as
+closing it.
 
 Write a self-contained HTML file for offline viewing:
 
@@ -71,18 +77,13 @@ always reads the file, since `.` is no query.
       --host <ip>      bind address for -p (default 127.0.0.1)
   -o, --output <file>  write the page to <file>; "-" writes to stdout
   -O, --open           opens your default web browser with the output
-  -C, --close          stop serving once the page has been fetched
-      --close-delay <d>  how long after the last fetch -C waits, such as
-                       500ms or 5s (default 1s); giving it turns on -C
+  -C, --close          serve from the background until the last tab closes
+      --close-delay <d>  how long after the last tab closes -C waits
+                       (default 10s); giving it turns on -C
       --simple         leave out the jq query engine, for a smaller page
       --theme <name>   light, dark, or auto to follow the reader's system
 ```
 With no -p and no -o, it listens on a random available port.
-
-`-C` waits out `--close-delay` after the *last* fetch of the page rather than
-exiting on the first one. Every fetch restarts the timer, so a reload or a
-second tab keeps the server up, and a prefetcher or link scanner that gets
-there first extends the wait instead of ending it.
 
 
 ## Search

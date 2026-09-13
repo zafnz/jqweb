@@ -42,6 +42,10 @@ them gets `default`, and a window of 1200x800.
 name in the address, so `test.use({ address: '?q=keys' })` is how a spec checks
 what the page reads out of its own URL.
 
+`alive.spec.js` is the one spec that needs a server behind the page. It starts
+the binary `global-setup.js` built, drives the page over HTTP in a page of its
+own, and stops the server when it is done.
+
 The fixture document is `testdata/doc.json`: ten records with repeated fields,
 so a suggestion has something to pivot on, and long enough that the page
 scrolls.

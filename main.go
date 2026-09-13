@@ -46,14 +46,14 @@ reads the file, since "." is no query.
       --host <ip>      bind address for -p (default 127.0.0.1)
   -o, --output <file>  write the page to <file>; "-" writes to stdout
   -O, --open           open the page in the default browser
-  -C, --close          stop serving once the page has been fetched
-      --close-delay <d>  how long after the last fetch -C waits, such as
-                       500ms or 5s (default 1s); giving it turns on -C
+  -C, --close          serve from the background until the last tab closes
+      --close-delay <d>  how long after the last tab closes -C waits
+                       (default 10s); giving it turns on -C
       --simple         leave out the jq query engine, for a smaller page
       --theme <name>   light, dark, or auto to follow the reader's system
                        (default auto)
 
--OC does both: open the browser and stop once it has the page.
+-OC does both: open the browser and serve from the background.
 
 With no -p and no -o, it listens on a random available port.
 `)
@@ -71,6 +71,7 @@ type cliOptions struct {
 	version    bool
 	closeOnGet bool
 	closeDelay time.Duration
+	child      bool // this is the -C child that serves in the background
 
 	portSet bool // -p or --port was given, whatever its value
 	outSet  bool // -o or --output was given
@@ -92,7 +93,8 @@ func parseFlags(fs *flag.FlagSet, args []string) (cliOptions, error) {
 	fs.BoolVar(&o.open, "O", false, "")
 	fs.BoolVar(&o.closeOnGet, "close", false, "")
 	fs.BoolVar(&o.closeOnGet, "C", false, "")
-	fs.DurationVar(&o.closeDelay, "close-delay", time.Second, "")
+	fs.DurationVar(&o.closeDelay, "close-delay", 10*time.Second, "")
+	fs.BoolVar(&o.child, "child", false, "")
 	// The flag package has no notion of bundling, so the one combination worth
 	// writing as a bundle is spelled out as a flag of its own.
 	var openClose bool
@@ -158,8 +160,15 @@ func main() {
 
 	// Started once the command line is known to be good and before the
 	// document is read, so the request runs alongside the work that follows.
-	// Only the exit below ever waits on it.
-	notice := checkForUpdate()
+	// Only an exit ever waits on it. The -C parent keeps the terminal, so it
+	// checks and the child does not.
+	var notice <-chan string
+	if !opt.child {
+		notice = checkForUpdate()
+	}
+	if opt.closeOnGet && !opt.child && (portSet || !outSet) {
+		os.Exit(runInBackground(notice))
+	}
 
 	var data []byte
 	if inName == "-" {
@@ -203,7 +212,8 @@ func main() {
 
 	// The page assembly asks for what to put in rather than what to leave out,
 	// so the flag is turned round here and nowhere else.
-	page := []byte(renderPage(data, title, options{jq: !simple, theme: theme, query: query}))
+	pageOpt := options{jq: !simple, theme: theme, query: query}
+	page := []byte(renderPage(data, title, pageOpt))
 
 	if outSet {
 		if output == "-" {
@@ -229,11 +239,15 @@ func main() {
 		}
 	}
 	if portSet {
-		err := serve(host, port, page, serveOptions{
+		// Only a served page holds /alive open, so -o and -p together
+		// render it twice.
+		pageOpt.served = true
+		err := serve(host, port, []byte(renderPage(data, title, pageOpt)), serveOptions{
 			open:       open,
 			closeOnGet: opt.closeOnGet,
 			closeDelay: opt.closeDelay,
 			notice:     notice,
+			background: opt.child,
 		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)

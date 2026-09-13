@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bufio"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -49,6 +52,58 @@ func fetch(t *testing.T, method, url string) (status int, body string) {
 		t.Fatalf("reading %s: %v", url, err)
 	}
 	return resp.StatusCode, string(b)
+}
+
+// hold opens /alive the way a served page does and keeps the connection until
+// the function it returns is called. It is a raw connection so that closing it
+// is what the browser does when a tab unloads, with no client pool in between.
+// It returns once the status line has arrived, by which point the server has
+// counted it.
+func hold(t *testing.T, url string) (release func()) {
+	t.Helper()
+	addr := strings.TrimSuffix(strings.TrimPrefix(url, "http://"), "/")
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		t.Fatalf("dial %s: %v", addr, err)
+	}
+	fmt.Fprintf(conn, "GET /alive HTTP/1.1\r\nHost: %s\r\n\r\n", addr)
+	status, err := bufio.NewReader(conn).ReadString('\n')
+	if err != nil {
+		conn.Close()
+		t.Fatalf("GET /alive: %v", err)
+	}
+	if !strings.HasPrefix(status, "HTTP/1.1 200 ") {
+		conn.Close()
+		t.Fatalf("GET /alive = %q, want 200", status)
+	}
+	return func() { conn.Close() }
+}
+
+// stillServing fails the test if serveOn has returned.
+func stillServing(t *testing.T, done <-chan error, when string) {
+	t.Helper()
+	select {
+	case err := <-done:
+		t.Fatalf("stopped %s (serveOn returned %v)", when, err)
+	default:
+	}
+}
+
+// stopsAfter fails the test unless serveOn returns nil, no sooner than delay
+// after since.
+func stopsAfter(t *testing.T, done <-chan error, since time.Time, delay time.Duration) {
+	t.Helper()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("serveOn returned %v, want nil for a shutdown that was asked for", err)
+		}
+		if waited := time.Since(since); waited+closeTimerSlack < delay {
+			t.Errorf("stopped %s after the last tab closed, before the %s delay", waited, delay)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("still serving 10s after the last tab closed")
+	}
 }
 
 func TestServeSendsThePage(t *testing.T) {
@@ -138,12 +193,9 @@ func TestServeKeepsServingWithoutClose(t *testing.T) {
 	}()
 
 	fetch(t, http.MethodGet, url)
+	hold(t, url)()
 	time.Sleep(5 * delay)
-	select {
-	case err := <-done:
-		t.Fatalf("stopped without -C (returned %v); a delay alone must not end the server", err)
-	default:
-	}
+	stillServing(t, done, "without -C after a tab closed; a delay alone must not end the server")
 	if status, _ := fetch(t, http.MethodGet, url); status != http.StatusOK {
 		t.Errorf("GET / = %d after the delay passed, want 200", status)
 	}
@@ -202,4 +254,61 @@ func TestBrowserCommandFallsBackForOS(t *testing.T) {
 			}
 		})
 	}
+}
+
+// An open tab keeps the server up however long it stays open, and closing it
+// starts the delay.
+func TestServeAliveKeepsServing(t *testing.T) {
+	const delay = 150 * time.Millisecond
+	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay})
+	defer ln.Close()
+
+	fetch(t, http.MethodGet, url)
+	release := hold(t, url)
+	time.Sleep(5 * delay)
+	stillServing(t, done, "with a tab open")
+	if status, _ := fetch(t, http.MethodGet, url); status != http.StatusOK {
+		t.Fatalf("GET / = %d with a tab open, want 200", status)
+	}
+	time.Sleep(5 * delay)
+	stillServing(t, done, "with a tab open after a second fetch")
+
+	release()
+	stopsAfter(t, done, time.Now(), delay)
+}
+
+func TestServeClosingOneOfTwoTabsKeepsServing(t *testing.T) {
+	const delay = 150 * time.Millisecond
+	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay})
+	defer ln.Close()
+
+	first := hold(t, url)
+	second := hold(t, url)
+	first()
+	time.Sleep(5 * delay)
+	stillServing(t, done, "with one of two tabs still open")
+
+	second()
+	stopsAfter(t, done, time.Now(), delay)
+}
+
+// A reload fetches the page, then the old page unloads, then the new one opens
+// its own connection. The gap between the last two is what the delay covers.
+func TestServeReloadKeepsServing(t *testing.T) {
+	const delay = 400 * time.Millisecond
+	url, ln, done := startServer(t, []byte("page"), serveOptions{closeOnGet: true, closeDelay: delay})
+	defer ln.Close()
+
+	old := hold(t, url)
+	if status, _ := fetch(t, http.MethodGet, url); status != http.StatusOK {
+		t.Fatalf("GET / = %d, want 200", status)
+	}
+	old()
+	time.Sleep(delay / 4)
+	reloaded := hold(t, url)
+	time.Sleep(3 * delay)
+	stillServing(t, done, "across a reload")
+
+	reloaded()
+	stopsAfter(t, done, time.Now(), delay)
 }

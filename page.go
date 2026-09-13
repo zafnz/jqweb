@@ -12,9 +12,10 @@ import (
 // options are the parts of the command line that change the page rather than
 // where it goes.
 type options struct {
-	jq    bool   // inline the query engine, which --simple turns off
-	theme string // auto, light or dark
-	query string // what the search box starts with, if anything
+	jq     bool   // inline the query engine, which --simple turns off
+	theme  string // auto, light or dark
+	query  string // what the search box starts with, if anything
+	served bool   // the page is served, so it holds /alive open
 }
 
 // renderPage embeds the document in the page as compact JSON; the script in
@@ -32,9 +33,20 @@ func renderPage(data []byte, title string, opt options) string {
 	return strings.NewReplacer(
 		"{{TITLE}}", html.EscapeString(title),
 		"{{PREF}}", opt.theme,
+		"{{SERVED}}", servedAttr(opt.served),
 		"{{QUERY}}", html.EscapeString(boxText(opt.query)),
 		"{{DATA}}", scriptSafe(buf.String()),
 	).Replace(pageTemplate(opt.jq))
+}
+
+// servedAttr marks the root element of a page jqweb serves. The page script
+// opens /alive only when it is there, so a page written with -o, or published
+// from one, makes no request for it.
+func servedAttr(served bool) string {
+	if served {
+		return " data-served"
+	}
+	return ""
 }
 
 // scriptSafe escapes "<" as its \u003c escape so that a string containing

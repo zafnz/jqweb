@@ -400,6 +400,9 @@ func printNotice(w io.Writer, ch <-chan string) {
 // waitNotice prints the line if it arrives within d. Nothing is behind this
 // but the process exiting, so a check that has not answered is dropped.
 func waitNotice(w io.Writer, ch <-chan string, d time.Duration) {
+	if ch == nil {
+		return
+	}
 	select {
 	case line := <-ch:
 		if line != "" {

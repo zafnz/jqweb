@@ -6,7 +6,7 @@ import { leafOf, stringify } from '../model/node.ts';
 import { parseJSON } from '../model/parse.ts';
 import { parsePath, pathText } from '../model/path.ts';
 import { renderTree } from '../model/render.ts';
-import { compile } from '../query/engine/index.js';
+import { compile } from '../query/engine/index.ts';
 import { completions, splitPartial, suggest } from '../query/suggest.ts';
 import { startPage } from '../page/bootstrap.ts';
 import { jqui } from '../query/ui.ts';

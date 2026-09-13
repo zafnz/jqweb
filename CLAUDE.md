@@ -122,7 +122,7 @@ head before the body is parsed.
 | `src/page/theme.ts` | theme | runs in `<head>`, picks the palette before the body parses |
 | `src/page/alive.ts` | theme | runs in `<head>`, holds `/alive` open on a served page |
 | `page.css` | both | the palette, both themes |
-| `src/query/engine/*.js` | full only | the jq engine: lexer, parser, evaluator, builtins. No DOM. |
+| `src/query/engine/*.ts` | full only | the jq engine: lexer, parser, evaluator, builtins. No DOM. |
 | `src/query/suggest.ts` | full only | builds the queries a clicked line could mean, and the key completions of a half-typed one. No DOM. |
 | `src/query/ui.ts` | full only | search box as a query, results view, suggestion list |
 | `query.css` | default only | mode select, suggestion list, error box, results |

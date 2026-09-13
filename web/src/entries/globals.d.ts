@@ -7,7 +7,7 @@ import type { leafOf, stringify } from '../model/node.ts';
 import type { parseJSON } from '../model/parse.ts';
 import type { parsePath, pathText } from '../model/path.ts';
 import type { renderTree } from '../model/render.ts';
-import type { compile } from '../query/engine/index.js';
+import type { compile } from '../query/engine/index.ts';
 import type { completions, splitPartial, suggest } from '../query/suggest.ts';
 
 declare global {

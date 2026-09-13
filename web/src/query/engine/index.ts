@@ -16,14 +16,28 @@
 
    Nothing in this directory touches the DOM; query/ui.ts drives it. */
 
-import { evaluate } from './evaluate.js';
-import { parse, pathSegs } from './parser.js';
+import type { Node } from '../../model/node.ts';
+import type { Segment } from '../../model/path.ts';
+import { evaluate } from './evaluate.ts';
+import type { Stream } from './evaluate.ts';
+import { parse, pathSegs } from './parser.ts';
+
+export { isJqError } from './errors.ts';
+export type { JqError } from './errors.ts';
+
+/* A compiled query. path is the segments of a query that only walks down the
+   document, in the form parsePath produces, and null for anything else. run
+   returns the stream the query produces for one input. */
+export interface Query {
+  path: Segment[] | null;
+  run(input: Node): Stream;
+}
 
 /* Compiles a query. Throws a parse error, with a pos, for anything that is
    not one. The result's path is the segment list for a query that only
    walks down the document, and null otherwise. */
-function compile(src) {
-  var ast = parse(src);
+export function compile(src: string): Query {
+  const ast = parse(src);
   return {
     path: pathSegs(ast),
     run: function (input) {
@@ -31,6 +45,3 @@ function compile(src) {
     }
   };
 }
-
-export { compile };
-export { isJqError } from './errors.js';

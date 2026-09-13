@@ -11,24 +11,31 @@ import fs from 'node:fs';
 import { stringify } from './src/model/node.ts';
 import { parseJSON } from './src/model/parse.ts';
 import { parsePath } from './src/model/path.ts';
-import { builtins } from './src/query/engine/builtins.js';
-import { compile } from './src/query/engine/index.js';
+import { builtins } from './src/query/engine/builtins.ts';
+import { compile, isJqError } from './src/query/engine/index.ts';
 
-const corpus = JSON.parse(fs.readFileSync(new URL('./testdata/jq-corpus.json', import.meta.url), 'utf8'));
+/* The corpus file: a fixture document, and each query with the output jq gave
+   for it, one JSON text per output. */
+interface Corpus {
+  input: unknown;
+  cases: { q: string; out: string[] }[];
+}
+
+const corpus: Corpus = JSON.parse(fs.readFileSync(new URL('./testdata/jq-corpus.json', import.meta.url), 'utf8'));
 
 /* Runs a query over a JSON document and returns its outputs as JSON text, so
    that a test can talk about values rather than nodes. */
-function run(query, doc) {
+function run(query: string, doc: string): string[] {
   return compile(query).run(parseJSON(doc)).map((n) => stringify(n));
 }
 
 /* The error a query raises, as "<kind>: <message>". */
-function error(query, doc) {
+function error(query: string, doc?: string): string {
   try {
     const out = run(query, doc === undefined ? 'null' : doc);
     assert.fail(`${query} did not fail; it returned ${JSON.stringify(out)}`);
   } catch (e) {
-    if (!e.jq) throw e;
+    if (!isJqError(e)) throw e;
     return `${e.jq}: ${e.message}`;
   }
 }
@@ -193,7 +200,7 @@ test('a path query agrees with parsePath on the same text', () => {
 });
 
 test('syntax the subset leaves out is named, not mis-parsed', () => {
-  const cases = {
+  const cases: Record<string, string> = {
     '.a = 1': 'assignment is not supported',
     '.a |= 1': 'assignment is not supported',
     '.a += 1': 'assignment is not supported',
@@ -232,12 +239,14 @@ test('the filters that change a document are not here', () => {
 });
 
 test('a malformed query reports where it gave up', () => {
-  for (const [q, pos] of [['', 0], ['.a |', 4], ['(.a', 3], ['{a', 2], ['..a', 2],
-    ['.a[', 3], ['"unclosed', 0], ['1 +', 3]]) {
+  const cases: [string, number][] = [['', 0], ['.a |', 4], ['(.a', 3], ['{a', 2], ['..a', 2],
+    ['.a[', 3], ['"unclosed', 0], ['1 +', 3]];
+  for (const [q, pos] of cases) {
     try {
       compile(q);
       assert.fail(`${q} compiled`);
     } catch (e) {
+      if (!isJqError(e)) throw e;
       assert.strictEqual(e.jq, 'parse', `query ${q}`);
       assert.strictEqual(e.pos, pos, `position for ${q}`);
       assert.ok(e.message.length > 0, `message for ${q}`);

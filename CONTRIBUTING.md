@@ -126,7 +126,7 @@ leaf.
 
 Its answers are checked against jq itself rather than against what anyone
 believed jq does. `web/testdata/jq-corpus.json` holds a fixture document, a
-list of queries and the output jq gave for each, and `web/jq.test.js` runs
+list of queries and the output jq gave for each, and `web/jq.test.ts` runs
 every one through the engine. After adding a query, or after a jq upgrade whose
 behaviour the tests should follow:
 

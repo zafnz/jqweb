@@ -12,8 +12,8 @@ import { pathText } from '../model/path.ts';
 import { renderTree } from '../model/render.ts';
 import { find } from '../page/dom.ts';
 import type { QueryHost, QueryUI } from '../page/search.ts';
-import { compile, isJqError } from './engine/index.js';
-import type { Query } from './engine/index.js';
+import { compile, isJqError } from './engine/index.ts';
+import type { Query } from './engine/index.ts';
 import { completions, splitPartial, suggest } from './suggest.ts';
 import type { Candidate, Shape } from './suggest.ts';
 

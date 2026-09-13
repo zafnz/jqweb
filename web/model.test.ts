@@ -1,53 +1,74 @@
-/* Tests for the pure half of the page script. Run with:  node --test web/
-   These cover the parser, the HTML renderer and the path reader; the DOM
-   wiring in page.js is not exercised here. */
+/* Tests for the value model in src/model: the parser, the HTML renderer,
+   escaping and the path reader. Run with:  node --test
+   The DOM wiring in page.js is not exercised here. */
 
 import test from 'node:test';
 import assert from 'node:assert';
-import { parseJSON, renderTree, parsePath, quote, esc } from './src/core.js';
+import { esc, quote } from './src/model/escape.ts';
+import type { ArrayNode, LeafNode, Node, ObjectNode } from './src/model/node.ts';
+import { parseJSON } from './src/model/parse.ts';
+import { parsePath } from './src/model/path.ts';
+import { renderTree } from './src/model/render.ts';
+
+/* The node as the kind a test expects, failing the test when it is another
+   kind. */
+function asObject(node: Node): ObjectNode {
+  if (node.t !== 'o') assert.fail(`expected an object node, got '${node.t}'`);
+  return node;
+}
+
+function asArray(node: Node): ArrayNode {
+  if (node.t !== 'a') assert.fail(`expected an array node, got '${node.t}'`);
+  return node;
+}
+
+function asLeaf(node: Node): LeafNode {
+  if (node.t !== 'l') assert.fail(`expected a leaf node, got '${node.t}'`);
+  return node;
+}
+
+const entities: Record<string, string> = { '&lt;': '<', '&gt;': '>', '&#34;': '"', '&#39;': "'" };
 
 /* The leaf text of a node, with the markup stripped and the escaping undone,
    so tests can talk about values rather than spans. Escaping itself is checked
    separately, against the raw HTML. */
-function leaf(node) {
-  assert.strictEqual(node.t, 'l', 'expected a leaf node');
-  return node.h
+function leaf(node: Node): string {
+  return asLeaf(node).h
     .replace(/<[^>]*>/g, '')
-    .replace(/&(?:lt|gt|#34|#39);/g, (e) => ({ '&lt;': '<', '&gt;': '>', '&#34;': '"', '&#39;': "'" })[e])
+    .replace(/&(?:lt|gt|#34|#39);/g, (e) => entities[e])
     .replace(/&amp;/g, '&');
 }
 
 test('parseJSON keeps object keys in document order', () => {
-  const node = parseJSON('{"b":1,"a":2,"B":3}');
-  assert.strictEqual(node.t, 'o');
+  const node = asObject(parseJSON('{"b":1,"a":2,"B":3}'));
   assert.deepStrictEqual(node.k, ['b', 'a', 'B']);
   assert.strictEqual(node.v.length, 3);
 });
 
 test('parseJSON keeps duplicate keys', () => {
   // JSON.parse would collapse these; the tree shows the document as written.
-  const node = parseJSON('{"a":1,"a":2}');
+  const node = asObject(parseJSON('{"a":1,"a":2}'));
   assert.deepStrictEqual(node.k, ['a', 'a']);
   assert.deepStrictEqual(node.v.map(leaf), ['1', '2']);
 });
 
 test('parseJSON keeps numbers exactly as written', () => {
   const written = ['1.0', '1e5', '1E+5', '-0', '0.1000', '123456789012345678901234567890'];
-  const node = parseJSON('[' + written.join(',') + ']');
+  const node = asArray(parseJSON('[' + written.join(',') + ']'));
   assert.deepStrictEqual(node.v.map(leaf), written);
 });
 
 test('parseJSON handles the literals', () => {
-  const node = parseJSON('[true,false,null]');
+  const node = asArray(parseJSON('[true,false,null]'));
   assert.deepStrictEqual(node.v.map(leaf), ['true', 'false', 'null']);
-  assert.match(node.v[0].h, /class="v bool"/);
-  assert.match(node.v[2].h, /class="v null"/);
+  assert.match(asLeaf(node.v[0]).h, /class="v bool"/);
+  assert.match(asLeaf(node.v[2]).h, /class="v null"/);
 });
 
 test('parseJSON handles empty containers', () => {
   assert.deepStrictEqual(parseJSON('{}'), { t: 'o', k: [], v: [] });
   assert.deepStrictEqual(parseJSON('[]'), { t: 'a', v: [] });
-  assert.deepStrictEqual(parseJSON('[{},[]]').v, [{ t: 'o', k: [], v: [] }, { t: 'a', v: [] }]);
+  assert.deepStrictEqual(asArray(parseJSON('[{},[]]')).v, [{ t: 'o', k: [], v: [] }, { t: 'a', v: [] }]);
 });
 
 test('parseJSON decodes string escapes', () => {
@@ -58,31 +79,32 @@ test('parseJSON decodes string escapes', () => {
 });
 
 test('parseJSON handles a key or value containing a delimiter', () => {
-  const node = parseJSON('{"a,b":"]},[{"}');
+  const node = asObject(parseJSON('{"a,b":"]},[{"}'));
   assert.deepStrictEqual(node.k, ['a,b']);
   assert.strictEqual(leaf(node.v[0]), '"]},[{"');
 });
 
 test('parseJSON tolerates whitespace between tokens', () => {
-  const node = parseJSON('{ "a" : [ 1 , 2 ] , "b" : { } }');
+  const node = asObject(parseJSON('{ "a" : [ 1 , 2 ] , "b" : { } }'));
   assert.deepStrictEqual(node.k, ['a', 'b']);
-  assert.strictEqual(node.v[0].v.length, 2);
+  assert.strictEqual(asArray(node.v[0]).v.length, 2);
 });
 
 test('parseJSON nests containers', () => {
-  const node = parseJSON('{"a":[1,{"b":[2]}]}');
-  assert.strictEqual(node.v[0].t, 'a');
-  assert.strictEqual(node.v[0].v[1].t, 'o');
-  assert.strictEqual(leaf(node.v[0].v[1].v[0].v[0]), '2');
+  const node = asObject(parseJSON('{"a":[1,{"b":[2]}]}'));
+  const a = asArray(node.v[0]);
+  const b = asObject(a.v[1]);
+  assert.strictEqual(leaf(asArray(b.v[0]).v[0]), '2');
 });
 
 test('markup in values is escaped', () => {
-  const node = parseJSON('["<img src=x>","a & b","q\\"q"]');
+  const node = asArray(parseJSON('["<img src=x>","a & b","q\\"q"]'));
   for (const child of node.v) {
-    assert.ok(!/<(img|script)/.test(child.h), 'value markup leaked into the tree: ' + child.h);
+    const h = asLeaf(child).h;
+    assert.ok(!/<(img|script)/.test(h), 'value markup leaked into the tree: ' + h);
   }
-  assert.match(node.v[0].h, /&lt;img src=x&gt;/);
-  assert.match(node.v[1].h, /a &amp; b/);
+  assert.match(asLeaf(node.v[0]).h, /&lt;img src=x&gt;/);
+  assert.match(asLeaf(node.v[1]).h, /a &amp; b/);
 });
 
 test('esc escapes every HTML-significant character', () => {
@@ -163,7 +185,7 @@ test('parsePath rejects text that is not a path', () => {
 test('a copied path round-trips through parsePath', () => {
   // pathOf() in page.js emits .key for identifiers and ["key"] otherwise;
   // both forms have to read back.
-  const cases = [
+  const cases: [string, ReturnType<typeof parsePath>][] = [
     ['.items[302].item', [{ key: 'items' }, { index: 302 }, { key: 'item' }]],
     ['["a b"][0].c', [{ key: 'a b' }, { index: 0 }, { key: 'c' }]],
     ['._private.$x', [{ key: '_private' }, { key: '$x' }]],

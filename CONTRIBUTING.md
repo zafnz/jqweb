@@ -112,9 +112,10 @@ and fails if any of them will not compile or will not run: a suggestion that
 errors is worse than no suggestion, and the shapes that cause one are easy to
 miss by hand.
 
-The engine works on the same node form `core.js` builds for rendering, so a
-result goes straight back to `renderTree` with key order and number text intact
-and the document is parsed once; scalars come from the `r` field on a leaf.
+The engine works on the nodes `web/src/model/parse.ts` builds for rendering, so
+a result goes straight back to `renderTree` with key order and number text
+intact and the document is parsed once; scalars come from the `r` field on a
+leaf.
 
 Its answers are checked against jq itself rather than against what anyone
 believed jq does. `web/testdata/jq-corpus.json` holds a fixture document, a

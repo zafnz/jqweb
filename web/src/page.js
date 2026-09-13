@@ -1,14 +1,16 @@
 /* The interactive half of the page: builds the tree from the embedded
    document, then wires up expanding and collapsing, copying a path, and the
    search box. Everything here needs the DOM; the parsing, rendering and path
-   reading it calls live in core.js.
+   reading it calls live in model/.
 
    Reading the box as a jq query lives in query.js, which every page has unless
    --simple left it out. This file is in every page either way, so it works
    without it: the full entry passes jqui from query.js to startPage, and the
    simple entry passes null. */
 
-import { parseJSON, parsePath, pathText, renderTree } from './core.js';
+import { parseJSON } from './model/parse.ts';
+import { parsePath, pathText } from './model/path.ts';
+import { renderTree } from './model/render.ts';
 
 export function startPage(jqui) {
   var header = document.querySelector('header');

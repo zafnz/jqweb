@@ -1,6 +1,6 @@
 /* The document as it comes out on screen, and the two ways of folding it up
    again. What renderTree writes is markup rather than DOM calls, so nothing in
-   core.test.js can say whether the browser makes a tree out of it. */
+   model.test.ts can say whether the browser makes a tree out of it. */
 
 import { test, expect, settle } from '../fixtures.js';
 
@@ -13,7 +13,7 @@ test('the document renders as a tree', async ({ page }) => {
     return {
       root: !!root,
       branch: root.classList.contains('branch'),
-      /* Keys in document order, which is the reason core.js parses JSON by
+      /* Keys in document order, which is the reason parse.ts parses JSON by
          hand: JSON.parse hands back an object, and an object has no order. */
       keys: __t.$$(':scope > .kids > .node', root).map((n) => n.dataset.key).join(','),
       /* Numbers exactly as written, for the same reason: JSON.parse turns 1.50

@@ -114,7 +114,7 @@ head before the body is parsed.
 | source asset | included in | what it is |
 |---|---|---|
 | `src/entries/*.js` | one each | what each bundle imports, whether `startPage` gets `jqui`, and the page globals |
-| `src/core.js` | simple and full | parse, render, path text. No DOM, no jq. |
+| `src/model/*.ts` | simple and full | the node types, parse, render, escaping, path text. No DOM, no jq. |
 | `src/page.js` | simple and full | the tree, text filter, path lookup, copy, folding, theme button |
 | `src/theme.js` | theme | runs in `<head>`, picks the palette before the body parses |
 | `page.css` | both | the palette, both themes |
@@ -141,7 +141,8 @@ renders what a query produced, belongs in `query.js`.
 
 ## The value model
 
-`core.js` `parseJSON` produces nodes, not JavaScript values:
+`parseJSON` in `src/model/parse.ts` produces nodes, not JavaScript values. Their
+types are in `src/model/node.ts`:
 
     {t:'o', k:[keys], v:[children]}
     {t:'a', v:[children]}

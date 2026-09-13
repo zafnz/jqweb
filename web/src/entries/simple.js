@@ -2,7 +2,11 @@
    jq engine. Nothing reachable from here may import jq.js, suggest.js or
    query.js, and bundles.test.ts fails when something does. */
 
-import { esc, leafOf, parseJSON, parsePath, pathText, quote, renderTree, stringify } from '../core.js';
+import { esc, quote } from '../model/escape.ts';
+import { leafOf, stringify } from '../model/node.ts';
+import { parseJSON } from '../model/parse.ts';
+import { parsePath, pathText } from '../model/path.ts';
+import { renderTree } from '../model/render.ts';
 import { startPage } from '../page.js';
 
 /* The browser specs find a line of the tree with jqweb.parsePath. The object is

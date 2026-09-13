@@ -100,7 +100,7 @@ The Go side is these files, all `package main`:
 Each apart from the per-platform files has a `_test.go` of its own along the
 same lines.
 
-`web/build.mjs` bundles the entry points in `web/src/entries` into the
+`web/build.ts` bundles the entry points in `web/src/entries` into the
 committed files under `web/dist`, and `page.go` assembles those with the HTML
 and CSS. The document goes in as compact JSON inside `<script id="data">`; the
 tree is built in the browser, not in Go. That is why `renderPage` is cheap on a
@@ -121,27 +121,27 @@ head before the body is parsed.
 | `src/page/*.ts` except `theme.ts` and `alive.ts` | simple and full | the tree, search box, text filter, path lookup, copy, folding, theme button |
 | `src/page/theme.ts` | theme | runs in `<head>`, picks the palette before the body parses |
 | `src/page/alive.ts` | theme | runs in `<head>`, holds `/alive` open on a served page |
-| `page.css` | both | the palette, both themes |
+| `styles/page.css` | both | the palette, both themes |
 | `src/query/engine/*.ts` | full only | the jq engine: lexer, parser, evaluator, builtins. No DOM. |
 | `src/query/suggest.ts` | full only | builds the queries a clicked line could mean, and the key completions of a half-typed one. No DOM. |
 | `src/query/ui.ts` | full only | search box as a query, results view, suggestion list |
-| `query.css` | default only | mode select, suggestion list, error box, results |
+| `styles/query.css` | default only | mode select, suggestion list, error box, results |
 
 The three files under `web/dist` are generated, minified and committed. Never
 edit them by hand; run `npm --prefix web run build` and commit the result. CI
 runs the same build and fails when it leaves a diff. Keeping them in the source
 tree is what lets a module fetched by `go install` build without Node.
 
-`web/browser-test` ships in nothing. It is the Playwright suite: the specs, the
+`web/test/browser` ships in nothing. It is the Playwright suite: the specs, the
 in-page helpers they measure with, the fixtures that open a page and the setup
 that renders one. No rendered page has ever seen any of it.
 
 `src/page` must work with the query modules absent. `entries/full.ts` passes
 `startPage` the `jqui` from `query/ui.ts` and `entries/simple.ts` passes null,
 which falls back to path lookup. Nothing reachable from `entries/simple.ts` may
-import a module under `src/query`; `web/bundles.test.ts` reads esbuild's module
-graph and fails when one does. Anything that reads the box as a query, or
-renders what a query produced, belongs in `query/ui.ts`.
+import a module under `src/query`; `web/test/unit/bundles.test.ts` reads
+esbuild's module graph and fails when one does. Anything that reads the box as
+a query, or renders what a query produced, belongs in `query/ui.ts`.
 
 ## The value model
 
@@ -211,7 +211,7 @@ and the `curl` in `README.md` fetches it from there. Examples that need a
 document use this one.
 
 **`demo.png` is generated and committed.** Regenerate it for every new release,
-after the example page is current, with `node web/browser-test/capture-demo.js`.
+after the example page is current, with `node web/test/browser/capture-demo.js`.
 The script drives `docs/k8s.json` into the screenshot query and draws the browser
 frame; do not replace it with a hand capture.
 
@@ -246,20 +246,25 @@ success for a run that failed and the output is lost.
 
 ## Testing
 
-`go test ./...` and `node --test` are what CI runs. Beyond that:
+`go test ./...` and `npm --prefix web test` are what CI runs. Beyond that:
 
-**The jq engine is checked against real jq.** `web/testdata/jq-corpus.json` holds
-queries with the output jq itself gave for each; `node
-web/testdata/regenerate.js` rewrites the answers and needs `jq` on the path. A
+**The unit tests are named by glob, `test/unit/*.test.ts`.** A bare `node
+--test` runs every `.js` file under a directory called `test`, which takes in
+the browser specs and `capture-demo.js`.
+
+**The jq engine is checked against real jq.**
+`web/test/testdata/jq-corpus.json` holds queries with the output jq itself gave
+for each; `node web/test/testdata/regenerate.js` rewrites the answers and needs
+`jq` on the path. A
 builtin with no case in the corpus fails the test that reads the builtin table's
 names. When jq's behaviour is in question, run `jq` and find out — guessing
 has been wrong about operator stream order, `"ab" * 0`, `max_by` ties and
 `from_entries` key spellings.
 
-**The browser suite is Playwright, in `web/browser-test`, and CI runs it.**
+**The browser suite is Playwright, in `web/test/browser`, and CI runs it.**
 `npm --prefix web run test:browser` is the whole suite, 521 assertions in about
 nine seconds, against the Chrome already installed rather than a downloaded one.
-`web/browser-test/README.md` is how it works and how to write a spec; read it
+`web/test/browser/README.md` is how it works and how to write a spec; read it
 before adding one. `--headed` watches a run and `--debug` steps through it, and
 the trace of a failure is `npx playwright show-trace` over what it left in
 `.out`.

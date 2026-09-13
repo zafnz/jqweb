@@ -1,15 +1,15 @@
 /* The modules each page script is built from. A --simple page leaves the query
    engine out, and the head script runs before the body exists, so what each
    bundle reaches is read from esbuild's own module graph rather than trusted
-   to the import statements. Run with:  node --test */
+   to the import statements. Run with:  npm --prefix web test */
 
 import assert from 'node:assert';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { build } from 'esbuild';
-import { options, root } from './bundles.ts';
-import type { Bundle } from './bundles.ts';
+import { options, root } from '../../bundles.ts';
+import type { Bundle } from '../../bundles.ts';
 
 /* The query half of the page, which only the full script may reach: every
    module under src/query, read from the directory so that a new one is

@@ -212,11 +212,11 @@ func TestCompiledScriptsCannotCloseTheirElements(t *testing.T) {
 }
 
 func TestInlineTrimsOnlyTheTrailingNewline(t *testing.T) {
-	css := asset("web/page.css")
+	css := asset("web/styles/page.css")
 	if !strings.HasSuffix(css, "\n") {
-		t.Fatal("web/page.css does not end with a newline")
+		t.Fatal("web/styles/page.css does not end with a newline")
 	}
-	if got, want := inline("web/page.css"), strings.TrimSuffix(css, "\n"); got != want {
+	if got, want := inline("web/styles/page.css"), strings.TrimSuffix(css, "\n"); got != want {
 		t.Error("inline() did not trim exactly one trailing newline")
 	}
 }

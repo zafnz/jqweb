@@ -1,7 +1,7 @@
 /* Builds a deterministic README screenshot from the committed example.
 
-     node web/browser-test/capture-demo.js
-     node web/browser-test/capture-demo.js /tmp/demo.png
+     node web/test/browser/capture-demo.js
+     node web/test/browser/capture-demo.js /tmp/demo.png
 
    The browser chrome is part of the page being captured. Headless browsers do
    not include their own window chrome, and drawing this small frame keeps its
@@ -14,7 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const repo = path.resolve(import.meta.dirname, '..', '..');
+const repo = path.resolve(import.meta.dirname, '..', '..', '..');
 const output = path.resolve(process.argv[2] || path.join(repo, 'demo.png'));
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'jqweb-demo-'));
 

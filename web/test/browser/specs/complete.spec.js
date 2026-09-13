@@ -1,7 +1,7 @@
 /* Completing a key name as it is typed. jq reads a missing key as null, so
    ".items[].ki" run as written is ten nulls until the "nd" of "kind" arrives;
    the page holds the run back while the name is a prefix of real keys and
-   offers those instead. suggest.test.js checks what gets offered; what only a
+   offers those instead. suggest.test.ts checks what gets offered; what only a
    browser can say is that the view survives the typing and that the run really
    is held back. */
 

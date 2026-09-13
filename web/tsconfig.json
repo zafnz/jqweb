@@ -1,8 +1,6 @@
 {
   "compilerOptions": {
     "allowImportingTsExtensions": true,
-    "allowJs": true,
-    "checkJs": false,
     "erasableSyntaxOnly": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
@@ -15,7 +13,7 @@
     "verbatimModuleSyntax": true
   },
   "include": [
-    "build.mjs",
+    "test/unit/*.ts",
     "*.ts",
     "src/**/*.ts"
   ]

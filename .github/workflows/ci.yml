@@ -120,6 +120,6 @@ jobs:
         with:
           name: browser-failures
           path: |
-            web/browser-test/.out/results
-            web/browser-test/.out/report
-            web/browser-test/.out/pages/*.html
+            web/test/browser/.out/results
+            web/test/browser/.out/report
+            web/test/browser/.out/pages/*.html

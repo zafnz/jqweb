@@ -1,6 +1,6 @@
 /* Tests for query/suggest.ts: the queries offered when you click the filter
    button on a line, and the completions of a key name still being typed.
-   Run with:  node --test
+   Run with:  npm --prefix web test
 
    The property that matters most is near the bottom: every query offered for
    every line of a document has to compile and run against that document. A
@@ -10,12 +10,12 @@
 
 import test from 'node:test';
 import assert from 'node:assert';
-import type { Node } from './src/model/node.ts';
-import { parseJSON } from './src/model/parse.ts';
-import type { Segment } from './src/model/path.ts';
-import { compile, isJqError } from './src/query/engine/index.ts';
-import { suggest, splitPartial, completions } from './src/query/suggest.ts';
-import type { Candidate } from './src/query/suggest.ts';
+import type { Node } from '../../src/model/node.ts';
+import { parseJSON } from '../../src/model/parse.ts';
+import type { Segment } from '../../src/model/path.ts';
+import { compile, isJqError } from '../../src/query/engine/index.ts';
+import { suggest, splitPartial, completions } from '../../src/query/suggest.ts';
+import type { Candidate } from '../../src/query/suggest.ts';
 
 /* A document with the shapes that have caught the generator out: an object
    used as a map, records reached through a second map level, an array of

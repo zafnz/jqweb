@@ -1,7 +1,7 @@
 /* Fills in the expected output of every case in jq-corpus.json by running the
    queries through jq itself:
 
-       node web/testdata/regenerate.js
+       node web/test/testdata/regenerate.js
 
    Run it after adding a case, or after a jq upgrade whose behaviour the tests
    should follow. CI has no jq, which is why the answers are committed rather

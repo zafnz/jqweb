@@ -109,7 +109,7 @@ any of that. See `suggest.spec.js` and zafnz/jqweb#61.
 The trace is the whole run: every action, the DOM at each one, the console and
 the network.
 
-    npx playwright show-trace web/browser-test/.out/results/<test>/trace.zip
+    npx playwright show-trace web/test/browser/.out/results/<test>/trace.zip
 
 The rendered pages stay in `.out/pages`, so the page a spec was driving can be
 opened in a browser directly. CI uploads both when the job fails.

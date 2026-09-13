@@ -1,14 +1,14 @@
 /* Tests for the value model in src/model: the parser, the HTML renderer,
-   escaping and the path reader. Run with:  node --test
+   escaping and the path reader. Run with:  npm --prefix web test
    The DOM wiring in src/page is not exercised here. */
 
 import test from 'node:test';
 import assert from 'node:assert';
-import { esc, quote } from './src/model/escape.ts';
-import type { ArrayNode, LeafNode, Node, ObjectNode } from './src/model/node.ts';
-import { parseJSON } from './src/model/parse.ts';
-import { parsePath } from './src/model/path.ts';
-import { renderTree } from './src/model/render.ts';
+import { esc, quote } from '../../src/model/escape.ts';
+import type { ArrayNode, LeafNode, Node, ObjectNode } from '../../src/model/node.ts';
+import { parseJSON } from '../../src/model/parse.ts';
+import { parsePath } from '../../src/model/path.ts';
+import { renderTree } from '../../src/model/render.ts';
 
 /* The node as the kind a test expects, failing the test when it is another
    kind. */

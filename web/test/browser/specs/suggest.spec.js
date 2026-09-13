@@ -1,4 +1,4 @@
-/* The list of readings the filter button on a line opens. suggest.test.js
+/* The list of readings the filter button on a line opens. suggest.test.ts
    already checks that every query it builds compiles and runs; what only a
    browser can say is whether the list is right about what they return, and
    whether picking one leaves you able to try the next. */

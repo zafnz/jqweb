@@ -64,7 +64,7 @@ func boxText(q string) string {
 	return strings.NewReplacer("\r\n", " ", "\r", " ", "\n", " ").Replace(q)
 }
 
-//go:embed web/page.html web/page.css web/query.css web/dist/theme.js web/dist/simple.js web/dist/full.js
+//go:embed web/page.html web/styles/page.css web/styles/query.css web/dist/theme.js web/dist/simple.js web/dist/full.js
 var assets embed.FS
 
 // pageTemplate returns the page shell with its stylesheet and script inlined,
@@ -93,9 +93,9 @@ func buildTemplate(jq bool) string {
 // query engine has, so it goes in only alongside it.
 func style(jq bool) string {
 	if !jq {
-		return inline("web/page.css")
+		return inline("web/styles/page.css")
 	}
-	return inline("web/page.css") + "\n" + inline("web/query.css")
+	return inline("web/styles/page.css") + "\n" + inline("web/styles/query.css")
 }
 
 // script returns the compiled page JavaScript. The two bundles are built and

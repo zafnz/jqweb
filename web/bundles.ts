@@ -1,4 +1,4 @@
-/* The three scripts web/dist holds, and the esbuild options for each. build.mjs
+/* The three scripts web/dist holds, and the esbuild options for each. build.ts
    writes them, and bundles.test.ts checks which modules each one reaches. */
 
 import type { BuildOptions } from 'esbuild';

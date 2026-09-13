@@ -9,6 +9,11 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+### Dev container feature
+
+`ghcr.io/zafnz/devcontainer-features/jqweb:1` installs jqweb in a dev
+container; the README shows the `devcontainer.json` line.
+
 ### apt and dnf packages
 
 jqweb installs from an apt or dnf repository on Debian, Ubuntu, Fedora and

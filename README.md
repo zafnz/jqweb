@@ -42,6 +42,12 @@ On Linux or macOS without Homebrew, this puts the latest release in
 
     curl -fsSL https://raw.githubusercontent.com/zafnz/jqweb/main/install.sh | sh
 
+In a [dev container](https://containers.dev/), add the feature to
+`devcontainer.json` and it installs the latest release when the container is
+built:
+
+    "features": { "ghcr.io/zafnz/devcontainer-features/jqweb:1": {} }
+
 Or download a binary for macOS, Linux or Windows from
 [Releases](https://github.com/zafnz/jqweb/releases) and put it on your `$PATH`.
 The macOS builds are signed and notarized. The .deb and .rpm packages are there

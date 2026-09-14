@@ -291,6 +291,33 @@ func TestIsFile(t *testing.T) {
 	}
 }
 
+func TestIsTTYRejectsNonTerminals(t *testing.T) {
+	null, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer null.Close()
+
+	pipe, pipeWriter, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pipe.Close()
+	defer pipeWriter.Close()
+
+	file, err := os.CreateTemp(t.TempDir(), "ordinary-file")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+
+	for _, f := range []*os.File{null, pipe, file} {
+		if isTTY(f) {
+			t.Errorf("isTTY(%s) = true, want false", f.Name())
+		}
+	}
+}
+
 // README.md carries the usage text as jqweb prints it, so a flag added to one
 // and not the other fails here rather than going unnoticed.
 func TestReadmeCarriesUsage(t *testing.T) {

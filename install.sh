@@ -19,6 +19,15 @@ die() {
 
 command -v curl >/dev/null 2>&1 || die "curl is required"
 
+# shasum is for macOS releases without sha256sum.
+if command -v sha256sum >/dev/null 2>&1; then
+	sha256="sha256sum"
+elif command -v shasum >/dev/null 2>&1; then
+	sha256="shasum -a 256"
+else
+	die "sha256sum or shasum is required to verify the download"
+fi
+
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
 case "$os" in
 linux | darwin) ;;
@@ -42,12 +51,27 @@ if [ -z "$version" ]; then
 fi
 
 number=${version#v}
-url="https://github.com/$repo/releases/download/$version/jqweb_${number}_${os}_${arch}.tar.gz"
+base="https://github.com/$repo/releases/download/$version"
+archive="jqweb_${number}_${os}_${arch}.tar.gz"
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
-curl -fsSL -o "$tmp/jqweb.tar.gz" "$url" || die "could not download $url"
+curl -fsSL -o "$tmp/jqweb.tar.gz" "$base/$archive" || die "could not download $base/$archive"
+curl -fsSL -o "$tmp/checksums.txt" "$base/checksums.txt" || die "could not download $base/checksums.txt"
+
+expected=
+while read -r sum name; do
+	if [ "$name" = "$archive" ]; then
+		expected=$sum
+	fi
+done <"$tmp/checksums.txt"
+[ -n "$expected" ] || die "$archive is not listed in checksums.txt"
+
+actual=$($sha256 "$tmp/jqweb.tar.gz")
+actual=${actual%% *}
+[ "$actual" = "$expected" ] || die "checksum mismatch for $archive: expected $expected, got $actual"
+
 tar xzf "$tmp/jqweb.tar.gz" -C "$tmp" jqweb || die "unexpected archive contents"
 
 mkdir -p "$bindir"

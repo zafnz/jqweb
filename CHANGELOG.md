@@ -16,6 +16,10 @@ run in the search box, and the address shows the current one as `?q=`. A `?q=`
 is read the way typing it would be, so `?q=keys` searches for the word where it
 used to run `keys` as a jq query.
 
+**Changed:** `install.sh` checks the downloaded archive against the release's
+`checksums.txt` and stops without installing if the checksum does not match or
+cannot be checked.
+
 **Fixed:** JSON nested beyond 128 arrays or objects is rejected with a clear
 error instead of producing a broken page. Queries that create deeper values
 also report an error.

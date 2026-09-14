@@ -65,6 +65,38 @@ func TestBackgroundReportsABadDocument(t *testing.T) {
 	}
 }
 
+func TestDeepDocumentRejectedBeforeOutput(t *testing.T) {
+	for _, mode := range []string{"stdout", "file", "serve", "background"} {
+		t.Run(mode, func(t *testing.T) {
+			file := filepath.Join(t.TempDir(), "page.html")
+			if err := os.WriteFile(file, []byte("existing page"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			args := map[string][]string{
+				"stdout":     {"-o", "-"},
+				"file":       {"-o", file},
+				"serve":      {"-p", "0"},
+				"background": {"-C", "-p", "0"},
+			}[mode]
+			cmd := jqweb(t, args...)
+			cmd.Stdin = strings.NewReader(strings.Repeat("[", 10001) + "0" + strings.Repeat("]", 10001))
+			var stdout, stderr bytes.Buffer
+			cmd.Stdout, cmd.Stderr = &stdout, &stderr
+			err := cmd.Run()
+			var exit *exec.ExitError
+			if !errors.As(err, &exit) || exit.ExitCode() != 1 {
+				t.Fatalf("exit = %v, want status 1; stderr: %s", err, stderr.String())
+			}
+			if stdout.Len() != 0 || !strings.Contains(stderr.String(), "JSON nesting exceeds the supported limit of 128") || strings.Contains(stderr.String(), "serving on") || strings.Contains(stderr.String(), serve.ReadyLine) {
+				t.Fatalf("stdout = %q, stderr = %q", stdout.String(), stderr.String())
+			}
+			if got, err := os.ReadFile(file); err != nil || string(got) != "existing page" {
+				t.Fatalf("output changed: %q, %v", got, err)
+			}
+		})
+	}
+}
+
 func TestBackgroundOutlivesTheParentUntilTheTabCloses(t *testing.T) {
 	const delay = 300 * time.Millisecond
 	doc := filepath.Join(t.TempDir(), "doc.json")

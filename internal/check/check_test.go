@@ -1,9 +1,51 @@
 package check
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
+
+func TestNestingLimit(t *testing.T) {
+	for _, shape := range []string{"array", "object", "mixed"} {
+		for _, depth := range []int{127, 128, 129, 4000, 9000, 10001} {
+			t.Run(fmt.Sprintf("%s/%d", shape, depth), func(t *testing.T) {
+				var opens, closes strings.Builder
+				for i := 0; i < depth; i++ {
+					if shape == "object" || (shape == "mixed" && i%2 != 0) {
+						opens.WriteString(`{"a":`)
+						closes.WriteByte('}')
+					} else {
+						opens.WriteByte('[')
+						closes.WriteByte(']')
+					}
+				}
+				end := []byte(closes.String())
+				for i, j := 0, len(end)-1; i < j; i, j = i+1, j-1 {
+					end[i], end[j] = end[j], end[i]
+				}
+				err := Document([]byte(opens.String() + `"[{\""` + string(end)))
+				if depth <= 128 {
+					if err != nil {
+						t.Fatal(err)
+					}
+				} else if err == nil || !strings.Contains(err.Error(), "JSON nesting exceeds the supported limit of 128") {
+					t.Fatalf("got %v, want nesting limit error", err)
+				}
+			})
+		}
+	}
+}
+
+func TestNestingCountsEmptyContainersAndResetsForSiblings(t *testing.T) {
+	child := strings.Repeat("[", 127) + strings.Repeat("]", 127)
+	if err := Document([]byte("[" + child + "," + child + "]")); err != nil {
+		t.Fatal(err)
+	}
+	if err := Document([]byte("[[" + child + "]]")); err == nil {
+		t.Fatal("accepted an empty container at depth 129")
+	}
+}
 
 func TestCheckAccepts(t *testing.T) {
 	valid := []string{

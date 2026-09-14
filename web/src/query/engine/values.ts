@@ -4,6 +4,7 @@
 
 import { leafOf } from '../../model/node.ts';
 import type { ArrayNode, LeafNode, Node, ObjectNode } from '../../model/node.ts';
+import { checkNesting, NestingError } from '../../model/nesting.ts';
 import { runErr } from './errors.ts';
 
 export const NULL = leafOf(null);
@@ -25,8 +26,17 @@ interface Typed {
   object: ObjectNode;
 }
 
-export function arrayOf(list: Node[]): ArrayNode { return { t: 'a', v: list }; }
-export function objectOf(keys: string[], vals: Node[]): ObjectNode { return { t: 'o', k: keys, v: vals }; }
+export function arrayOf(list: Node[]): ArrayNode { return bounded({ t: 'a', v: list }); }
+export function objectOf(keys: string[], vals: Node[]): ObjectNode { return bounded({ t: 'o', k: keys, v: vals }); }
+
+function bounded<T extends Node>(node: T): T {
+  try {
+    return checkNesting(node);
+  } catch (e) {
+    if (e instanceof NestingError) throw runErr(e.message);
+    throw e;
+  }
+}
 
 /* jq's name for a value's type, which is also what the type builtin
    returns and what the error messages are written in terms of. */

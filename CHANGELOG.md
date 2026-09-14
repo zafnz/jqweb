@@ -26,6 +26,9 @@ or Unicode characters, including paths on Windows.
 **Fixed:** redirected character devices such as `/dev/null` are no longer
 mistaken for terminals.
 
+**Fixed:** `-C`, `--close-delay` and `--host` with `-o` but no `-p`, and `-O`
+with `-o -`, are usage errors. Each flag used to be ignored.
+
 ## [0.9.0] - 2026-09-13
 
 ### Dev container feature

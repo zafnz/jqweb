@@ -167,3 +167,24 @@ func TestBackgroundOutlivesTheParentUntilTheTabCloses(t *testing.T) {
 		t.Errorf("exited %s after /alive closed, before the %s delay", waited, delay)
 	}
 }
+
+// A conflicting command line is a usage error before anything is read or
+// written.
+func TestFlagConflictIsAUsageError(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "page.html")
+	cmd := jqweb(t, "-C", "-o", file)
+	cmd.Stdin = strings.NewReader("{}")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) || exit.ExitCode() != 2 {
+		t.Fatalf("exit = %v, want status 2; stderr: %s", err, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "-o without -p serves nothing") || !strings.Contains(stderr.String(), "usage:") {
+		t.Errorf("stderr = %q, want the conflict and the usage text", stderr.String())
+	}
+	if _, err := os.Stat(file); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("stat %s = %v, want no file written", file, err)
+	}
+}

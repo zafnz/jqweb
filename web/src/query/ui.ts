@@ -110,15 +110,14 @@ export function jqui(page: QueryHost): QueryUI {
       return;
     }
     if (query.path) { page.showFound(page.resolve(query.path), query.path.length); return; }
-    let out: ValueNode[];
     try {
-      out = query.run(page.value);
+      const out = query.run(page.value);
+      showResults(out);
     } catch (e) {
       if (!(e instanceof Error)) throw e;
       fault(e.message);
       return;
     }
-    showResults(out);
   }
 
   /* Reports a query that would not compile or would not run. The message goes

@@ -1,6 +1,7 @@
 /* The markup for the tree, and for the value on each leaf. */
 
 import type { Node } from './node.ts';
+import { checkDepth } from './nesting.ts';
 import { esc, quote } from './escape.ts';
 
 /* Wraps a rendered value in the span the stylesheet colors by class. */
@@ -24,7 +25,7 @@ const FQ = '<button class="fq" title="Filter on this value">&#x2261;</button>';
    this file free of the DOM. */
 export function renderTree(root: Node, withFilter?: boolean): string {
   const out: string[] = [];
-  emit(out, root, null, -1, false, withFilter ? CP + FQ : CP);
+  emit(out, root, null, -1, false, withFilter ? CP + FQ : CP, 0);
   return out.join('');
 }
 
@@ -40,7 +41,7 @@ export function renderTree(root: Node, withFilter?: boolean): string {
    branch adds <div class="kids"> for its children and a <div class="closer">
    for the bracket that follows them. The key or index is repeated in a data
    attribute, which is what page/tree.ts reads back to reconstruct a path. */
-function emit(out: string[], node: Node, key: string | null, idx: number, comma: boolean, buttons: string): void {
+function emit(out: string[], node: Node, key: string | null, idx: number, comma: boolean, buttons: string, depth: number): void {
   const attrs = key !== null ? ' data-key="' + esc(key) + '"'
     : idx >= 0 ? ' data-index="' + idx + '"' : '';
   /* A member's buttons sit right after its key; an array element or the
@@ -61,6 +62,7 @@ function emit(out: string[], node: Node, key: string | null, idx: number, comma:
     return;
   }
   const obj = node.t === 'o';
+  checkDepth(depth + 1);
   const open = obj ? '{' : '[';
   const close = obj ? '}' : ']';
   const n = node.v.length;
@@ -83,7 +85,7 @@ function emit(out: string[], node: Node, key: string | null, idx: number, comma:
   /* Children carry their own key or index, and every child but the last is
      followed by a comma. */
   for (let j = 0; j < n; j++) {
-    emit(out, node.v[j], obj ? node.k[j] : null, obj ? -1 : j, j < n - 1, buttons);
+    emit(out, node.v[j], obj ? node.k[j] : null, obj ? -1 : j, j < n - 1, buttons, depth + 1);
   }
   out.push('</div><div class="closer"><span class="p">' + close + '</span>' + c + '</div></div>');
 }

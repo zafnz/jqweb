@@ -5,7 +5,7 @@
 [![GitHub Issues](https://img.shields.io/github/issues/zafnz/jqweb)](https://github.com/zafnz/jqweb/issues)
 [![GitHub License](https://img.shields.io/github/license/zafnz/jqweb)](https://github.com/zafnz/jqweb/blob/main/LICENSE)
 
-**jqweb** turns any JSON into an interactive webpage with one pipe. Run
+**jqweb** turns JSON into an interactive webpage with one pipe. Run
 `cat data.json | jqweb -O` and it opens locally in your browser as a navigable
 tree with instant text search and jq-style queries—no upload and no server to
 configure.
@@ -116,6 +116,10 @@ reads the file, since "." is no query.
 
 With no -p and no -o, it listens on a random available port.
 ```
+
+JSON may contain up to 128 nested arrays or objects, counting the root
+container as level one. Deeper input is rejected before a page is produced;
+queries that create deeper values report an error in the page.
 
 ## Search
 

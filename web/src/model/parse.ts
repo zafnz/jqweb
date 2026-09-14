@@ -1,6 +1,7 @@
 /* Reading the embedded document into nodes. */
 
 import type { Node } from './node.ts';
+import { checkDepth } from './nesting.ts';
 import { esc, quote } from './escape.ts';
 import { span } from './render.ts';
 
@@ -12,9 +13,8 @@ import { span } from './render.ts';
    This is a recursive-descent scanner over src. The read position i lives
    here, and the three helpers below close over it: each one advances i as a
    side effect rather than taking and returning a position, which is what
-   keeps their call sites short enough to read. Nothing validates the input,
-   because the Go side has already rejected anything that is not a single
-   well-formed JSON document. */
+   keeps their call sites short enough to read. Only nesting is checked here,
+   because Go or the fromjson builtin has already checked the JSON syntax. */
 export function parseJSON(src: string): Node {
   let i = 0;
 
@@ -35,9 +35,10 @@ export function parseJSON(src: string): Node {
 
   /* Reads one value at src[i] and returns its node, recursing for members
      and elements. */
-  function value(): Node {
+  function value(depth: number): Node {
     ws();
     const c = src.charAt(i);
+    if (c === '{' || c === '[') checkDepth(depth + 1);
     if (c === '{') {
       const keys: string[] = [];
       const vals: Node[] = [];
@@ -52,7 +53,7 @@ export function parseJSON(src: string): Node {
           ws();
           keys.push(str());
           ws(); i++;                 /* ':' */
-          vals.push(value());
+          vals.push(value(depth + 1));
           ws();
           if (src.charAt(i++) === '}') break;
         }
@@ -69,7 +70,7 @@ export function parseJSON(src: string): Node {
            test, and tells us whether another element follows. value()
            leaves i on it, so only trailing whitespace needs skipping. */
         for (;;) {
-          vals.push(value());
+          vals.push(value(depth + 1));
           ws();
           if (src.charAt(i++) === ']') break;
         }
@@ -92,5 +93,5 @@ export function parseJSON(src: string): Node {
     return { t: 'l', r: +lit, n: lit, h: span('num', lit) };
   }
 
-  return value();
+  return value(0);
 }

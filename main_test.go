@@ -350,3 +350,43 @@ func TestReadmeCarriesUsage(t *testing.T) {
 		t.Error("README.md does not carry the usage text in main.go; copy usageText into its Usage section")
 	}
 }
+
+// A flag the rest of the command line leaves with nothing to do is an error,
+// and the same flag alongside -p, which serves the page, is not.
+func TestFlagConflict(t *testing.T) {
+	tests := []struct {
+		args []string
+		want string // substring of the error, or "" for none
+	}{
+		{[]string{"-C", "-o", "f.html"}, "-C and --close-delay"},
+		{[]string{"--close", "-o", "f.html"}, "-C and --close-delay"},
+		{[]string{"--close-delay", "5s", "-o", "f.html"}, "-C and --close-delay"},
+		{[]string{"-OC", "-o", "f.html"}, "-C and --close-delay"},
+		{[]string{"--host", "0.0.0.0", "-o", "f.html"}, "--host"},
+		{[]string{"--host=127.0.0.1", "-o", "-"}, "--host"},
+		{[]string{"-O", "-o", "-"}, "-O has nothing to open"},
+		{[]string{"-o", "-", "--open"}, "-O has nothing to open"},
+		{[]string{"-C", "-o", "f.html", "-p", "0"}, ""},
+		{[]string{"--host", "0.0.0.0", "-o", "f.html", "-p", "8080"}, ""},
+		{[]string{"-O", "-o", "-", "-p", "0"}, ""},
+		{[]string{"-O", "-o", "f.html"}, ""},
+		{[]string{"-o", "-"}, ""},
+		{[]string{"-C"}, ""},
+		{[]string{"--host", "0.0.0.0"}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
+			opt, err := parse(t, tt.args...)
+			if err != nil {
+				t.Fatalf("parseFlags: %v", err)
+			}
+			err = flagConflict(opt)
+			switch {
+			case tt.want == "" && err != nil:
+				t.Errorf("flagConflict = %v, want nil", err)
+			case tt.want != "" && (err == nil || !strings.Contains(err.Error(), tt.want)):
+				t.Errorf("flagConflict = %v, want an error containing %q", err, tt.want)
+			}
+		})
+	}
+}

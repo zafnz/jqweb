@@ -465,6 +465,31 @@ func TestNoticeSurvivesAnUnreachableGitHub(t *testing.T) {
 	}
 }
 
+// An exit waits ExitWait for the check and a request can run for updateTimeout,
+// so a run can end with its request still out. The attempt is on disk before
+// the request is made, or such a run leaves nothing behind and the next run
+// asks again.
+func TestNoticeRecordsTheAttemptBeforeAsking(t *testing.T) {
+	u, _ := newTestUpdater(t, "0.7.0", "")
+	stateFile := u.stateFile
+	seen := make(chan updateState, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var state updateState
+		if b, err := os.ReadFile(stateFile); err == nil {
+			json.Unmarshal(b, &state)
+		}
+		seen <- state
+		http.Redirect(w, r, "/releases/tag/v0.9.0", http.StatusFound)
+	}))
+	defer srv.Close()
+	u.url = srv.URL + "/releases/latest"
+
+	u.notice()
+	if state := <-seen; !state.CheckedAt.Equal(u.now()) {
+		t.Errorf("state file held %+v while github.com was asked, want the attempt recorded at %s", state, u.now())
+	}
+}
+
 // A check that fails spends the day like any other. Asking again on every run
 // would mean a request per run for as long as github.com is unreachable, and
 // the notice is not worth that; a run of failures costs a day each instead.

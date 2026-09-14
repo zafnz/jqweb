@@ -26,6 +26,10 @@ or Unicode characters, including paths on Windows.
 **Fixed:** redirected character devices such as `/dev/null` are no longer
 mistaken for terminals.
 
+**Fixed:** an update check that has not finished when jqweb exits still counts
+as the day's check, so repeated `-o` runs on a slow network no longer ask GitHub
+every time.
+
 **Fixed:** input that is not valid UTF-8 is rejected with the line and column
 of the first bad byte, instead of rendering with replacement characters.
 

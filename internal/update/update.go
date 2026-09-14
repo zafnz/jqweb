@@ -142,21 +142,24 @@ func (u *updater) notice() string {
 	if u.now().Sub(state.CheckedAt) < updateInterval {
 		return ""
 	}
+	// The day is spent whether or not the answer comes, so the attempt is
+	// recorded before the request is made. An exit waits ExitWait for the
+	// answer, which is less than updateTimeout, and a record written after the
+	// request would be lost with every run that exits first, leaving the next
+	// run to ask again. Recording a failure the same way means no request on
+	// every run for as long as github.com is unreachable; the cost is that a
+	// run of failures delays the notice by a day each.
+	state.CheckedAt = u.now()
+	u.writeState(state)
+
 	latest, err := u.latestVersion()
 	if err != nil {
-		// The day is spent whether or not the answer came. Leaving CheckedAt
-		// alone would mean a request on every run for as long as github.com is
-		// unreachable, which is more than a version notice is worth; the cost
-		// is that a run of failures delays the notice by a day each.
-		state.CheckedAt = u.now()
-		u.writeState(state)
 		return ""
 	}
 	if latest != state.Latest {
 		state.Latest, state.FirstSeen = latest, u.now()
+		u.writeState(state)
 	}
-	state.CheckedAt = u.now()
-	u.writeState(state)
 
 	if !newerVersion(u.version, latest) {
 		return ""

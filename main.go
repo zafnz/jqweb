@@ -19,6 +19,7 @@ import (
 	"github.com/zafnz/jqweb/internal/page"
 	"github.com/zafnz/jqweb/internal/serve"
 	"github.com/zafnz/jqweb/internal/update"
+	"golang.org/x/term"
 )
 
 func fileURL(path string) string {
@@ -335,8 +336,7 @@ func flagName(a string) string {
 // isTTY reports whether f is a terminal, which decides whether stdin can be
 // read for the document and whether anyone is watching stderr for a notice.
 func isTTY(f *os.File) bool {
-	fi, err := f.Stat()
-	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+	return term.IsTerminal(int(f.Fd()))
 }
 
 // inputArgs splits the positional arguments into a query and the name of the

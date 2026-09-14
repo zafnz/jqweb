@@ -12,7 +12,10 @@ export const FORMATS: Record<string, (x: Node) => string> = {
   '@text': function (x) { return is(x, 'string') ? x.r : stringify(x); },
   '@json': function (x) { return stringify(x); },
   '@uri': function (x) {
-    return asText(x).replace(/[^A-Za-z0-9\-_.~]/g, function (c) {
+    /* With u, the pattern matches a whole code point, so a character
+       outside the BMP is encoded as its four UTF-8 bytes rather than as two
+       surrogates. */
+    return asText(x).replace(/[^A-Za-z0-9\-_.~]/gu, function (c) {
       return utf8(c).map(function (b) {
         return '%' + (b < 16 ? '0' : '') + b.toString(16).toUpperCase();
       }).join('');

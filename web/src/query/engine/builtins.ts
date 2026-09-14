@@ -17,8 +17,8 @@ import { captureOne, matchOne, scanOne, splitOn, substitute, testOne,
   withRe } from './regex.ts';
 import { broken, parseDate, seconds, strftime } from './time.ts';
 import { FALSE, NULL, TRUE, add2, arrayOf, chars, cmp, descend, distinct, elem,
-  equal, field, is, iterate, lookup, members, num, objectOf, truthy, typeOf,
-  wantType } from './values.ts';
+  equal, field, is, iterate, lookup, members, num, objectOf, splitStr, truthy,
+  typeOf, wantType } from './values.ts';
 import type { JqType } from './values.ts';
 
 /* Emits f of every output of an argument expression, because jq treats a
@@ -116,19 +116,21 @@ function argOrOne(a: Ast | null, x: Node, dflt: number, f: (n: Node) => void): v
 /* jq's containment: a string contains a substring, an array contains
    another when every element of the second is contained in some element of
    the first, and an object when every member of the second is contained in
-   the member of the first with that key. */
-function containsIn(a: Node, b: Node): boolean {
+   the member of the first with that key. Two values of different kinds --
+   jq counts true and false as different kinds here -- are an error at the
+   top and a non-match anywhere inside, so [1] | contains(["1"]) is false. */
+function containsIn(a: Node, b: Node, top: boolean): boolean {
   if (a.t === 'o' && b.t === 'o') {
     const mb = members(b);
     for (let i = 0; i < mb.k.length; i++) {
-      if (!containsIn(field(a, mb.k[i]), mb.v[i])) return false;
+      if (!containsIn(field(a, mb.k[i]), mb.v[i], false)) return false;
     }
     return true;
   }
   if (a.t === 'a' && b.t === 'a') {
     for (let i = 0; i < b.v.length; i++) {
       let ok = false;
-      for (let j = 0; j < a.v.length && !ok; j++) ok = containsIn(a.v[j], b.v[i]);
+      for (let j = 0; j < a.v.length && !ok; j++) ok = containsIn(a.v[j], b.v[i], false);
       if (!ok) return false;
     }
     return true;
@@ -136,7 +138,10 @@ function containsIn(a: Node, b: Node): boolean {
   if (is(a, 'string') && is(b, 'string')) return a.r.indexOf(b.r) >= 0;
   const ta = typeOf(a);
   const tb = typeOf(b);
-  if (ta !== tb) throw runErr(ta + ' and ' + tb + ' cannot be checked for containment');
+  if (ta !== tb || (ta === 'boolean' && a.t === 'l' && b.t === 'l' && a.r !== b.r)) {
+    if (top) throw runErr(ta + ' and ' + tb + ' cannot be checked for containment');
+    return false;
+  }
   return equal(a, b);
 }
 
@@ -185,26 +190,27 @@ function endIndex(found: Node, last: boolean): Node {
   return last ? found.v[found.v.length - 1] : found.v[0];
 }
 
-/* The names from_entries accepts for the key and the value of an entry. A
-   key falls through to the next spelling when it is null or false; a value
-   does not, so an entry may hold a null on purpose. */
-const ENTRY_KEYS = ['name', 'Name', 'key', 'Key'];
-const ENTRY_VALUES = ['value', 'Value'];
+/* The names from_entries accepts for the key and the value of an entry,
+   from jq's own definition:
 
-function entryKey(e: ObjectNode): Node {
-  for (let i = 0; i < ENTRY_KEYS.length; i++) {
-    const at = e.k.lastIndexOf(ENTRY_KEYS[i]);
-    if (at >= 0 && truthy(e.v[at])) return e.v[at];
-  }
-  return NULL;
+       map({(.key // .Key // .name // .Name): (if has("value") then .value else .Value end)}) | add | .//={}
+
+   A key falls through to the next spelling when it is null or false, and
+   has to end up a string; a value does not fall through, so an entry may
+   hold a null on purpose. An entry that is not an object fails the way
+   .key on it would. */
+const ENTRY_KEYS = ['key', 'Key', 'name', 'Name'];
+
+function entryKey(e: Node): string {
+  let k: Node = NULL;
+  for (let i = 0; i < ENTRY_KEYS.length && !truthy(k); i++) k = field(e, ENTRY_KEYS[i]);
+  if (!is(k, 'string')) throw runErr('an object key must be a string, not ' + typeOf(k));
+  return k.r;
 }
 
-function entryValue(e: ObjectNode): Node {
-  for (let i = 0; i < ENTRY_VALUES.length; i++) {
-    const at = e.k.lastIndexOf(ENTRY_VALUES[i]);
-    if (at >= 0) return e.v[at];
-  }
-  return NULL;
+function entryValue(e: Node): Node {
+  if (e.t === 'o' && e.k.indexOf('value') >= 0) return field(e, 'value');
+  return field(e, 'Value');
 }
 
 function toEntries(x: Node): ArrayNode {
@@ -221,10 +227,8 @@ function fromEntries(x: Node): ObjectNode {
   const keys: string[] = [];
   const vals: Node[] = [];
   for (let i = 0; i < list.length; i++) {
-    const e = list[i];
-    const k = e.t === 'o' ? entryKey(e) : e;
-    vals.push(e.t === 'o' ? entryValue(e) : NULL);
-    keys.push(is(k, 'string') ? k.r : stringify(k));
+    keys.push(entryKey(list[i]));
+    vals.push(entryValue(list[i]));
   }
   return distinct(objectOf(keys, vals));
 }
@@ -424,6 +428,10 @@ function recurseWith(x: Node, f: Ast, cond: Ast | null, emit: Emit): void {
   }
 }
 
+const DECIMAL = /^\s*[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?\s*$/;
+const NOT_FINITE = /^\s*[+-]?inf(?:inity)?\s*$/i;
+const NOT_A_NUMBER = /^\s*[+-]?nan\s*$/i;
+
 /* A builtin that maps one number to another; name is for its error message. */
 function mathOf(f: (n: number) => number, name: string): Builtin {
   return function (x, _a, emit) { emit(leafOf(f(num(x, name)))); };
@@ -510,10 +518,10 @@ export const builtins: Record<string, Builtin> = {
     overArg(a[0], x, emit, function (w) { return endIndex(indicesOf(x, w), true); });
   },
   'contains/1': function (x, a, emit) {
-    overArg(a[0], x, emit, function (b) { return containsIn(x, b) ? TRUE : FALSE; });
+    overArg(a[0], x, emit, function (b) { return containsIn(x, b, true) ? TRUE : FALSE; });
   },
   'inside/1': function (x, a, emit) {
-    overArg(a[0], x, emit, function (b) { return containsIn(b, x) ? TRUE : FALSE; });
+    overArg(a[0], x, emit, function (b) { return containsIn(b, x, true) ? TRUE : FALSE; });
   },
 
   'to_entries/0': function (x, _a, emit) { emit(toEntries(x)); },
@@ -636,28 +644,31 @@ export const builtins: Record<string, Builtin> = {
   'range/2': function (x, a, emit) { rangeOf(a[0], a[1], null, x, emit); },
   'range/3': function (x, a, emit) { rangeOf(a[0], a[1], a[2], x, emit); },
 
-  /* The argument is run before the input is checked, as jq binds a value
+  /* jq's definition, which is a reduce over "+": a null separator adds
+     nothing, a number or boolean element is written out, a null one is
+     empty text, and anything else is added as it is, so a separator or an
+     element that cannot be added to a string is the error "+" gives. The
+     argument is run before the input is checked, as jq binds a value
      argument first: 0 | join(empty) produces nothing rather than failing.
      split, startswith, endswith and strftime are the same. */
   'join/1': function (x, a, emit) {
     overArg(a[0], x, emit, function (sep) {
-      const list = wantType(x, 'array', 'join').v;
-      const parts: string[] = [];
+      const list = iterate(x);
+      let acc: Node = leafOf('');
       for (let i = 0; i < list.length; i++) {
+        if (i) acc = add2(acc, sep);
         const v = list[i];
         const t = typeOf(v);
-        if (t === 'null') parts.push('');
-        else if (is(v, 'string')) parts.push(v.r);
-        else if (t === 'number' || t === 'boolean') parts.push(stringify(v));
-        else throw runErr('cannot join ' + t + ' elements');
+        acc = add2(acc, t === 'number' || t === 'boolean' ? leafOf(stringify(v))
+          : t === 'null' ? leafOf('') : v);
       }
-      return leafOf(parts.join(is(sep, 'string') ? sep.r : stringify(sep)));
+      return acc;
     });
   },
   'split/1': function (x, a, emit) {
     overArg(a[0], x, emit, function (sep) {
       const s = wantType(x, 'string', 'split').r;
-      return arrayOf(s.split(wantType(sep, 'string', 'split').r).map(leafOf));
+      return arrayOf(splitStr(s, wantType(sep, 'string', 'split').r).map(leafOf));
     });
   },
 
@@ -697,15 +708,20 @@ export const builtins: Record<string, Builtin> = {
   'tostring/0': function (x, _a, emit) {
     emit(is(x, 'string') ? x : leafOf(stringify(x)));
   },
+  /* What jq's number reader takes: a decimal with an optional sign,
+     fraction and exponent, or a spelling of infinity or NaN, with blank
+     space around it. JavaScript's own conversion also takes hex, binary
+     and octal, which jq refuses. */
   'tonumber/0': function (x, _a, emit) {
     if (is(x, 'number')) {
       emit(x);
       return;
     }
     const s = wantType(x, 'string', 'tonumber').r;
-    const n = +s;
-    if (s.trim() === '' || isNaN(n)) throw runErr('cannot parse "' + s + '" as a number');
-    emit(leafOf(n));
+    if (DECIMAL.test(s)) emit(leafOf(+s));
+    else if (NOT_FINITE.test(s)) emit(leafOf(s.trim().charAt(0) === '-' ? -Infinity : Infinity));
+    else if (NOT_A_NUMBER.test(s)) emit(NULL);
+    else throw runErr('cannot parse "' + s + '" as a number');
   },
   'tojson/0': function (x, _a, emit) { emit(leafOf(stringify(x))); },
   /* JSON.parse is the syntax check and parseJSON the parse. parseJSON keeps
@@ -728,7 +744,9 @@ export const builtins: Record<string, Builtin> = {
 
   'floor/0': mathOf(Math.floor, 'floor'),
   'ceil/0': mathOf(Math.ceil, 'ceil'),
-  'round/0': mathOf(Math.round, 'round'),
+  /* Halves go away from zero, as C's round does: -1.5 is -2. Math.round
+     would take it to -1. */
+  'round/0': mathOf(function (n) { return Math.sign(n) * Math.round(Math.abs(n)); }, 'round'),
   'fabs/0': mathOf(Math.abs, 'fabs'),
   'sqrt/0': mathOf(Math.sqrt, 'sqrt'),
 
@@ -846,9 +864,14 @@ export const builtins: Record<string, Builtin> = {
     emit(arrayOf(chars(wantType(x, 'string', 'explode').r)
       .map(function (c) { return leafOf(c.codePointAt(0)!); })));
   },
+  /* A code point that is not one -- past U+10FFFF, negative, or a surrogate
+     -- becomes the replacement character, as in jq. */
   'implode/0': function (x, _a, emit) {
-    emit(leafOf(wantType(x, 'array', 'implode').v
-      .map(function (n) { return String.fromCodePoint(num(n, 'implode')); }).join('')));
+    emit(leafOf(wantType(x, 'array', 'implode').v.map(function (n) {
+      const c = Math.trunc(num(n, 'implode'));
+      const ok = c >= 0 && c <= 0x10FFFF && !(c >= 0xD800 && c <= 0xDFFF);
+      return String.fromCodePoint(ok ? c : 0xFFFD);
+    }).join('')));
   },
 
   'now/0': function (_x, _a, emit) { emit(leafOf(Date.now() / 1000)); },

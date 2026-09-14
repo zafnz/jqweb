@@ -332,8 +332,10 @@ func reorderArgs(args []string) []string {
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if a == "--" {
-			pos = append(pos, args[i+1:]...)
-			break
+			// The terminator goes on to the flag package as well, which
+			// otherwise reads a positional argument such as "-dash.json" as a
+			// flag.
+			return append(append(flags, a), append(pos, args[i+1:]...)...)
 		}
 		if strings.HasPrefix(a, "-") && a != "-" {
 			flags = append(flags, a)

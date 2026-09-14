@@ -60,17 +60,6 @@ export function startSearch(jqui: StartQuery | null, value: ValueNode, root: HTM
      every history entry records it. */
   const mode = find('#mode', HTMLSelectElement);
 
-  /* A query given on the command line is in the page as the box's value. One
-     in a ?q= on the page's address takes its place, so a link to a served
-     page can carry a query of its own. A history entry the page is loading
-     into, on a reload or on coming back from another page, takes the place of
-     both, since it holds what the box last held. Whichever it is runs at the
-     end of this function, once everything it needs is set up. */
-  const kept = entryOf(history.state);
-  const asked = new URLSearchParams(location.search).get('q');
-  if (kept) input.value = kept.q;
-  else if (asked !== null) input.value = asked;
-
   /* The query half, or null in a page built with --simple. */
   const query = jqui ? jqui({
     value: value,
@@ -79,7 +68,24 @@ export function startSearch(jqui: StartQuery | null, value: ValueNode, root: HTM
     rerun: function () { step(); },
     record: record
   }) : null;
-  if (kept) mode.value = kept.mode;
+
+  /* A query given on the command line is in the page as the box's value, and
+     jqui has set the select for it. A ?q= on the page's address takes its
+     place and is read as though it had been typed, with the select on auto,
+     since the history writes the box there whichever way it was read. A
+     history entry the page is loading into, on a reload or on coming back from
+     another page, takes the place of both, since it holds the box and the
+     select as they were. Whichever it is runs at the end of this function,
+     once everything it needs is set up. */
+  const kept = entryOf(history.state);
+  const asked = new URLSearchParams(location.search).get('q');
+  if (kept) {
+    input.value = kept.q;
+    mode.value = kept.mode;
+  } else if (asked !== null) {
+    input.value = asked;
+    mode.value = 'auto';
+  }
 
   /* Searching walks the whole tree, so wait for a pause in typing rather than
      doing it on every keystroke. */
@@ -109,9 +115,8 @@ export function startSearch(jqui: StartQuery | null, value: ValueNode, root: HTM
      entry is only recorded for a run that was not held back to offer
      completions, so forcing it shows what was on screen when it was recorded.
 
-     The address is left alone. A ?q= in it runs as a jq query however it
-     reads, so a text search written there would come back as a query on a
-     reload.
+     Each write also puts the box in the address as ?q=, or takes ?q= out for
+     an empty box.
 
      Typing makes one entry per query rather than one per pause: a write within
      EDIT_MS of the last one replaces the entry, and a longer gap starts a new
@@ -123,11 +128,11 @@ export function startSearch(jqui: StartQuery | null, value: ValueNode, root: HTM
     const entry: Entry = { q: input.value, mode: mode.value };
     const now = Date.now();
     if (how === 'replace' || (!how && now - written < EDIT_MS)) {
-      history.replaceState(entry, '');
+      history.replaceState(entry, '', addressOf(entry.q));
     } else {
       const at = entryOf(history.state);
       if (at && at.q === entry.q && at.mode === entry.mode) return;
-      history.pushState(entry, '');
+      history.pushState(entry, '', addressOf(entry.q));
     }
     written = now;
   }
@@ -216,9 +221,20 @@ export function startSearch(jqui: StartQuery | null, value: ValueNode, root: HTM
      that it is run as written: it was given whole rather than a letter at a
      time, so a name in it that no key finishes is still the query. */
   if (input.value.trim()) run(true);
+  /* The address stays as the page was opened with. A command-line query that
+     auto reads as text runs on jq, and written to ?q= it would open as text. */
   history.replaceState({ q: input.value, mode: mode.value } satisfies Entry, '');
 
   return query;
+}
+
+/* The page's address with q as its ?q=, or with no ?q= for an empty box. The
+   rest of the address is kept. */
+function addressOf(q: string): string {
+  const url = new URL(location.href);
+  if (q.trim()) url.searchParams.set('q', q);
+  else url.searchParams.delete('q');
+  return url.href;
 }
 
 /* The entry in a history state, or null for a state this page did not write. */

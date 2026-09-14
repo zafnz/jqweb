@@ -11,6 +11,9 @@ const view = (page) => page.evaluate(() => ({
   stats: __t.text('#stats')
 }));
 
+/* The ?q= in the page's address, or null for none. */
+const addressQ = (page) => page.evaluate(() => new URLSearchParams(location.search).get('q'));
+
 /* Writes within a second of each other rewrite one entry, so a step that is
    meant to make an entry of its own waits past that. */
 async function typeAlone(page, text) {
@@ -43,6 +46,38 @@ test.describe('the default page', () => {
     expect.soft(got.box, 'forward twice reaches the last query').toBe('.items[0]');
     expect.soft(got.results, 'a path shows in place').toBe(false);
     expect.soft(got.stats, 'and says where it led').toBe('.items[0]');
+  });
+
+  test('the address follows the box', async ({ page }) => {
+    expect.soft(await addressQ(page), 'the page opens with no ?q=').toBe(null);
+
+    await page.locator('#q').fill('blah');
+    await settle(page, 300);
+    expect.soft(await addressQ(page), 'typing puts the box in the address').toBe('blah');
+
+    await page.locator('#q').fill('blahblah');
+    await settle(page, 300);
+    expect.soft(await addressQ(page), 'and typing on rewrites it').toBe('blahblah');
+
+    await page.goBack();
+    expect.soft(await addressQ(page), 'back takes it out again').toBe(null);
+
+    await page.goForward();
+    await type(page, '');
+    expect.soft(await addressQ(page), 'as does emptying the box').toBe(null);
+  });
+
+  test('an address the page wrote opens on the same view', async ({ page }) => {
+    await typeAlone(page, 'Running');
+    const written = await page.evaluate(() => ({ url: location.href, stats: __t.text('#stats') }));
+
+    await page.goto(written.url);
+    await settle(page);
+    const got = await view(page);
+    expect.soft(got.box, 'the box holds the word').toBe('Running');
+    expect.soft(got.mode, 'read on auto').toBe('auto');
+    expect.soft(got.results, 'as text').toBe(false);
+    expect.soft(got.stats, 'with the same count').toBe(written.stats);
   });
 
   test('typing without a pause makes one entry', async ({ page }) => {

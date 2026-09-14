@@ -12,7 +12,9 @@ above the commit list GoReleaser generates.
 ### Back and Forward step through searches
 
 The browser's Back and Forward buttons step through the searches and queries
-run in the search box, and reloading the page keeps the one in it.
+run in the search box, and the address shows the current one as `?q=`. A `?q=`
+is read the way typing it would be, so `?q=keys` searches for the word where it
+used to run `keys` as a jq query.
 
 **Fixed:** `-O` now opens generated files whose paths contain spaces, `#`, `?`
 or Unicode characters, including paths on Windows.

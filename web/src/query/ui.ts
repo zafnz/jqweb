@@ -81,10 +81,11 @@ export function jqui(page: QueryHost): QueryUI {
     return QUERY_START.indexOf(raw.charAt(0)) >= 0 || CALL.test(raw);
   }
 
-  /* The box starts with something in it only when a query was given on the
-     command line or in the page's address, and either is a jq query. One that
-     auto reads as text, such as keys, starts the select on jq so that it runs
-     as one. */
+  /* The box has something in it here only when a query was given on the
+     command line, which is a jq query. One that auto reads as text, such as
+     keys, starts the select on jq so that it runs as one. page/search.ts puts
+     a ?q= or a history entry in the box afterwards, with the select each of
+     those calls for. */
   const start = input.value.trim();
   if (start && !wants(start)) mode.value = 'jq';
 

@@ -112,15 +112,14 @@ export function jqui(page: QueryHost): QueryUI {
       return true;
     }
     if (query.path) { page.showFound(page.resolve(query.path), query.path.length); return true; }
-    let out: ValueNode[];
     try {
-      out = query.run(page.value);
+      const out = query.run(page.value);
+      showResults(out);
     } catch (e) {
       if (!(e instanceof Error)) throw e;
       fault(e.message);
       return true;
     }
-    showResults(out);
     return true;
   }
 

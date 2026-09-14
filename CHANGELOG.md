@@ -16,6 +16,10 @@ run in the search box, and the address shows the current one as `?q=`. A `?q=`
 is read the way typing it would be, so `?q=keys` searches for the word where it
 used to run `keys` as a jq query.
 
+**Fixed:** JSON nested beyond 128 arrays or objects is rejected with a clear
+error instead of producing a broken page. Queries that create deeper values
+also report an error.
+
 **Fixed:** `-O` now opens generated files whose paths contain spaces, `#`, `?`
 or Unicode characters, including paths on Windows.
 

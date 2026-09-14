@@ -6,6 +6,7 @@
 
 import { leafOf, stringify } from '../../model/node.ts';
 import type { ArrayNode, Node, ObjectNode } from '../../model/node.ts';
+import { NestingError } from '../../model/nesting.ts';
 import { parseJSON } from '../../model/parse.ts';
 import { runErr } from './errors.ts';
 import { ev, push, tick } from './evaluate.ts';
@@ -594,8 +595,8 @@ export const builtins: Record<string, Builtin> = {
     return [leafOf(n)];
   },
   'tojson/0': function (x) { return [leafOf(stringify(x))]; },
-  /* JSON.parse is the check and parseJSON the parse. parseJSON keeps key order
-     and number text but validates nothing, and its string scanner never ends
+  /* JSON.parse is the syntax check and parseJSON the parse. parseJSON keeps
+     key order and number text, and its string scanner never ends
      on text with no closing quote, so it only sees what JSON.parse accepted. */
   'fromjson/0': function (x) {
     const s = wantType(x, 'string', 'fromjson').r;
@@ -604,7 +605,12 @@ export const builtins: Record<string, Builtin> = {
     } catch {
       throw runErr('cannot parse "' + s + '" as JSON');
     }
-    return [parseJSON(s)];
+    try {
+      return [parseJSON(s)];
+    } catch (e) {
+      if (e instanceof NestingError) throw runErr(e.message);
+      throw e;
+    }
   },
 
   'floor/0': mathOf(Math.floor, 'floor'),

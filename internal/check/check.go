@@ -10,13 +10,22 @@ import (
 	"unicode/utf8"
 )
 
-// Document reports whether data is a single well-formed JSON document. The page
-// embeds the document itself and renders it in the browser, so nothing is kept
-// from this pass but the error.
+// Each JSON level adds two HTML wrappers; stay below browser DOM limits as
+// well as JavaScript stack limits. Keep in sync with web/src/model/nesting.ts.
+const maxDepth = 128
+
+var errNesting = fmt.Errorf("JSON nesting exceeds the supported limit of %d", maxDepth)
+
+// Document checks for one well-formed JSON document within the nesting limit.
+// The page embeds the document itself and renders it in the browser, so
+// nothing is kept from this pass but the error.
 func Document(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
-	if err := checkValue(dec); err != nil {
+	if err := checkValue(dec, 0); err != nil {
+		if errors.Is(err, errNesting) {
+			return err
+		}
 		return describe(data, err)
 	}
 	if dec.More() {
@@ -33,7 +42,7 @@ func Document(data []byte) error {
 
 // checkValue reads one JSON value from dec, recursing into containers, and
 // returns the decoder's error if it is not well formed.
-func checkValue(dec *json.Decoder) error {
+func checkValue(dec *json.Decoder, depth int) error {
 	tok, err := dec.Token()
 	if err != nil {
 		return err
@@ -42,10 +51,13 @@ func checkValue(dec *json.Decoder) error {
 	if !ok {
 		return nil
 	}
+	if (d == '[' || d == '{') && depth >= maxDepth {
+		return errNesting
+	}
 	switch d {
 	case '[':
 		for dec.More() {
-			if err := checkValue(dec); err != nil {
+			if err := checkValue(dec, depth+1); err != nil {
 				return err
 			}
 		}
@@ -58,7 +70,7 @@ func checkValue(dec *json.Decoder) error {
 			if _, ok := kt.(string); !ok {
 				return fmt.Errorf("object key is not a string: %v", kt)
 			}
-			if err := checkValue(dec); err != nil {
+			if err := checkValue(dec, depth+1); err != nil {
 				return err
 			}
 		}

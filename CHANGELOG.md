@@ -40,6 +40,13 @@ by code point, `@uri` encodes an emoji as one character, `implode` replaces an
 invalid code point, and `contains`, `join` and `from_entries` fail or pass on
 the inputs jq fails or passes on.
 
+**Fixed:** A number with an exponent and no digits after it, such as `1e`, is
+a query error. Regex modifiers are jq's letters (`g`, `i`, `x`, `n`, `s`, `m`,
+`p`), a non-string modifier is an error, and an empty match no longer loops on
+an emoji. `fromdate` reads only `%Y-%m-%dT%H:%M:%SZ`, and `mktime` and
+`strftime` take the eight-part broken-out time jq's `gmtime` produces and
+refuse a shorter one.
+
 **Fixed:** `-O` now opens generated files whose paths contain spaces, `#`, `?`
 or Unicode characters, including paths on Windows.
 

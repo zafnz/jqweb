@@ -393,9 +393,10 @@ test('an index of 0 is still a truthy select', () => {
     ['["abc","bca"]']);
 });
 
-test('regex flags outside the supported set are refused', () => {
+test('regex modifiers are jq\'s letters, and the one JavaScript cannot do is refused', () => {
   assert.deepStrictEqual(run('test("A"; "i")', '"a"'), ['true']);
-  assert.strictEqual(error('test("a"; "x")', '"a"'), 'run: unsupported regex flag "x"');
+  assert.strictEqual(error('test("a"; "q")', '"a"'), 'run: q is not a valid modifier string');
+  assert.strictEqual(error('test("a"; "l")', '"a"'), 'run: the l modifier is not supported');
   assert.ok(error('test("(")', '"a"').startsWith('run: bad regular expression'));
 });
 

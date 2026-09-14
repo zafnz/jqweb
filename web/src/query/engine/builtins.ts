@@ -15,7 +15,7 @@ import { FORMATS } from './formats.ts';
 import type { Ast } from './parser.ts';
 import { captureOne, matchOne, scanOne, splitOn, substitute, testOne,
   withRe } from './regex.ts';
-import { broken, parseDate, seconds, strftime } from './time.ts';
+import { broken, fields, mktime, parseDate, parts, strftime } from './time.ts';
 import { FALSE, NULL, TRUE, add2, arrayOf, chars, cmp, cmpStr, descend, distinct,
   elem, equal, field, is, iterate, lookup, members, num, objectOf, splitStr,
   truthy, typeOf, wantType } from './values.ts';
@@ -428,6 +428,12 @@ function recurseWith(x: Node, f: Ast, cond: Ast | null, emit: Emit): void {
   }
 }
 
+/* What strftime and todate format: a number is broken out first, and an
+   array is taken as a broken-out time already. */
+function timeOf(x: Node, name: string): number[] {
+  return is(x, 'number') ? parts(x.r) : fields(x, name);
+}
+
 const DECIMAL = /^\s*[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?\s*$/;
 const NOT_FINITE = /^\s*[+-]?inf(?:inity)?\s*$/i;
 const NOT_A_NUMBER = /^\s*[+-]?nan\s*$/i;
@@ -769,9 +775,9 @@ export const builtins: Record<string, Builtin> = {
   'splits/1': function (x, a, emit) { withRe(x, a, 1, splitOn, emit); },
   'splits/2': function (x, a, emit) { withRe(x, a, 2, splitOn, emit); },
   'split/2': function (x, a, emit) {
-    withRe(x, a, 2, function (s, pattern, flags, out) {
+    withRe(x, a, 2, function (s, pattern, mode, out) {
       const parts: Node[] = [];
-      splitOn(s, pattern, flags, function (p) { parts.push(p); });
+      splitOn(s, pattern, mode, function (p) { parts.push(p); });
       out(arrayOf(parts));
     }, emit);
   },
@@ -877,18 +883,18 @@ export const builtins: Record<string, Builtin> = {
 
   'now/0': function (_x, _a, emit) { emit(leafOf(Date.now() / 1000)); },
   'gmtime/0': function (x, _a, emit) { emit(broken(num(x, 'gmtime'))); },
-  'mktime/0': function (x, _a, emit) { emit(leafOf(seconds(x, 'mktime'))); },
+  'mktime/0': function (x, _a, emit) { emit(leafOf(mktime(fields(x, 'mktime')))); },
   'todate/0': function (x, _a, emit) {
-    emit(leafOf(strftime(num(x, 'todate'), '%Y-%m-%dT%H:%M:%SZ')));
+    emit(leafOf(strftime(timeOf(x, 'todate'), '%Y-%m-%dT%H:%M:%SZ')));
   },
   'todateiso8601/0': function (x, _a, emit) {
-    emit(leafOf(strftime(num(x, 'todateiso8601'), '%Y-%m-%dT%H:%M:%SZ')));
+    emit(leafOf(strftime(timeOf(x, 'todateiso8601'), '%Y-%m-%dT%H:%M:%SZ')));
   },
   'fromdate/0': function (x, _a, emit) { emit(leafOf(parseDate(x, 'fromdate'))); },
   'fromdateiso8601/0': function (x, _a, emit) { emit(leafOf(parseDate(x, 'fromdateiso8601'))); },
   'strftime/1': function (x, a, emit) {
     overArg(a[0], x, emit, function (f) {
-      return leafOf(strftime(seconds(x, 'strftime'), wantType(f, 'string', 'strftime').r));
+      return leafOf(strftime(timeOf(x, 'strftime'), wantType(f, 'string', 'strftime').r));
     });
   },
   /* The exponent is on the outside, so pow((2,3); (4,5)) gives 16, 81, 32,

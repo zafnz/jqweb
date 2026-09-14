@@ -151,7 +151,7 @@ a terminal.
 
 ## The example page
 
-`docs/index.html` is a rendered page committed for GitHub Pages, and it does
+`docs/k8s.html` is a rendered page committed for GitHub Pages, and it does
 not regenerate itself. After a change to the scripts or the styling it is
 stale until someone rebuilds the scripts and then the page. Build it the
 default way, so that the page people are pointed at is the one they will get.
@@ -159,11 +159,11 @@ The input file name sets the page title, so build from `docs/k8s.json` where it
 sits:
 
     npm --prefix web run build
-    go build -o jqweb . && ./jqweb -o docs/index.html docs/k8s.json
+    go build -o jqweb . && ./jqweb -o docs/k8s.html docs/k8s.json
 
 `docs/k8s.json` is the document that page shows: a `kubectl get all -o json`
 listing, generated rather than taken from a real cluster. GitHub Pages serves
-it at https://zafnz.github.io/jqweb/k8s.json, which is what the `curl` in
+it at https://jqweb.io/k8s.json, which is what the `curl` in
 `README.md` fetches, so changing the file changes both the example page and
 the first command a reader runs.
 

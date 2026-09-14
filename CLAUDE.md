@@ -208,9 +208,15 @@ as written, so a comment in `page.css` or `query.css` ships in every page.
 colour anywhere means one theme gets it wrong. Check the contrast ratio rather
 than the look on one screen: dimming a grey with `opacity` once gave 1.6:1.
 
-**`docs/index.html` is generated and committed.** It is `docs/k8s.json`
+**`docs/k8s.html` is generated and committed.** It is `docs/k8s.json`
 rendered, so rebuild `web/dist` and then regenerate it after any change under
-`web/`, with the commands in `CONTRIBUTING.md`.
+`web/`, with the commands in `CONTRIBUTING.md`. `docs/index.html` is written by
+hand and is not rendered from anything.
+
+**`docs/CNAME` sets the custom domain.** Pages deploys from `/docs` on `main`,
+and GitHub reads the domain from that file, so a build without it drops
+jqweb.io. The `main` ruleset stops GitHub committing the file itself, so a
+domain change is a pull request that edits it.
 
 **The packages' install path is written twice.** `bindir` in the `nfpms`
 section of `.goreleaser.yaml` and `packagedPath` in `internal/update` both
@@ -225,7 +231,7 @@ name. Renaming either package leaves Windows users with the releases page as
 their upgrade hint.
 
 **`docs/k8s.json` is the example document.** It is a generated `kubectl get all
--o json` listing, committed and served at https://zafnz.github.io/jqweb/k8s.json,
+-o json` listing, committed and served at https://jqweb.io/k8s.json,
 and the `curl` in `README.md` fetches it from there. Examples that need a
 document use this one.
 

@@ -1,4 +1,4 @@
-/* docs/index.html, the copy committed for GitHub Pages. It is generated and
+/* docs/k8s.html, the copy committed for GitHub Pages. It is generated and
    does not regenerate itself, so it is the one page here that nothing else
    would ever load: a change to web/ that breaks it goes unnoticed until someone
    follows the link in the README.

@@ -9,6 +9,13 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+### Back and Forward step through searches
+
+The browser's Back and Forward buttons step through the searches and queries
+run in the search box, and the address shows the current one as `?q=`. A `?q=`
+is read the way typing it would be, so `?q=keys` searches for the word where it
+used to run `keys` as a jq query.
+
 **Fixed:** JSON nested beyond 128 arrays or objects is rejected with a clear
 error instead of producing a broken page. Queries that create deeper values
 also report an error.

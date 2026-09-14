@@ -107,8 +107,8 @@ jobs:
       - name: The example page is built from the current assets
         run: |
           go build -o "${RUNNER_TEMP}/jqweb" .
-          "${RUNNER_TEMP}/jqweb" -o "${RUNNER_TEMP}/index.html" docs/k8s.json
-          cmp docs/index.html "${RUNNER_TEMP}/index.html"
+          "${RUNNER_TEMP}/jqweb" -o "${RUNNER_TEMP}/k8s.html" docs/k8s.json
+          cmp docs/k8s.html "${RUNNER_TEMP}/k8s.html"
 
       - run: npm --prefix web run test:browser
 

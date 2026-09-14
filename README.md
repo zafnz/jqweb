@@ -1,4 +1,4 @@
-[![jqweb — turn JSON into an interactive webpage](docs/banner.png)](https://zafnz.github.io/jqweb/)
+[![jqweb — turn JSON into an interactive webpage](docs/banner.png)](https://jqweb.io/k8s.html)
 <br/>
 ![Release](https://github.com/zafnz/jqweb/workflows/release/badge.svg)
 [![GitHub Release](https://img.shields.io/github/v/release/zafnz/jqweb)](https://github.com/zafnz/jqweb/releases)
@@ -14,7 +14,7 @@ configure.
 ```bash
 $ kubectl get pods -o json | jqweb -O
 ```
-[Try the live demo](https://zafnz.github.io/jqweb/).
+[Try the live demo](https://jqweb.io/k8s.html).
 
 ## Install
 
@@ -58,11 +58,11 @@ too.
 Pipe JSON into jqweb with `-O` to open it immediately in your browser:
 
 ```
-$ curl -s https://zafnz.github.io/jqweb/k8s.json | jqweb -O
+$ curl -s https://jqweb.io/k8s.json | jqweb -O
 jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)
 ```
 
-[<img src="demo.png" alt="jqweb filtering running pods in a Kubernetes resource list" width="580">](https://zafnz.github.io/jqweb/)
+[<img src="demo.png" alt="jqweb filtering running pods in a Kubernetes resource list" width="580">](https://jqweb.io/k8s.html)
 
 *Filtering running Kubernetes pods with a jq-style query.*
 

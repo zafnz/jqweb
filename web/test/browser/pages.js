@@ -36,7 +36,7 @@ const doc = path.join(here, 'testdata', 'doc.json');
 function pageFile(name) {
   if (!(name in PAGES)) throw new Error('unknown page "' + name + '"');
   return name === 'docs'
-    ? path.join(repo, 'docs', 'index.html')
+    ? path.join(repo, 'docs', 'k8s.html')
     : path.join(built, name + '.html');
 }
 
@@ -63,7 +63,7 @@ function renderAll() {
   }
 
   const committed = pageFile('docs');
-  if (!fs.existsSync(committed)) throw new Error('docs/index.html is missing');
+  if (!fs.existsSync(committed)) throw new Error('docs/k8s.html is missing');
 }
 
 export { PAGES, pageFile, pageURL, renderAll, built, repo };

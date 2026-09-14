@@ -26,6 +26,9 @@ or Unicode characters, including paths on Windows.
 **Fixed:** redirected character devices such as `/dev/null` are no longer
 mistaken for terminals.
 
+**Fixed:** input that is not valid UTF-8 is rejected with the line and column
+of the first bad byte, instead of rendering with replacement characters.
+
 **Fixed:** arguments after `--` are read as the query and input file, so
 `jqweb -- -dash.json` reads a file whose name begins with a dash.
 

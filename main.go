@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -18,7 +19,16 @@ import (
 	"github.com/zafnz/jqweb/internal/page"
 	"github.com/zafnz/jqweb/internal/serve"
 	"github.com/zafnz/jqweb/internal/update"
+	"golang.org/x/term"
 )
+
+func fileURL(path string) string {
+	path = filepath.ToSlash(path)
+	if len(path) >= 3 && path[1] == ':' && path[2] == '/' {
+		path = "/" + path
+	}
+	return (&url.URL{Scheme: "file", Path: path}).String()
+}
 
 // versionString is set by the linker at release time:
 // -X main.versionString=<tag>
@@ -246,7 +256,7 @@ func main() {
 					fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
 					os.Exit(1)
 				}
-				if err := serve.OpenBrowser("file://" + abs); err != nil {
+				if err := serve.OpenBrowser(fileURL(abs)); err != nil {
 					fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
 					os.Exit(1)
 				}
@@ -326,8 +336,7 @@ func flagName(a string) string {
 // isTTY reports whether f is a terminal, which decides whether stdin can be
 // read for the document and whether anyone is watching stderr for a notice.
 func isTTY(f *os.File) bool {
-	fi, err := f.Stat()
-	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+	return term.IsTerminal(int(f.Fd()))
 }
 
 // inputArgs splits the positional arguments into a query and the name of the

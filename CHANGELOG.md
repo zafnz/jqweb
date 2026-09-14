@@ -14,6 +14,12 @@ above the commit list GoReleaser generates.
 The browser's Back and Forward buttons step through the searches and queries
 run in the search box, and reloading the page keeps the one in it.
 
+**Fixed:** `-O` now opens generated files whose paths contain spaces, `#`, `?`
+or Unicode characters, including paths on Windows.
+
+**Fixed:** redirected character devices such as `/dev/null` are no longer
+mistaken for terminals.
+
 ## [0.9.0] - 2026-09-13
 
 ### Dev container feature

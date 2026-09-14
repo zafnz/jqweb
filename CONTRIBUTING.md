@@ -19,6 +19,10 @@ directly; `tsc` still performs the type checking. The browser suite is
 Playwright Test, driving the Chrome already installed rather than downloading
 one, so `npm --prefix web ci` is the whole install.
 
+Go dependencies are acceptable when they materially reduce platform-specific
+code or correctness risk. They must not add a runtime service, require CGO, or
+make Node part of the Go build.
+
 The code that starts the `-C` child detached is split by build tag, in
 `internal/serve/detach_unix.go` and `detach_windows.go`, with `dup2_linux.go`
 and `dup2_other.go` under the first. CI builds on Linux only, so check the

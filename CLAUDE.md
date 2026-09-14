@@ -192,10 +192,12 @@ theme through `window.jqtheme`, and the browser specs reach the parser and
 engine through `window.jqweb`, `jqjs` and `jqsuggest`, so dropping one from
 an entry breaks whichever of them reads it.
 
-**Build dependencies do not become install dependencies.** `go.mod` requires
-nothing, the JavaScript tests use Node's built-in runner, and the TypeScript and
-esbuild packages under `web` are development dependencies only. `go build`
-embeds the committed output and must never invoke Node or need `node_modules`.
+**Dependencies keep the binary self-contained.** A Go dependency is justified
+when it materially reduces platform-specific code or correctness risk, but it
+must not add a runtime service or require CGO. The JavaScript tests use Node's
+built-in runner, and the TypeScript and esbuild packages under `web` are
+development dependencies only. `go build` embeds the committed output and must
+never invoke Node or need `node_modules`.
 
 **Stylesheets carry no comments.** The scripts are minified, but CSS is inlined
 as written, so a comment in `page.css` or `query.css` ships in every page.

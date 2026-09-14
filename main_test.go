@@ -11,6 +11,27 @@ import (
 	"time"
 )
 
+func TestFileURL(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want string
+	}{
+		{"plain", "/tmp/page.html", "file:///tmp/page.html"},
+		{"space", "/tmp/a page.html", "file:///tmp/a%20page.html"},
+		{"fragment and query", "/tmp/a#b?.html", "file:///tmp/a%23b%3F.html"},
+		{"Unicode", "/tmp/猫.html", "file:///tmp/%E7%8C%AB.html"},
+		{"Windows drive", "C:/Users/A Name/page.html", "file:///C:/Users/A%20Name/page.html"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := fileURL(tt.path); got != tt.want {
+				t.Errorf("fileURL(%q) = %q, want %q", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestReorderArgs(t *testing.T) {
 	tests := []struct {
 		name string
@@ -287,6 +308,33 @@ func TestIsFile(t *testing.T) {
 	} {
 		if got := isFile(tt.name); got != tt.want {
 			t.Errorf("isFile(%q) = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestIsTTYRejectsNonTerminals(t *testing.T) {
+	null, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer null.Close()
+
+	pipe, pipeWriter, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pipe.Close()
+	defer pipeWriter.Close()
+
+	file, err := os.CreateTemp(t.TempDir(), "ordinary-file")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+
+	for _, f := range []*os.File{null, pipe, file} {
+		if isTTY(f) {
+			t.Errorf("isTTY(%s) = true, want false", f.Name())
 		}
 	}
 }

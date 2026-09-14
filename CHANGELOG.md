@@ -9,6 +9,9 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+**Fixed:** `-O` now opens generated files whose paths contain spaces, `#`, `?`
+or Unicode characters, including paths on Windows.
+
 ## [0.9.0] - 2026-09-13
 
 ### Dev container feature

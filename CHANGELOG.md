@@ -9,6 +9,9 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+**Fixed:** redirected character devices such as `/dev/null` are no longer
+mistaken for terminals.
+
 ## [0.9.0] - 2026-09-13
 
 ### Dev container feature

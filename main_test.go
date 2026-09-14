@@ -47,9 +47,10 @@ func TestReorderArgs(t *testing.T) {
 		{"value not swallowed by boolean flag", []string{"-O", "f.json", "-v"}, []string{"-O", "-v", "f.json"}},
 		{"dash is stdin, not a flag", []string{"-p", "9", "-"}, []string{"-p", "9", "-"}},
 		{"flag missing its value", []string{"f.json", "-p"}, []string{"-p", "f.json"}},
-		{"terminator makes the rest positional", []string{"--", "-p", "8080"}, []string{"-p", "8080"}},
-		{"terminator after a flag", []string{"-O", "--", "-weird.json"}, []string{"-O", "-weird.json"}},
-		{"terminator with nothing after it", []string{"-O", "--"}, []string{"-O"}},
+		{"terminator makes the rest positional", []string{"--", "-p", "8080"}, []string{"--", "-p", "8080"}},
+		{"terminator after a flag", []string{"-O", "--", "-weird.json"}, []string{"-O", "--", "-weird.json"}},
+		{"terminator with nothing after it", []string{"-O", "--"}, []string{"-O", "--"}},
+		{"positional before the terminator stays positional", []string{"q", "-O", "--", "-f.json"}, []string{"-O", "--", "q", "-f.json"}},
 		{"close flag value stays attached", []string{"f.json", "--close-delay", "5s"}, []string{"--close-delay", "5s", "f.json"}},
 		{"close is boolean and swallows nothing", []string{"-C", "f.json"}, []string{"-C", "f.json"}},
 		{"-OC moves like any other flag", []string{"f.json", "-OC"}, []string{"-OC", "f.json"}},
@@ -64,7 +65,7 @@ func TestReorderArgs(t *testing.T) {
 		{"equals form after the file", []string{"f.json", "--theme=dark"}, []string{"--theme=dark", "f.json"}},
 		{"equals form before another flag", []string{"f.json", "--host=0.0.0.0", "-O"}, []string{"--host=0.0.0.0", "-O", "f.json"}},
 		{"unknown flag swallows nothing", []string{"-Ox", "f.json"}, []string{"-Ox", "f.json"}},
-		{"terminator hides a flag-shaped file", []string{"--", "-OC"}, []string{"-OC"}},
+		{"terminator hides a flag-shaped file", []string{"--", "-OC"}, []string{"--", "-OC"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -73,6 +74,25 @@ func TestReorderArgs(t *testing.T) {
 				t.Errorf("reorderArgs(%q) = %q, want %q", tt.args, got, tt.want)
 			}
 		})
+	}
+}
+
+// Everything after "--" is a positional argument however it is spelled, and
+// the flags before it still apply.
+func TestParseFlagsTerminator(t *testing.T) {
+	opt, err := parse(t, "-O", "--", "-dash.json")
+	if err != nil {
+		t.Fatalf("parseFlags: %v", err)
+	}
+	if !opt.open || !reflect.DeepEqual(opt.args, []string{"-dash.json"}) {
+		t.Errorf("open = %v, args = %q; want true and [-dash.json]", opt.open, opt.args)
+	}
+	opt, err = parse(t, ".a", "--", "-p")
+	if err != nil {
+		t.Fatalf("parseFlags: %v", err)
+	}
+	if opt.portSet || !reflect.DeepEqual(opt.args, []string{".a", "-p"}) {
+		t.Errorf("portSet = %v, args = %q; want false and [.a -p]", opt.portSet, opt.args)
 	}
 }
 

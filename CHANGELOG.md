@@ -26,6 +26,9 @@ or Unicode characters, including paths on Windows.
 **Fixed:** redirected character devices such as `/dev/null` are no longer
 mistaken for terminals.
 
+**Fixed:** arguments after `--` are read as the query and input file, so
+`jqweb -- -dash.json` reads a file whose name begins with a dash.
+
 ## [0.9.0] - 2026-09-13
 
 ### Dev container feature

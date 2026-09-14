@@ -11,6 +11,27 @@ import (
 	"time"
 )
 
+func TestFileURL(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want string
+	}{
+		{"plain", "/tmp/page.html", "file:///tmp/page.html"},
+		{"space", "/tmp/a page.html", "file:///tmp/a%20page.html"},
+		{"fragment and query", "/tmp/a#b?.html", "file:///tmp/a%23b%3F.html"},
+		{"Unicode", "/tmp/猫.html", "file:///tmp/%E7%8C%AB.html"},
+		{"Windows drive", "C:/Users/A Name/page.html", "file:///C:/Users/A%20Name/page.html"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := fileURL(tt.path); got != tt.want {
+				t.Errorf("fileURL(%q) = %q, want %q", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestReorderArgs(t *testing.T) {
 	tests := []struct {
 		name string

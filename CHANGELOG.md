@@ -29,6 +29,9 @@ mistaken for terminals.
 **Fixed:** arguments after `--` are read as the query and input file, so
 `jqweb -- -dash.json` reads a file whose name begins with a dash.
 
+**Fixed:** `-C`, `--close-delay` and `--host` with `-o` but no `-p`, and `-O`
+with `-o -`, are usage errors. Each flag used to be ignored.
+
 ## [0.9.0] - 2026-09-13
 
 ### Dev container feature

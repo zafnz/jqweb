@@ -100,6 +100,10 @@ func TestCheckErrors(t *testing.T) {
 		{"script", "#!/bin/sh\necho hi\n", "a script"},
 		{"gzip", "\x1f\x8b\x08\x00binary", "gzip-compressed"},
 		{"binary", "\x00\x01\x02\x03 not text", "binary data"},
+		{"invalid UTF-8 in a string", "{\"a\":\"\xff\"}", "not valid UTF-8 (line 1, column 7)"},
+		{"Latin-1 on a later line", "{\n  \"name\": \"caf\xe9\"\n}", "not valid UTF-8 (line 2, column 15)"},
+		{"truncated sequence in a key", "{\"\xc3\":1}", "not valid UTF-8 (line 1, column 3)"},
+		{"encoded surrogate", "[\"\xed\xa0\x80\"]", "not valid UTF-8 (line 1, column 3)"},
 		{"bare word", "hello there", "does not look like JSON"},
 	}
 	for _, tt := range tests {

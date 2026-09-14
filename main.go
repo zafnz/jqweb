@@ -106,6 +106,7 @@ type cliOptions struct {
 
 	portSet bool // -p or --port was given, whatever its value
 	outSet  bool // -o or --output was given
+	hostSet bool // --host was given
 	args    []string
 }
 
@@ -144,12 +145,31 @@ func parseFlags(fs *flag.FlagSet, args []string) (cliOptions, error) {
 	fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
 	o.portSet = set["p"] || set["port"]
 	o.outSet = set["o"] || set["output"]
+	o.hostSet = set["host"]
 	o.open = o.open || openClose
 	// Asking for a delay is asking to close, so --close-delay does not also
 	// need -C. Without this the flag on its own would do nothing at all.
 	o.closeOnGet = o.closeOnGet || openClose || set["close-delay"]
 	o.args = fs.Args()
 	return o, nil
+}
+
+// flagConflict reports a flag that the rest of the command line leaves with
+// nothing to do. Each case is -o without -p, since -p serves the page as well
+// as writing the file.
+func flagConflict(o cliOptions) error {
+	if !o.outSet || o.portSet {
+		return nil
+	}
+	switch {
+	case o.closeOnGet:
+		return errors.New("-C and --close-delay close a served page, and -o without -p serves nothing")
+	case o.hostSet:
+		return errors.New("--host sets where the page is served, and -o without -p serves nothing")
+	case o.open && o.output == "-":
+		return errors.New("-O has nothing to open when -o - writes the page to stdout")
+	}
+	return nil
 }
 
 func main() {
@@ -175,6 +195,12 @@ func main() {
 
 	if opt.closeDelay < 0 {
 		fmt.Fprintf(os.Stderr, "jqweb: --close-delay cannot be negative, got %s\n", opt.closeDelay)
+		usage()
+		os.Exit(2)
+	}
+
+	if err := flagConflict(opt); err != nil {
+		fmt.Fprintf(os.Stderr, "jqweb: %v\n", err)
 		usage()
 		os.Exit(2)
 	}
@@ -306,8 +332,10 @@ func reorderArgs(args []string) []string {
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if a == "--" {
-			pos = append(pos, args[i+1:]...)
-			break
+			// The terminator goes on to the flag package as well, which
+			// otherwise reads a positional argument such as "-dash.json" as a
+			// flag.
+			return append(append(flags, a), append(pos, args[i+1:]...)...)
 		}
 		if strings.HasPrefix(a, "-") && a != "-" {
 			flags = append(flags, a)

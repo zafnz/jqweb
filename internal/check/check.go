@@ -20,6 +20,14 @@ var errNesting = fmt.Errorf("JSON nesting exceeds the supported limit of %d", ma
 // The page embeds the document itself and renders it in the browser, so
 // nothing is kept from this pass but the error.
 func Document(data []byte) error {
+	// Bytes that are not UTF-8 pass the decoder, and the page shows U+FFFD in
+	// their place. Input that does not start like JSON is left for the decoder
+	// to reject, so that describe can say it is gzip or binary data.
+	if i := invalidUTF8(data); i >= 0 && startsJSON(data) {
+		line, col := lineCol(data, int64(i))
+		return fmt.Errorf("input is not valid UTF-8 (line %d, column %d); "+
+			"JSON has to be UTF-8, so convert it first, e.g. with iconv", line, col)
+	}
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
 	if err := checkValue(dec, 0); err != nil {
@@ -87,6 +95,22 @@ func checkValue(dec *json.Decoder, depth int) error {
 func moreValues(dec *json.Decoder) bool {
 	var raw json.RawMessage
 	return dec.Decode(&raw) == nil
+}
+
+// invalidUTF8 is the index of the first byte of data that does not begin a
+// valid UTF-8 sequence, or -1 when there is none.
+func invalidUTF8(data []byte) int {
+	if utf8.Valid(data) {
+		return -1
+	}
+	for i := 0; i < len(data); {
+		r, size := utf8.DecodeRune(data[i:])
+		if r == utf8.RuneError && size == 1 {
+			return i
+		}
+		i += size
+	}
+	return -1
 }
 
 // describe turns the decoder's error into the message the user sees: what

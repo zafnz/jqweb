@@ -26,6 +26,9 @@ or Unicode characters, including paths on Windows.
 **Fixed:** redirected character devices such as `/dev/null` are no longer
 mistaken for terminals.
 
+**Fixed:** input that is not valid UTF-8 is rejected with the line and column
+of the first bad byte, instead of rendering with replacement characters.
+
 ## [0.9.0] - 2026-09-13
 
 ### Dev container feature

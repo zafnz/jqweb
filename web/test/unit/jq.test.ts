@@ -18,7 +18,7 @@ import { compile, isJqError } from '../../src/query/engine/index.ts';
    for it, one JSON text per output. */
 interface Corpus {
   input: unknown;
-  cases: { q: string; out: string[] }[];
+  cases: ({ q: string; out: string[] } | { q: string; error: 'parse' | 'run' })[];
 }
 
 const corpus: Corpus = JSON.parse(fs.readFileSync(new URL('../testdata/jq-corpus.json', import.meta.url), 'utf8'));
@@ -43,7 +43,8 @@ function error(query: string, doc?: string): string {
 test('every corpus query agrees with jq', () => {
   const doc = JSON.stringify(corpus.input);
   for (const c of corpus.cases) {
-    assert.deepStrictEqual(run(c.q, doc), c.out, `query ${c.q}`);
+    if ('error' in c) assert.ok(error(c.q, doc).startsWith(c.error + ':'), `query ${c.q}`);
+    else assert.deepStrictEqual(run(c.q, doc), c.out, `query ${c.q}`);
   }
 });
 
@@ -125,8 +126,35 @@ test('"//" falls back only when nothing truthy came out', () => {
   assert.deepStrictEqual(run('.a // "d"', '{"a":false}'), ['"d"']);
   assert.deepStrictEqual(run('.a // "d"', '{"a":0}'), ['0']);
   assert.deepStrictEqual(run('[(1,null,2) // 9]', 'null'), ['[1,2]']);
-  /* A left-hand side that fails outright counts as producing nothing. */
-  assert.deepStrictEqual(run('.a.b // "d"', '{"a":3}'), ['"d"']);
+  /* A left-hand side that fails is an error, as in jq 1.7; "?" is what
+     turns the failure into nothing. */
+  assert.strictEqual(error('.a.b // "d"', '{"a":3}'), 'run: cannot index number with "b"');
+  assert.deepStrictEqual(run('.a.b? // "d"', '{"a":3}'), ['"d"']);
+});
+
+test('a stream stops once its consumer has what it needs', () => {
+  /* The rest of the stream is never run, so what would have failed or
+     never ended is neither reached nor finished. */
+  assert.deepStrictEqual(run('first(1, error("boom"))', 'null'), ['1']);
+  assert.deepStrictEqual(run('first(range(1000000000))', 'null'), ['0']);
+  assert.deepStrictEqual(run('[limit(3; 0 | recurse(. + 1))]', 'null'), ['[0,1,2]']);
+  assert.deepStrictEqual(run('isempty(1, error("boom"))', 'null'), ['false']);
+  assert.deepStrictEqual(run('any(true, error("boom"); .)', 'null'), ['true']);
+  assert.deepStrictEqual(run('map_values(., error("boom"))', '{"a":1}'), ['{"a":1}']);
+  /* The outputs "?" had already passed on stay. */
+  assert.deepStrictEqual(run('[(1, error("boom"), 2)?]', 'null'), ['[1]']);
+});
+
+test('"?" catches the expression it wraps and not what comes after', () => {
+  assert.strictEqual(error('(1,2)? | error("d")'), 'run: d');
+  assert.deepStrictEqual(run('[((1,2)? | error("d"))?]', 'null'), ['[]']);
+  assert.deepStrictEqual(run('[(.[]? | .a?)]', '[3,{"a":1}]'), ['[1]']);
+});
+
+test('a long loop does not exhaust the stack', () => {
+  assert.deepStrictEqual(run('until(. >= 100000; . + 1)', '0'), ['100000']);
+  assert.deepStrictEqual(run('[while(. < 100000; . + 1)] | length', '0'), ['100000']);
+  assert.deepStrictEqual(run('[limit(100000; recurse(. + 1))] | length', '0'), ['100000']);
 });
 
 test('and/or stop once the left-hand value settles the answer', () => {

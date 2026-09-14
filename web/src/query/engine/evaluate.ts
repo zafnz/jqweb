@@ -1,5 +1,10 @@
 /* Running a parsed query against one input.
 
+   An expression is run with a sink: ev hands each output to emit as it is
+   produced, and never holds a whole stream. That is what lets first, limit
+   and isempty stop a stream part way, and what keeps the outputs "?" had
+   already passed on when the expression then fails.
+
    A call carries the builtin the parser looked up for it, so this module does
    not import the builtin table, which imports ev from here. */
 
@@ -14,9 +19,12 @@ import { FALSE, TRUE, add2, arrayOf, cmp, descend, distinct, div2, field, is,
 /* Every output an expression produces for one input, in order. */
 export type Stream = Node[];
 
-/* A builtin: the input and the argument expressions, still unrun, to the
-   stream it produces. */
-export type Builtin = (x: Node, args: Ast[]) => Stream;
+/* Where an expression sends each output as it is produced. */
+export type Emit = (n: Node) => void;
+
+/* A builtin: the input, the argument expressions still unrun, and where to
+   send each output. */
+export type Builtin = (x: Node, args: Ast[], emit: Emit) => void;
 
 /* A node for one of the operators that joins two expressions. */
 type Binary = Extract<Ast, { l: Ast }>;
@@ -33,7 +41,7 @@ let steps = 0;
    across all of them. */
 export function evaluate(ast: Ast, input: Node): Stream {
   steps = 0;
-  return ev(ast, input);
+  return collect(ast, input);
 }
 
 /* Bounds the work one query may do, so a filter that fans out over a large
@@ -42,10 +50,66 @@ export function tick(): void {
   if (++steps > STEP_LIMIT) throw runErr('query produced too much work');
 }
 
-/* Appends one stream to another. push.apply would do it in a single call,
-   but a stream can be long enough to overflow the argument stack. */
-export function push(out: Stream, list: Stream): void {
-  for (let i = 0; i < list.length; i++) out.push(list[i]);
+/* Every output of an expression, for the builtins that need the whole
+   stream before they can say anything: sort_by, last, array construction. */
+export function collect(a: Ast, x: Node): Stream {
+  const out: Stream = [];
+  ev(a, x, function (n) { out.push(n); });
+  return out;
+}
+
+/* Runs produce, and stops it as soon as take returns true for an output.
+   The stop is a throw through produce, which the try here catches; it is a
+   plain object rather than an Error because no stack trace is wanted, and
+   a fresh one each time so that one consumer cannot catch another's. */
+export function stopping(produce: (emit: Emit) => void, take: (n: Node) => boolean): void {
+  const stop = {};
+  try {
+    produce(function (n) { if (take(n)) throw stop; });
+  } catch (e) {
+    if (e !== stop) throw e;
+  }
+}
+
+/* Runs an expression until take returns true for one of its outputs. */
+export function evUntil(a: Ast, x: Node, take: (n: Node) => boolean): void {
+  stopping(function (emit) { ev(a, x, emit); }, take);
+}
+
+/* The first output of an expression, or undefined when it has none. The
+   rest of the stream is never run, so map_values(., error) takes the value
+   and never reaches the error. */
+export function firstOf(a: Ast, x: Node): Node | undefined {
+  let found: Node | undefined;
+  evUntil(a, x, function (n) { found = n; return true; });
+  return found;
+}
+
+/* Whether any output of an expression satisfies f, stopping at the first
+   that does. */
+export function some(a: Ast, x: Node, f: (n: Node) => boolean): boolean {
+  let found = false;
+  evUntil(a, x, function (n) { return (found = f(n)); });
+  return found;
+}
+
+/* An error on its way back through an expression from something its output
+   went on to. "?" catches only what fails inside the expression it wraps,
+   as jq 1.7 does, so the emit it passes down wraps whatever comes back up,
+   and its catch unwraps that and lets it carry on. */
+class Downstream {
+  e: unknown;
+  constructor(e: unknown) { this.e = e; }
+}
+
+function guard(emit: Emit): Emit {
+  return function (n) {
+    try {
+      emit(n);
+    } catch (e) {
+      throw new Downstream(e);
+    }
+  };
 }
 
 const COMPARE: Record<'==' | '!=' | '<' | '<=' | '>' | '>=', (c: number) => boolean> = {
@@ -60,168 +124,155 @@ const ARITH: Record<'+' | '-' | '*' | '/' | '%', (a: Node, b: Node) => Node> = {
   '+': add2, '-': sub2, '*': mul2, '/': div2, '%': mod2
 };
 
-/* Runs one expression against one input and returns its stream. */
-export function ev(a: Ast, x: Node): Stream {
+/* Runs one expression against one input, sending each output to emit. */
+export function ev(a: Ast, x: Node, emit: Emit): void {
   tick();
   switch (a.op) {
     case '.':
-      return [x];
+      emit(x);
+      return;
     case 'lit':
-      return [a.n];
-    case 'recurse': {
-      const out: Stream = [];
-      descend(x, out);
-      return out;
-    }
-    case '|': {
-      const out: Stream = [];
-      const vals = ev(a.l, x);
-      for (let i = 0; i < vals.length; i++) push(out, ev(a.r, vals[i]));
-      return out;
-    }
+      emit(a.n);
+      return;
+    case 'recurse':
+      descend(x, emit);
+      return;
+    case '|':
+      ev(a.l, x, function (v) { ev(a.r, v, emit); });
+      return;
     case ',':
-      return ev(a.l, x).concat(ev(a.r, x));
+      ev(a.l, x, emit);
+      ev(a.r, x, emit);
+      return;
     case '//':
-      return alternative(a, x);
+      alternative(a, x, emit);
+      return;
     case 'and':
     case 'or':
-      return logical(a, x);
+      logical(a, x, emit);
+      return;
     case '==': case '!=': case '<': case '<=': case '>': case '>=': {
       const test = COMPARE[a.op];
-      return pair(a, x, function (l, r) { return test(cmp(l, r)) ? TRUE : FALSE; });
+      pair(a, x, emit, function (l, r) { return test(cmp(l, r)) ? TRUE : FALSE; });
+      return;
     }
     case '+': case '-': case '*': case '/': case '%':
-      return pair(a, x, ARITH[a.op]);
-    case 'neg': {
-      const out: Stream = [];
-      const vals = ev(a.e, x);
-      for (let i = 0; i < vals.length; i++) {
-        out.push(leafOf(-num(vals[i], 'negation')));
-      }
-      return out;
-    }
+      pair(a, x, emit, ARITH[a.op]);
+      return;
+    case 'neg':
+      ev(a.e, x, function (v) { emit(leafOf(-num(v, 'negation'))); });
+      return;
     case 'opt':
-      try {
-        return ev(a.e, x);
-      } catch (e) {
-        if (isJqError(e) && e.jq === 'run') return [];
-        throw e;
-      }
-    case 'field': {
-      const out: Stream = [];
-      const vals = ev(a.src, x);
-      for (let i = 0; i < vals.length; i++) out.push(field(vals[i], a.name));
-      return out;
-    }
-    case 'index': {
-      const out: Stream = [];
-      const vals = ev(a.src, x);
-      const to = ev(a.e, x);
-      for (let i = 0; i < vals.length; i++) {
-        for (let j = 0; j < to.length; j++) out.push(lookup(vals[i], to[j]));
-      }
-      return out;
-    }
-    case 'slice': {
-      const out: Stream = [];
-      const vals = ev(a.src, x);
-      const from = a.from ? ev(a.from, x) : [null];
-      const to = a.to ? ev(a.to, x) : [null];
-      for (let i = 0; i < vals.length; i++) {
-        for (let j = 0; j < from.length; j++) {
-          for (let k = 0; k < to.length; k++) out.push(slice(vals[i], from[j], to[k]));
-        }
-      }
-      return out;
-    }
-    case 'iterate': {
-      const out: Stream = [];
-      const vals = ev(a.src, x);
-      for (let i = 0; i < vals.length; i++) push(out, iterate(vals[i]));
-      return out;
-    }
+      optional(a.e, x, emit);
+      return;
+    case 'field':
+      ev(a.src, x, function (v) { emit(field(v, a.name)); });
+      return;
+    /* The index is on the outside and the value inside, so ([1,2],[3,4])[0,1]
+       gives 1, 3, 2, 4 as jq does. */
+    case 'index':
+      ev(a.e, x, function (k) {
+        ev(a.src, x, function (v) { emit(lookup(v, k)); });
+      });
+      return;
+    case 'slice':
+      maybe(a.from, x, function (from) {
+        maybe(a.to, x, function (to) {
+          ev(a.src, x, function (v) { emit(slice(v, from, to)); });
+        });
+      });
+      return;
+    case 'iterate':
+      ev(a.src, x, function (v) {
+        const list = iterate(v);
+        for (let i = 0; i < list.length; i++) emit(list[i]);
+      });
+      return;
     case 'array':
-      return [arrayOf(a.e ? ev(a.e, x) : [])];
-    case 'object': {
-      const out: Stream = [];
-      buildObject(a.entries, 0, [], [], x, out);
-      return out;
-    }
-    case 'if': {
-      const out: Stream = [];
-      const vals = ev(a.c, x);
-      for (let i = 0; i < vals.length; i++) push(out, ev(truthy(vals[i]) ? a.t : a.f, x));
-      return out;
-    }
+      emit(arrayOf(a.e ? collect(a.e, x) : []));
+      return;
+    case 'object':
+      buildObject(a.entries, 0, [], [], x, emit);
+      return;
+    case 'if':
+      ev(a.c, x, function (c) { ev(truthy(c) ? a.t : a.f, x, emit); });
+      return;
     case 'call':
-      return a.fn(x, a.args);
+      a.fn(x, a.args, emit);
+      return;
   }
+}
+
+/* An expression that may be absent, as either end of a slice can be: absent
+   stands for one output of null. */
+function maybe(a: Ast | null, x: Node, f: (n: Node | null) => void): void {
+  if (a) ev(a, x, f);
+  else f(null);
 }
 
 /* Applies a two-value operator across both streams. jq runs the right-hand
    one on the outside, so (1,2) + (10,20) gives 11, 12, 21, 22. */
-function pair(a: Binary, x: Node, f: (l: Node, r: Node) => Node): Stream {
-  const l = ev(a.l, x);
-  const r = ev(a.r, x);
-  const out: Stream = [];
-  for (let i = 0; i < r.length; i++) {
-    for (let j = 0; j < l.length; j++) out.push(f(l[j], r[i]));
+function pair(a: Binary, x: Node, emit: Emit, f: (l: Node, r: Node) => Node): void {
+  ev(a.r, x, function (r) {
+    ev(a.l, x, function (l) { emit(f(l, r)); });
+  });
+}
+
+/* "?" drops the error an expression raises and keeps what it had produced
+   before then. An error from further down the pipeline goes on up. */
+function optional(e: Ast, x: Node, emit: Emit): void {
+  try {
+    ev(e, x, guard(emit));
+  } catch (err) {
+    if (err instanceof Downstream) throw err.e;
+    if (!(isJqError(err) && err.jq === 'run')) throw err;
   }
-  return out;
 }
 
 /* a // b keeps every truthy output of a, and falls back to b when a
-   produced none of them or failed outright. */
-function alternative(a: Binary, x: Node): Stream {
-  const out: Stream = [];
-  try {
-    const vals = ev(a.l, x);
-    for (let i = 0; i < vals.length; i++) if (truthy(vals[i])) out.push(vals[i]);
-  } catch (e) {
-    if (!isJqError(e) || e.jq !== 'run') throw e;
-  }
-  return out.length ? out : ev(a.r, x);
+   produced none of them. An error in a is an error, as in jq 1.7. */
+function alternative(a: Binary, x: Node, emit: Emit): void {
+  let found = false;
+  ev(a.l, x, function (v) {
+    if (!truthy(v)) return;
+    found = true;
+    emit(v);
+  });
+  if (!found) ev(a.r, x, emit);
 }
 
 /* and/or stop at the left-hand value when it settles the answer, which
    matters because the right-hand side may well fail on the value that made
    it unnecessary. */
-function logical(a: Binary, x: Node): Stream {
-  const vals = ev(a.l, x);
+function logical(a: Binary, x: Node, emit: Emit): void {
   const decided = a.op === 'or';
-  const out: Stream = [];
-  for (let i = 0; i < vals.length; i++) {
-    if (truthy(vals[i]) === decided) {
-      out.push(decided ? TRUE : FALSE);
-      continue;
+  ev(a.l, x, function (l) {
+    if (truthy(l) === decided) {
+      emit(decided ? TRUE : FALSE);
+      return;
     }
-    const rest = ev(a.r, x);
-    for (let j = 0; j < rest.length; j++) out.push(truthy(rest[j]) ? TRUE : FALSE);
-  }
-  return out;
+    ev(a.r, x, function (r) { emit(truthy(r) ? TRUE : FALSE); });
+  });
 }
 
 /* Object construction runs each member's key and value as a stream, so
    {a: (1,2)} makes two objects. Members are taken left to right with the
    first on the outside, which is the order jq produces. */
-function buildObject(entries: Entry[], i: number, keys: string[], vals: Node[], x: Node, out: Stream): void {
+function buildObject(entries: Entry[], i: number, keys: string[], vals: Node[], x: Node, emit: Emit): void {
   if (i === entries.length) {
-    out.push(distinct(objectOf(keys.slice(), vals.slice())));
+    emit(distinct(objectOf(keys.slice(), vals.slice())));
     return;
   }
-  const ks = ev(entries[i].k, x);
-  for (let j = 0; j < ks.length; j++) {
-    const key = ks[j];
+  ev(entries[i].k, x, function (key) {
     if (!is(key, 'string')) {
       throw runErr('an object key must be a string, not ' + typeOf(key));
     }
-    const vs = ev(entries[i].v, x);
-    for (let m = 0; m < vs.length; m++) {
+    ev(entries[i].v, x, function (v) {
       keys.push(key.r);
-      vals.push(vs[m]);
-      buildObject(entries, i + 1, keys, vals, x, out);
+      vals.push(v);
+      buildObject(entries, i + 1, keys, vals, x, emit);
       keys.pop();
       vals.pop();
-    }
-  }
+    });
+  });
 }

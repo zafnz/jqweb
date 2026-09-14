@@ -15,12 +15,15 @@ const file = path.join(import.meta.dirname, 'jq-corpus.json');
 const corpus = JSON.parse(fs.readFileSync(file, 'utf8'));
 const input = JSON.stringify(corpus.input);
 
+/* A query jq refuses is kept with the kind of error, so the engine can be
+   held to failing the same way: jq exits with 3 for a query that does not
+   compile and 5 for one that fails on the input. */
 const cases = corpus.cases.map(({ q }) => {
   try {
-    const out = execFileSync('jq', ['-c', q], { input, encoding: 'utf8', timeout: 5000 });
+    const out = execFileSync('jq', ['-c', q], { input, encoding: 'utf8', timeout: 5000, stdio: ['pipe', 'pipe', 'ignore'] });
     return { q, out: out.split('\n').filter((l) => l !== '') };
   } catch (e) {
-    return { q, error: true };
+    return { q, error: e.status === 3 ? 'parse' : 'run' };
   }
 });
 
@@ -31,4 +34,4 @@ fs.writeFileSync(file,
   ',\n  "cases": [\n' + body + '\n  ]\n}\n');
 
 const failed = cases.filter((c) => c.error).length;
-console.log(cases.length + ' cases, ' + failed + ' of them errors');
+console.log(cases.length + ' cases, ' + failed + ' of them errors jq raises');

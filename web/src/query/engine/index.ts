@@ -5,10 +5,11 @@
    and number text intact, and the document is parsed once rather than twice.
    Scalars are read from a leaf's r field and built with leafOf.
 
-   Every jq expression maps one input to a stream of outputs. Here a stream is
-   an array, which makes ",", "[]" and select fall out of the evaluator for
-   free; the price is that nothing short-circuits, so a filter over an endless
-   stream would not terminate. None of the builtins produce one.
+   Every jq expression maps one input to a stream of outputs. An expression
+   is run with a sink that takes each output as it is produced, so first,
+   limit and isempty can stop a stream part way, and a query over an endless
+   one -- limit(3; recurse(. + 1)) -- ends. run collects the stream into an
+   array for the page.
 
    What is missing, and rejected by name rather than mis-parsed: variables and
    "as", def, reduce, foreach, assignment, path expressions, string

@@ -167,9 +167,17 @@ number text intact, and the document is parsed once rather than twice. `r` is
 what comparisons and arithmetic read; `leafOf` builds a node from a computed
 scalar.
 
-In the engine, a stream is an array. Every jq expression maps one input to many
-outputs, and an array makes `,`, `[]` and `select` fall out for free. Nothing
-short-circuits as a result, so no builtin may produce an endless stream.
+In the engine, an expression is run with a sink: `ev(ast, input, emit)` calls
+`emit` once per output, in order, and holds no stream of its own. `first`,
+`limit` and `isempty` stop a stream by throwing a token through it from inside
+`emit`, which `stopping` in `evaluate.ts` catches, so a builtin may produce an
+endless stream as long as it calls `tick()` per output. A builtin that needs
+every output before it can answer -- `sort_by`, `last`, `[...]` -- uses
+`collect`. Stream order follows jq's own definitions: for a two-argument
+builtin, check with `jq` which argument is on the outside before writing the
+nesting. `"?"` catches what fails inside the expression it wraps and lets an
+error from further down the pipeline through, as jq 1.7 does; `//` catches
+nothing.
 
 ## Rules that bite
 

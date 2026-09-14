@@ -4,8 +4,8 @@
 import { leafOf } from '../../model/node.ts';
 import type { Node, ObjectNode } from '../../model/node.ts';
 import { runErr } from './errors.ts';
-import { ev, push, tick } from './evaluate.ts';
-import type { Stream } from './evaluate.ts';
+import { first } from './evaluate.ts';
+import type { Evaluation, Stream } from './evaluate.ts';
 import type { Ast } from './parser.ts';
 import { FALSE, NULL, TRUE, arrayOf, chars, distinct, field, is, num, objectOf,
   wantType } from './values.ts';
@@ -85,12 +85,11 @@ function groupNames(pattern: string): (string | null)[] {
 
 /* Every match of a pattern in a string, as the objects jq's match produces:
    {offset, length, string, captures: [{offset, length, string, name}]}. */
-function matchesOf(x: Node, pattern: string, flags: string, global: boolean): ObjectNode[] {
+function* matchesOf(x: Node, pattern: string, flags: string, global: boolean, ctx: Evaluation): Generator<ObjectNode> {
   const s = wantType(x, 'string', 'match').r;
   const re = regex(pattern, flags.replace(/g/g, '') + 'gd');
   const names = groupNames(pattern);
   const off = charOffsets(s);
-  const out: ObjectNode[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(s)) !== null) {
     const indices = m.indices!;
@@ -103,15 +102,14 @@ function matchesOf(x: Node, pattern: string, flags: string, global: boolean): Ob
           : [leafOf(-1), leafOf(0), NULL,
             names[i] === undefined || names[i] === null ? NULL : leafOf(names[i])]));
     }
-    out.push(objectOf(['offset', 'length', 'string', 'captures'],
+    yield objectOf(['offset', 'length', 'string', 'captures'],
       [leafOf(off[m.index]), leafOf(off[m.index + m[0].length] - off[m.index]),
-        leafOf(m[0]), arrayOf(caps)]));
+        leafOf(m[0]), arrayOf(caps)]);
     if (!global) break;
     /* An empty match would otherwise be found at the same place for ever. */
-    if (m[0] === '') re.lastIndex++;
-    tick();
+    if (m[0] === '') re.lastIndex += re.unicode && s.codePointAt(re.lastIndex)! > 0xFFFF ? 2 : 1;
+    ctx.tick();
   }
-  return out;
 }
 
 /* The named captures of one match as an object, which is what capture gives
@@ -131,91 +129,71 @@ function captureObject(match: Node): ObjectNode {
 }
 
 /* The pieces of a string either side of every match. */
-export function splitOn(x: Node, pattern: string, flags: string): Stream {
-  const s = wantType(x, 'string', 'splits').r;
+export function* splitOn(x: Node, pattern: string, flags: string, ctx: Evaluation): Stream {
+  const s = wantType(x, 'string', 'split').r;
   const cs = chars(s);
-  const ms = matchesOf(x, pattern, flags, true);
-  const out: Stream = [];
   let at = 0;
-  for (let i = 0; i < ms.length; i++) {
-    const m = ms[i];
-    out.push(leafOf(cs.slice(at, num(field(m, 'offset'), 'splits')).join('')));
+  for (const m of matchesOf(x, pattern, flags, true, ctx)) {
+    yield leafOf(cs.slice(at, num(field(m, 'offset'), 'splits')).join(''));
     at = num(field(m, 'offset'), 'splits') + num(field(m, 'length'), 'splits');
   }
-  out.push(leafOf(cs.slice(at).join('')));
-  return out;
+  yield leafOf(cs.slice(at).join(''));
 }
 
 /* Replaces matches, running the replacement as a filter over each match's
    named captures -- gsub("(?<c>l)"; "[" + .c + "]") is jq's own example. A
    replacement that yields several values yields several whole strings, so
    the results are built across the matches rather than one at a time. */
-export function substitute(x: Node, pattern: string, replacement: Ast, flags: string, global: boolean): Stream {
+export function substitute(ctx: Evaluation, x: Node, pattern: string, replacement: Ast, flags: string, global: boolean): Stream {
   const s = wantType(x, 'string', 'sub').r;
   const cs = chars(s);
-  const ms = matchesOf(x, pattern, flags, global);
-  const out: Stream = [];
-  build(0, 0, '');
-  return out;
+  const ms = Array.from(matchesOf(x, pattern, flags, global, ctx));
+  // jq collects the replacement alternatives before emitting whole strings.
+  return Array.from(build(0, 0, ''));
 
-  function build(i: number, at: number, acc: string): void {
-    tick();
+  function* build(i: number, at: number, acc: string): Stream {
+    ctx.tick();
     if (i === ms.length) {
-      out.push(leafOf(acc + cs.slice(at).join('')));
+      yield leafOf(acc + cs.slice(at).join(''));
       return;
     }
     const m = ms[i];
     const start = num(field(m, 'offset'), 'sub');
     const len = num(field(m, 'length'), 'sub');
     const before = acc + cs.slice(at, start).join('');
-    const reps = ev(replacement, captureObject(m));
-    for (let j = 0; j < reps.length; j++) {
-      build(i + 1, start + len, before + wantType(reps[j], 'string', 'sub').r);
+    for (const rep of ctx.ev(replacement, captureObject(m))) {
+      yield* build(i + 1, start + len, before + wantType(rep, 'string', 'sub').r);
     }
   }
 }
 
 /* A regex builtin's pattern and flags come from its arguments, and jq runs
    the whole thing once per combination of them. */
-export function withRe(x: Node, args: Ast[], arity: number,
-  run: (x: Node, pattern: string, flags: string) => Stream): Stream {
-  const pats = ev(args[0], x);
-  const flags = arity > 1 ? ev(args[1], x) : [leafOf('')];
-  const out: Stream = [];
-  for (let i = 0; i < flags.length; i++) {
-    const f = flags[i];
-    for (let j = 0; j < pats.length; j++) {
-      push(out, run(x, wantType(pats[j], 'string', 'a regex').r,
-        is(f, 'string') ? f.r : ''));
-    }
+export function* withRe(ctx: Evaluation, x: Node, args: Ast[], arity: number,
+  run: (x: Node, pattern: string, flags: string, ctx: Evaluation) => Stream,
+  leftFirst = false): Stream {
+  for (const vals of ctx.args(args.slice(0, arity), x, leftFirst)) {
+    const pattern = wantType(vals[0], 'string', 'a regex').r;
+    const flags = arity > 1 && !is(vals[1], 'null') ? wantType(vals[1], 'string', 'regex flags').r : '';
+    yield* run(x, pattern, flags, ctx);
   }
-  return out;
 }
 
-/* The single value an argument stands for, where a stream would make no
-   sense -- the pattern of a substitution, whose replacement is already run
-   once per match. */
-export function one(arg: Ast, x: Node, name: string): string {
-  const vals = ev(arg, x);
-  if (!vals.length) throw runErr(name + ' needs a pattern');
-  return wantType(vals[0], 'string', name).r;
+export function matchOne(x: Node, pattern: string, flags: string, ctx: Evaluation): Stream {
+  return matchesOf(x, pattern, flags, flags.includes('g'), ctx);
 }
-
-export function matchOne(x: Node, pattern: string, flags: string): Stream {
-  return matchesOf(x, pattern, flags, flags.indexOf('g') >= 0);
+export function testOne(x: Node, pattern: string, flags: string, ctx: Evaluation): Stream {
+  return [first(matchesOf(x, pattern, flags, false, ctx)) === undefined ? FALSE : TRUE];
 }
-export function testOne(x: Node, pattern: string, flags: string): Stream {
-  return [matchesOf(x, pattern, flags, false).length ? TRUE : FALSE];
-}
-export function captureOne(x: Node, pattern: string, flags: string): Stream {
-  return matchOne(x, pattern, flags).map(captureObject);
+export function* captureOne(x: Node, pattern: string, flags: string, ctx: Evaluation): Stream {
+  for (const m of matchOne(x, pattern, flags, ctx)) yield captureObject(m);
 }
 /* scan gives the matched text, or the captures when the pattern has any. */
-export function scanOne(x: Node, pattern: string, flags: string): Stream {
-  return matchesOf(x, pattern, flags.replace(/g/g, '') + 'g', true).map(function (m) {
+export function* scanOne(x: Node, pattern: string, flags: string, ctx: Evaluation): Stream {
+  for (const m of matchesOf(x, pattern, flags, true, ctx)) {
     const caps = wantType(field(m, 'captures'), 'array', 'scan').v;
-    return caps.length
+    yield caps.length
       ? arrayOf(caps.map(function (c) { return field(c, 'string'); }))
       : field(m, 'string');
-  });
+  }
 }

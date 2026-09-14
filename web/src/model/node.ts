@@ -45,10 +45,11 @@ export function leafOf(v: Scalar): LeafNode {
   if (v === null) return { t: 'l', r: null, h: span('null', 'null') };
   if (v === true || v === false) return { t: 'l', r: v, h: span('bool', String(v)) };
   if (typeof v === 'number') {
-    /* JSON has no way to write a NaN or an infinity, so they become null,
-       which is what JSON.stringify does with them too. */
-    if (!isFinite(v)) return { t: 'l', r: null, h: span('null', 'null') };
-    return { t: 'l', r: v, n: String(v), h: span('num', String(v)) };
+    /* Keep the computed value for later arithmetic. Only its JSON display
+       is saturated (infinity) or null (NaN), as in jq. */
+    const text = Number.isNaN(v) ? 'null'
+      : String(Math.max(-Number.MAX_VALUE, Math.min(Number.MAX_VALUE, v)));
+    return { t: 'l', r: v, n: text, h: span(Number.isNaN(v) ? 'null' : 'num', text) };
   }
   return { t: 'l', r: v, h: span('str', esc(quote(v))) };
 }

@@ -142,6 +142,11 @@ committed rather than worked out while the tests run. A builtin with no case in
 the corpus fails the test that reads the names in the builtin table, so adding
 one means adding a query for it.
 
+`jq-semantics.json` also records outputs before an error and whether it failed
+at compile time or runtime. Regenerate it with
+`node web/test/testdata/regenerate.js jq-semantics.json`; its `jq` field records
+the reference build (currently jq 1.7.1).
+
 ## The update check
 
 `internal/update` asks github.com for the latest release once a day. Build with

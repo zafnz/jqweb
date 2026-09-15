@@ -9,7 +9,7 @@ import type { ArrayNode, Node, ObjectNode } from '../../model/node.ts';
 import { NestingError } from '../../model/nesting.ts';
 import { parseJSON } from '../../model/parse.ts';
 import { runErr } from './errors.ts';
-import { collect, ev, evUntil, firstOf, some, stopping, tick } from './evaluate.ts';
+import { collect, ev, evUntil, firstOf, one, scalar, some, stopping, tick } from './evaluate.ts';
 import type { Builtin, Emit } from './evaluate.ts';
 import { FORMATS } from './formats.ts';
 import type { Ast } from './parser.ts';
@@ -293,68 +293,134 @@ function anyMember(x: Node, f: (n: Node) => boolean): boolean {
 
 function falsy(n: Node): boolean { return !truthy(n); }
 
-/* while and until, which jq defines as
+/* The loops: while, until and recurse, which jq defines as
 
        def while(cond; update): def _while: if cond then ., (update | _while) else empty end; _while;
        def until(cond; update): def _until: if cond then . else (update | _until) end; _until;
+       def recurse(f): def r: ., (f | r); r;
+       def recurse(f; cond): def r: ., (f | select(cond) | r); r;
 
-   so every output of cond is a branch, and every output of update is
-   followed. The recursion is over an explicit stack rather than the
-   JavaScript one, since a loop of a hundred thousand steps is nothing
-   unusual. A task is a value to test, or one to emit. */
+   Every output of cond is a branch and every output of update is followed,
+   and each is followed before the next is asked for, so that
+   first(while(true; error)) is the input and never reaches the error.
+
+   That laziness is recursion on the JavaScript stack. A loop whose steps
+   are scalar -- until(. >= 3; . + 1) -- has no later output to wait for and
+   runs as a plain loop for any number of steps. A branching loop is
+   followed LAZY_DEPTH levels down, and past that each further step's
+   outputs are collected before the first is followed, over an explicit
+   stack, so the depth of a branch is bounded by memory rather than the
+   stack; only a sibling that would fail or never end, that deep, tells
+   the difference from jq. */
+const LAZY_DEPTH = 256;
+let lazyDepth = 0;
+
 interface LoopTask {
   v: Node;
   done: boolean;
 }
 
+/* What one step of a loop does with its value: emit it, and follow it or
+   not. For while the value is emitted when cond holds and then followed;
+   for until it is emitted when cond holds and followed when it does not. */
 function loop(x: Node, a: Ast[], emit: Emit, isWhile: boolean): void {
-  const stack: LoopTask[] = [{ v: x, done: false }];
-  let t: LoopTask | undefined;
-  while ((t = stack.pop()) !== undefined) {
-    tick();
-    if (t.done) {
-      emit(t.v);
-      continue;
+  if (scalar(a[0]) && scalar(a[1])) {
+    let v = x;
+    for (;;) {
+      tick();
+      const go = truthy(one(a[0], v));
+      if (go) emit(v);
+      if (go !== isWhile) return;
+      v = one(a[1], v);
     }
-    const v = t.v;
-    const next: LoopTask[] = [];
-    ev(a[0], v, function (c) {
-      const go = truthy(c);
-      if (go) next.push({ v: v, done: true });
-      if (go === isWhile) {
-        ev(a[1], v, function (u) { next.push({ v: u, done: false }); });
+  }
+  follow(x);
+
+  function follow(v: Node): void {
+    tick();
+    if (lazyDepth >= LAZY_DEPTH) {
+      collected(v);
+      return;
+    }
+    lazyDepth++;
+    try {
+      ev(a[0], v, function (c) {
+        const go = truthy(c);
+        if (go) emit(v);
+        if (go === isWhile) ev(a[1], v, follow);
+      });
+    } finally {
+      lazyDepth--;
+    }
+  }
+
+  function collected(v: Node): void {
+    const stack: LoopTask[] = [{ v: v, done: false }];
+    let t: LoopTask | undefined;
+    while ((t = stack.pop()) !== undefined) {
+      tick();
+      if (t.done) {
+        emit(t.v);
+        continue;
       }
-    });
-    /* Reversed, so that the first is the next one taken. */
-    for (let i = next.length - 1; i >= 0; i--) stack.push(next[i]);
+      const here = t.v;
+      const next: LoopTask[] = [];
+      ev(a[0], here, function (c) {
+        const go = truthy(c);
+        if (go) next.push({ v: here, done: true });
+        if (go === isWhile) ev(a[1], here, function (u) { next.push({ v: u, done: false }); });
+      });
+      /* Reversed, so that the first is the next one taken. */
+      for (let i = next.length - 1; i >= 0; i--) stack.push(next[i]);
+    }
   }
 }
 
-/* recurse(f) and recurse(f; cond), which jq defines as
-
-       def recurse(f): def r: ., (f | r); r;
-       def recurse(f; cond): def r: ., (f | select(cond) | r); r;
-
-   Depth first over an explicit stack rather than the JavaScript one,
-   because a filter with no end -- recurse(. + 1) -- would overflow that
-   long before the step limit could report it. */
 function recurseWith(x: Node, f: Ast, cond: Ast | null, emit: Emit): void {
-  const stack: Node[] = [x];
-  let top: Node | undefined;
-  while ((top = stack.pop()) !== undefined) {
+  if (scalar(f) && (!cond || scalar(cond))) {
+    let v = x;
+    for (;;) {
+      tick();
+      emit(v);
+      v = one(f, v);
+      if (cond && !truthy(one(cond, v))) return;
+    }
+  }
+  follow(x);
+
+  function follow(v: Node): void {
     tick();
-    emit(top);
-    const next: Node[] = [];
-    ev(f, top, function (n) {
-      if (!cond) {
-        next.push(n);
-        return;
-      }
-      /* select emits its input once for every truthy output of cond. */
-      ev(cond, n, function (c) { if (truthy(c)) next.push(n); });
-    });
-    /* Reversed, so that the first output is the next one taken. */
-    for (let i = next.length - 1; i >= 0; i--) stack.push(next[i]);
+    if (lazyDepth >= LAZY_DEPTH) {
+      collected(v);
+      return;
+    }
+    lazyDepth++;
+    try {
+      emit(v);
+      ev(f, v, function (n) {
+        if (!cond) follow(n);
+        /* select emits its input once for every truthy output of cond. */
+        else ev(cond, n, function (c) { if (truthy(c)) follow(n); });
+      });
+    } finally {
+      lazyDepth--;
+    }
+  }
+
+  function collected(v: Node): void {
+    const stack: Node[] = [v];
+    let top: Node | undefined;
+    while ((top = stack.pop()) !== undefined) {
+      tick();
+      emit(top);
+      const next: Node[] = [];
+      ev(f, top, function (n) {
+        if (!cond) next.push(n);
+        else ev(cond, n, function (c) { if (truthy(c)) next.push(n); });
+      });
+      /* Reversed, so that the first output is the next one taken. */
+      for (let i = next.length - 1; i >= 0; i--) stack.push(next[i]);
+    }
   }
 }
 
@@ -545,9 +611,11 @@ export const builtins: Record<string, Builtin> = {
   'first/1': function (x, a, emit) {
     evUntil(a[0], x, function (v) { emit(v); return true; });
   },
+  /* jq 1.7 defines last(f) as a reduce from null, so last(empty) is null. */
   'last/1': function (x, a, emit) {
-    const vals = collect(a[0], x);
-    if (vals.length) emit(vals[vals.length - 1]);
+    let last: Node = NULL;
+    ev(a[0], x, function (v) { last = v; });
+    emit(last);
   },
   /* jq 1.7 takes the whole stream for a negative count and stops once the
      count is reached, so a count of 1.8 gives two. */
@@ -568,9 +636,12 @@ export const builtins: Record<string, Builtin> = {
   'range/2': function (x, a, emit) { rangeOf(a[0], a[1], null, x, emit); },
   'range/3': function (x, a, emit) { rangeOf(a[0], a[1], a[2], x, emit); },
 
+  /* The argument is run before the input is checked, as jq binds a value
+     argument first: 0 | join(empty) produces nothing rather than failing.
+     split, startswith, endswith and strftime are the same. */
   'join/1': function (x, a, emit) {
-    const list = wantType(x, 'array', 'join').v;
     overArg(a[0], x, emit, function (sep) {
+      const list = wantType(x, 'array', 'join').v;
       const parts: string[] = [];
       for (let i = 0; i < list.length; i++) {
         const v = list[i];
@@ -584,21 +655,21 @@ export const builtins: Record<string, Builtin> = {
     });
   },
   'split/1': function (x, a, emit) {
-    const s = wantType(x, 'string', 'split').r;
     overArg(a[0], x, emit, function (sep) {
+      const s = wantType(x, 'string', 'split').r;
       return arrayOf(s.split(wantType(sep, 'string', 'split').r).map(leafOf));
     });
   },
 
   'startswith/1': function (x, a, emit) {
-    const s = wantType(x, 'string', 'startswith').r;
     overArg(a[0], x, emit, function (p) {
+      const s = wantType(x, 'string', 'startswith').r;
       return s.lastIndexOf(wantType(p, 'string', 'startswith').r, 0) === 0 ? TRUE : FALSE;
     });
   },
   'endswith/1': function (x, a, emit) {
-    const s = wantType(x, 'string', 'endswith').r;
     overArg(a[0], x, emit, function (p) {
+      const s = wantType(x, 'string', 'endswith').r;
       const t = wantType(p, 'string', 'endswith').r;
       return s.length >= t.length && s.indexOf(t, s.length - t.length) >= 0 ? TRUE : FALSE;
     });
@@ -792,9 +863,8 @@ export const builtins: Record<string, Builtin> = {
   'fromdate/0': function (x, _a, emit) { emit(leafOf(parseDate(x, 'fromdate'))); },
   'fromdateiso8601/0': function (x, _a, emit) { emit(leafOf(parseDate(x, 'fromdateiso8601'))); },
   'strftime/1': function (x, a, emit) {
-    const secs = seconds(x, 'strftime');
     overArg(a[0], x, emit, function (f) {
-      return leafOf(strftime(secs, wantType(f, 'string', 'strftime').r));
+      return leafOf(strftime(seconds(x, 'strftime'), wantType(f, 'string', 'strftime').r));
     });
   },
   /* The exponent is on the outside, so pow((2,3); (4,5)) gives 16, 81, 32,

@@ -172,8 +172,14 @@ In the engine, an expression is run with a sink: `ev(ast, input, emit)` calls
 `limit` and `isempty` stop a stream by throwing a token through it from inside
 `emit`, which `stopping` in `evaluate.ts` catches, so a builtin may produce an
 endless stream as long as it calls `tick()` per output. A builtin that needs
-every output before it can answer -- `sort_by`, `last`, `[...]` -- uses
-`collect`. Stream order follows jq's own definitions: for a two-argument
+every output before it can answer -- `sort_by`, `[...]` -- uses `collect`;
+anything else must hand each output on before asking for the next, so a
+consumer that has enough never sees the sibling that would have failed. The
+loops (`while`, `until`, `recurse`) do that by recursing on the JavaScript
+stack: a step that `scalar()` says has exactly one output runs as a loop,
+and a branching step is followed 256 levels deep before the rest of that
+branch is collected a step at a time. A query that runs out of work throws
+a `fatal` error that `?` lets through. Stream order follows jq's own definitions: for a two-argument
 builtin, check with `jq` which argument is on the outside before writing the
 nesting. `"?"` catches what fails inside the expression it wraps and lets an
 error from further down the pipeline through, as jq 1.7 does; `//` catches

@@ -84,13 +84,14 @@ function groupNames(pattern: string): (string | null)[] {
 }
 
 /* Every match of a pattern in a string, as the objects jq's match produces:
-   {offset, length, string, captures: [{offset, length, string, name}]}. */
-function matchesOf(x: Node, pattern: string, flags: string, global: boolean): ObjectNode[] {
+   {offset, length, string, captures: [{offset, length, string, name}]},
+   each handed to found as it is made, so a consumer that has enough can
+   stop the search. */
+function matchesOf(x: Node, pattern: string, flags: string, global: boolean, found: (m: ObjectNode) => void): void {
   const s = wantType(x, 'string', 'match').r;
   const re = regex(pattern, flags.replace(/g/g, '') + 'gd');
   const names = groupNames(pattern);
   const off = charOffsets(s);
-  const out: ObjectNode[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(s)) !== null) {
     const indices = m.indices!;
@@ -103,7 +104,7 @@ function matchesOf(x: Node, pattern: string, flags: string, global: boolean): Ob
           : [leafOf(-1), leafOf(0), NULL,
             names[i] === undefined || names[i] === null ? NULL : leafOf(names[i])]));
     }
-    out.push(objectOf(['offset', 'length', 'string', 'captures'],
+    found(objectOf(['offset', 'length', 'string', 'captures'],
       [leafOf(off[m.index]), leafOf(off[m.index + m[0].length] - off[m.index]),
         leafOf(m[0]), arrayOf(caps)]));
     if (!global) break;
@@ -111,6 +112,13 @@ function matchesOf(x: Node, pattern: string, flags: string, global: boolean): Ob
     if (m[0] === '') re.lastIndex++;
     tick();
   }
+}
+
+/* Every match, for the operations that need all of them before they can
+   say anything. */
+function allMatches(x: Node, pattern: string, flags: string, global: boolean): ObjectNode[] {
+  const out: ObjectNode[] = [];
+  matchesOf(x, pattern, flags, global, function (m) { out.push(m); });
   return out;
 }
 
@@ -134,7 +142,7 @@ function captureObject(match: Node): ObjectNode {
 export function splitOn(x: Node, pattern: string, flags: string, emit: Emit): void {
   const s = wantType(x, 'string', 'splits').r;
   const cs = chars(s);
-  const ms = matchesOf(x, pattern, flags, true);
+  const ms = allMatches(x, pattern, flags, true);
   let at = 0;
   for (let i = 0; i < ms.length; i++) {
     const m = ms[i];
@@ -156,7 +164,7 @@ export function substitute(x: Node, re: Node, replacement: Ast, flags: Node, glo
   const name = global ? 'gsub' : 'sub';
   const s = wantType(x, 'string', name).r;
   const cs = chars(s);
-  const ms = matchesOf(x, wantType(re, 'string', name).r, is(flags, 'string') ? flags.r : '', global);
+  const ms = allMatches(x, wantType(re, 'string', name).r, is(flags, 'string') ? flags.r : '', global);
   const results: string[] = [];
   let previous = 0;
   for (let i = 0; i < ms.length; i++) {
@@ -193,23 +201,22 @@ export function withRe(x: Node, args: Ast[], arity: number, run: Matcher, emit: 
 }
 
 export function matchOne(x: Node, pattern: string, flags: string, emit: Emit): void {
-  const ms = matchesOf(x, pattern, flags, flags.indexOf('g') >= 0);
-  for (let i = 0; i < ms.length; i++) emit(ms[i]);
+  matchesOf(x, pattern, flags, flags.indexOf('g') >= 0, emit);
 }
 export function testOne(x: Node, pattern: string, flags: string, emit: Emit): void {
-  emit(matchesOf(x, pattern, flags, false).length ? TRUE : FALSE);
+  let found = false;
+  matchesOf(x, pattern, flags, false, function () { found = true; });
+  emit(found ? TRUE : FALSE);
 }
 export function captureOne(x: Node, pattern: string, flags: string, emit: Emit): void {
-  const ms = matchesOf(x, pattern, flags, flags.indexOf('g') >= 0);
-  for (let i = 0; i < ms.length; i++) emit(captureObject(ms[i]));
+  matchesOf(x, pattern, flags, flags.indexOf('g') >= 0, function (m) { emit(captureObject(m)); });
 }
 /* scan gives the matched text, or the captures when the pattern has any. */
 export function scanOne(x: Node, pattern: string, flags: string, emit: Emit): void {
-  const ms = matchesOf(x, pattern, flags.replace(/g/g, '') + 'g', true);
-  for (let i = 0; i < ms.length; i++) {
-    const caps = wantType(field(ms[i], 'captures'), 'array', 'scan').v;
+  matchesOf(x, pattern, flags.replace(/g/g, '') + 'g', true, function (m) {
+    const caps = wantType(field(m, 'captures'), 'array', 'scan').v;
     emit(caps.length
       ? arrayOf(caps.map(function (c) { return field(c, 'string'); }))
-      : field(ms[i], 'string'));
-  }
+      : field(m, 'string'));
+  });
 }

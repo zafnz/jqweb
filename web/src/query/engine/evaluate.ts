@@ -10,7 +10,7 @@
 
 import { leafOf } from '../../model/node.ts';
 import type { Node } from '../../model/node.ts';
-import { isJqError, runErr } from './errors.ts';
+import { isJqError, runErr, workErr } from './errors.ts';
 import type { Ast, Entry } from './parser.ts';
 import { FALSE, TRUE, add2, arrayOf, cmp, descend, distinct, div2, field, is,
   iterate, lookup, mod2, mul2, num, objectOf, slice, sub2, truthy,
@@ -36,18 +36,58 @@ type Binary = Extract<Ast, { l: Ast }>;
 const STEP_LIMIT = 5000000;
 let steps = 0;
 
-/* Runs a whole query against one input. The step count starts again from
-   nothing, so a query run many times is bounded on each run rather than
-   across all of them. */
-export function evaluate(ast: Ast, input: Node): Stream {
+/* Runs a whole query against one input, sending each output to emit as it
+   is produced. The step count starts again from nothing, so a query run
+   many times is bounded on each run rather than across all of them. */
+export function stream(ast: Ast, input: Node, emit: Emit): void {
   steps = 0;
-  return collect(ast, input);
+  ev(ast, input, emit);
+}
+
+/* Runs a whole query against one input and returns every output. */
+export function evaluate(ast: Ast, input: Node): Stream {
+  const out: Stream = [];
+  stream(ast, input, function (n) { out.push(n); });
+  return out;
 }
 
 /* Bounds the work one query may do, so a filter that fans out over a large
    document reports an error instead of hanging the tab. */
 export function tick(): void {
-  if (++steps > STEP_LIMIT) throw runErr('query produced too much work');
+  if (++steps > STEP_LIMIT) throw workErr('query produced too much work');
+}
+
+/* Whether an expression always produces exactly one output, and can only
+   fail before producing it: the input, a literal, a field or index of one,
+   arithmetic, a comparison, and, or, negation, or an if over them. A loop
+   whose steps are scalar can be run as a loop, because no output can come
+   after the one the step gave. */
+const SCALAR = new WeakMap<Ast, boolean>();
+export function scalar(a: Ast): boolean {
+  let s = SCALAR.get(a);
+  if (s !== undefined) return s;
+  switch (a.op) {
+    case '.': case 'lit': s = true; break;
+    case 'field': s = scalar(a.src); break;
+    case 'neg': s = scalar(a.e); break;
+    case 'index': s = scalar(a.src) && scalar(a.e); break;
+    case 'if': s = scalar(a.c) && scalar(a.t) && scalar(a.f); break;
+    case 'and': case 'or':
+    case '==': case '!=': case '<': case '<=': case '>': case '>=':
+    case '+': case '-': case '*': case '/': case '%':
+      s = scalar(a.l) && scalar(a.r);
+      break;
+    default: s = false;
+  }
+  SCALAR.set(a, s);
+  return s;
+}
+
+/* The one output of a scalar expression. */
+export function one(a: Ast, x: Node): Node {
+  let v: Node | undefined;
+  ev(a, x, function (n) { v = n; });
+  return v!;
 }
 
 /* Every output of an expression, for the builtins that need the whole
@@ -219,13 +259,14 @@ function pair(a: Binary, x: Node, emit: Emit, f: (l: Node, r: Node) => Node): vo
 }
 
 /* "?" drops the error an expression raises and keeps what it had produced
-   before then. An error from further down the pipeline goes on up. */
+   before then. An error from further down the pipeline goes on up, and so
+   does running out of work, which no query can carry on from. */
 function optional(e: Ast, x: Node, emit: Emit): void {
   try {
     ev(e, x, guard(emit));
   } catch (err) {
     if (err instanceof Downstream) throw err.e;
-    if (!(isJqError(err) && err.jq === 'run')) throw err;
+    if (!(isJqError(err) && err.jq === 'run' && !err.fatal)) throw err;
   }
 }
 

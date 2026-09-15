@@ -5,7 +5,7 @@
 import { leafOf } from '../../model/node.ts';
 import type { ArrayNode, LeafNode, Node, ObjectNode } from '../../model/node.ts';
 import { checkNesting, NestingError } from '../../model/nesting.ts';
-import { runErr } from './errors.ts';
+import { runErr, workErr } from './errors.ts';
 
 export const NULL = leafOf(null);
 export const TRUE = leafOf(true);
@@ -81,6 +81,23 @@ export function members(n: ObjectNode): { k: string[]; v: Node[] } {
    so an emoji is two units and one character; jq counts characters. */
 export function chars(s: string): string[] { return Array.from(s); }
 
+/* Two strings in code point order, which is jq's. UTF-16 order differs
+   from it only where a surrogate, in D800-DFFF, meets a unit at E000 or
+   above, so each unit is compared through a key that lifts the surrogates
+   past the rest. */
+export function cmpStr(x: string, y: string): number {
+  const n = x.length < y.length ? x.length : y.length;
+  for (let i = 0; i < n; i++) {
+    let a = x.charCodeAt(i);
+    let b = y.charCodeAt(i);
+    if (a === b) continue;
+    if (a >= 0xD800 && a <= 0xDFFF) a += 0x2800;
+    if (b >= 0xD800 && b <= 0xDFFF) b += 0x2800;
+    return a < b ? -1 : 1;
+  }
+  return x.length === y.length ? 0 : x.length < y.length ? -1 : 1;
+}
+
 /* ---- ordering ----
 
    jq orders values across types as null < false < true < numbers < strings
@@ -105,9 +122,14 @@ export function cmp(a: Node, b: Node): number {
   const rb = rank(b);
   if (ra !== rb) return ra < rb ? -1 : 1;
   if (ra <= 2) return 0;                       /* null and the booleans */
-  if (ra <= 4) {
+  if (ra === 4) return cmpStr((a as OrderedLeaf).r as string, (b as OrderedLeaf).r as string);
+  if (ra === 3) {
     const x = (a as OrderedLeaf).r;
     const y = (b as OrderedLeaf).r;
+    /* jq compares a NaN as if it were null, so it is below every number
+       and below itself: nan < nan holds and nan == nan does not. */
+    if (x !== x) return -1;
+    if (y !== y) return 1;
     return x < y ? -1 : x > y ? 1 : 0;
   }
   if (ra === 5) {
@@ -124,8 +146,8 @@ export function cmp(a: Node, b: Node): number {
        values taken in that order. */
     const ma = members(a);
     const mb = members(b);
-    const ka = ma.k.slice().sort();
-    const kb = mb.k.slice().sort();
+    const ka = ma.k.slice().sort(cmpStr);
+    const kb = mb.k.slice().sort(cmpStr);
     const c = cmp(arrayOf(ka.map(leafOf)), arrayOf(kb.map(leafOf)));
     if (c) return c;
     for (let i = 0; i < ka.length; i++) {
@@ -153,12 +175,13 @@ export function field(n: Node, key: string): Node {
 }
 
 /* One element of an array. A negative index counts from the end and a
-   fractional one is rounded down, both as in jq; out of range gives null. */
+   fractional one is truncated toward zero, so -1.2 is the last element and
+   -0.5 the first, both as in jq; out of range gives null. */
 export function elem(n: Node, i: number): Node {
   if (n.t === 'a') {
-    i = Math.floor(i);
+    i = Math.trunc(i);
     if (i < 0) i += n.v.length;
-    return i < 0 || i >= n.v.length ? NULL : n.v[i];
+    return i >= 0 && i < n.v.length ? n.v[i] : NULL;
   }
   if (n.t === 'l' && n.r === null) return NULL;
   throw runErr('cannot index ' + typeOf(n) + ' with a number');
@@ -178,19 +201,24 @@ export function slice(n: Node, from: Node | null, to: Node | null): Node {
   if (n.t === 'l' && n.r === null) return NULL;
   const cs = n.t === 'a' ? n.v : is(n, 'string') ? chars(n.r) : null;
   if (cs === null) throw runErr('cannot slice ' + typeOf(n));
-  const lo = bound(from, 0, cs.length);
-  let hi = bound(to, cs.length, cs.length);
+  const lo = bound(from, 0, cs.length, false);
+  let hi = bound(to, cs.length, cs.length, true);
   if (hi < lo) hi = lo;
   return n.t === 'a' ? arrayOf(n.v.slice(lo, hi)) : leafOf(cs.slice(lo, hi).join(''));
 }
 
-/* One end of a slice: absent means the default, negative counts from the
-   end, and anything past either end is pulled back to it. */
-function bound(v: Node | null, dflt: number, len: number): number {
+/* One end of a slice: absent or NaN means the default, negative counts
+   from the end, and anything past either end is pulled back to it. The
+   count from the end is taken before rounding, and then a start is rounded
+   down and an end up, so .[1.8:3.2] takes elements 1 to 3 and .[:-0.5]
+   takes everything, as jq does. */
+function bound(v: Node | null, dflt: number, len: number, up: boolean): number {
   if (v === null) return dflt;
   if (!is(v, 'number')) throw runErr('a slice bound must be a number');
-  let i = Math.floor(v.r);
+  let i = v.r;
+  if (i !== i) return dflt;
   if (i < 0) i += len;
+  i = up ? Math.ceil(i) : Math.floor(i);
   return i < 0 ? 0 : i > len ? len : i;
 }
 
@@ -251,8 +279,15 @@ export function div2(a: Node, b: Node): Node {
     if (b.r === 0) throw runErr('cannot divide by zero');
     return leafOf(a.r / b.r);
   }
-  if (is(a, 'string') && is(b, 'string')) return arrayOf(a.r.split(b.r).map(leafOf));
+  if (is(a, 'string') && is(b, 'string')) return arrayOf(splitStr(a.r, b.r).map(leafOf));
   throw runErr(typeOf(a) + ' and ' + typeOf(b) + ' cannot be divided');
+}
+
+/* The pieces of a string between each separator. An empty separator gives
+   the characters, as code points rather than the UTF-16 units that
+   String.prototype.split would produce. */
+export function splitStr(s: string, sep: string): string[] {
+  return sep === '' ? chars(s) : s.split(sep);
 }
 
 /* jq truncates both sides to integers before taking the remainder, so
@@ -267,9 +302,13 @@ export function mod2(a: Node, b: Node): Node {
 }
 
 /* A negative count gives null and a fractional one is rounded down, so
-   "ab" * 2.5 is "abab" and "ab" * -1 is null. */
+   "ab" * 2.5 is "abab" and "ab" * -1 is null. jq builds a string of any
+   length the machine has memory for; here one past REPEAT_LIMIT UTF-16
+   units is more work than a page can take. */
+const REPEAT_LIMIT = 5000000;
 function repeat(s: string, n: number): Node {
   if (n < 0) return NULL;
+  if (n * s.length > REPEAT_LIMIT) throw workErr('query produced too much work');
   let out = '';
   for (let i = Math.floor(n); i > 0; i--) out += s;
   return leafOf(out);

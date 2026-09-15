@@ -393,9 +393,22 @@ test('an index of 0 is still a truthy select', () => {
     ['["abc","bca"]']);
 });
 
-test('regex flags outside the supported set are refused', () => {
+test('modifiers combine with alternatives, captures, comments and empty matches', () => {
+  /* n takes the alternative that consumes a character where there is one,
+     and skips the position where there is none. */
+  assert.deepStrictEqual(run('[match("a*|b"; "gn") | .string]', '"b"'), ['["b"]']);
+  assert.deepStrictEqual(run('[match("a*|b"; "gn") | .string]', '"ab"'), ['["a","b"]']);
+  assert.deepStrictEqual(run('[match("X*"; "gn") | .offset]', '"aXb"'), ['[1]']);
+  /* A bracket in an x-mode comment is not a group. */
+  assert.deepStrictEqual(run('capture("#(ignored)\\n(?<x>a)"; "x")', '"a"'), ['{"x":"a"}']);
+  assert.deepStrictEqual(run('[match("[a-c] # letters\\n"; "gix") | .string]', '"aBcd"'), ['["a","B","c"]']);
+  assert.deepStrictEqual(run('[match("(a)|b"; "gn") | .captures | length]', '"ba"'), ['[1,1]']);
+});
+
+test('regex modifiers are jq\'s letters, and the one JavaScript cannot do is refused', () => {
   assert.deepStrictEqual(run('test("A"; "i")', '"a"'), ['true']);
-  assert.strictEqual(error('test("a"; "x")', '"a"'), 'run: unsupported regex flag "x"');
+  assert.strictEqual(error('test("a"; "q")', '"a"'), 'run: q is not a valid modifier string');
+  assert.strictEqual(error('test("a"; "l")', '"a"'), 'run: the l modifier is not supported');
   assert.ok(error('test("(")', '"a"').startsWith('run: bad regular expression'));
 });
 

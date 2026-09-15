@@ -16,9 +16,9 @@ import type { Ast } from './parser.ts';
 import { captureOne, matchOne, scanOne, splitOn, substitute, testOne,
   withRe } from './regex.ts';
 import { broken, parseDate, seconds, strftime } from './time.ts';
-import { FALSE, NULL, TRUE, add2, arrayOf, chars, cmp, descend, distinct, elem,
-  equal, field, is, iterate, lookup, members, num, objectOf, splitStr, truthy,
-  typeOf, wantType } from './values.ts';
+import { FALSE, NULL, TRUE, add2, arrayOf, chars, cmp, cmpStr, descend, distinct,
+  elem, equal, field, is, iterate, lookup, members, num, objectOf, splitStr,
+  truthy, typeOf, wantType } from './values.ts';
 import type { JqType } from './values.ts';
 
 /* Emits f of every output of an argument expression, because jq treats a
@@ -35,7 +35,7 @@ function keysOf(n: Node, sorted: boolean): ArrayNode {
   }
   if (n.t === 'o') {
     const k = members(n).k.slice();
-    if (sorted) k.sort();
+    if (sorted) k.sort(cmpStr);
     return arrayOf(k.map(leafOf));
   }
   throw runErr(typeOf(n) + ' has no keys');
@@ -720,7 +720,7 @@ export const builtins: Record<string, Builtin> = {
     const s = wantType(x, 'string', 'tonumber').r;
     if (DECIMAL.test(s)) emit(leafOf(+s));
     else if (NOT_FINITE.test(s)) emit(leafOf(s.trim().charAt(0) === '-' ? -Infinity : Infinity));
-    else if (NOT_A_NUMBER.test(s)) emit(NULL);
+    else if (NOT_A_NUMBER.test(s)) emit(leafOf(NaN));
     else throw runErr('cannot parse "' + s + '" as a number');
   },
   'tojson/0': function (x, _a, emit) { emit(leafOf(stringify(x))); },
@@ -865,10 +865,11 @@ export const builtins: Record<string, Builtin> = {
       .map(function (c) { return leafOf(c.codePointAt(0)!); })));
   },
   /* A code point that is not one -- past U+10FFFF, negative, or a surrogate
-     -- becomes the replacement character, as in jq. */
+     -- becomes the replacement character, as in jq; a NaN is refused. */
   'implode/0': function (x, _a, emit) {
     emit(leafOf(wantType(x, 'array', 'implode').v.map(function (n) {
       const c = Math.trunc(num(n, 'implode'));
+      if (c !== c) throw runErr('implode needs a number, not null');
       const ok = c >= 0 && c <= 0x10FFFF && !(c >= 0xD800 && c <= 0xDFFF);
       return String.fromCodePoint(ok ? c : 0xFFFD);
     }).join('')));

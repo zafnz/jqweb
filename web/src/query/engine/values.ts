@@ -5,7 +5,7 @@
 import { leafOf } from '../../model/node.ts';
 import type { ArrayNode, LeafNode, Node, ObjectNode } from '../../model/node.ts';
 import { checkNesting, NestingError } from '../../model/nesting.ts';
-import { runErr } from './errors.ts';
+import { runErr, workErr } from './errors.ts';
 
 export const NULL = leafOf(null);
 export const TRUE = leafOf(true);
@@ -85,7 +85,7 @@ export function chars(s: string): string[] { return Array.from(s); }
    from it only where a surrogate, in D800-DFFF, meets a unit at E000 or
    above, so each unit is compared through a key that lifts the surrogates
    past the rest. */
-function cmpStr(x: string, y: string): number {
+export function cmpStr(x: string, y: string): number {
   const n = x.length < y.length ? x.length : y.length;
   for (let i = 0; i < n; i++) {
     let a = x.charCodeAt(i);
@@ -126,6 +126,10 @@ export function cmp(a: Node, b: Node): number {
   if (ra === 3) {
     const x = (a as OrderedLeaf).r;
     const y = (b as OrderedLeaf).r;
+    /* jq compares a NaN as if it were null, so it is below every number
+       and below itself: nan < nan holds and nan == nan does not. */
+    if (x !== x) return -1;
+    if (y !== y) return 1;
     return x < y ? -1 : x > y ? 1 : 0;
   }
   if (ra === 5) {
@@ -142,8 +146,8 @@ export function cmp(a: Node, b: Node): number {
        values taken in that order. */
     const ma = members(a);
     const mb = members(b);
-    const ka = ma.k.slice().sort();
-    const kb = mb.k.slice().sort();
+    const ka = ma.k.slice().sort(cmpStr);
+    const kb = mb.k.slice().sort(cmpStr);
     const c = cmp(arrayOf(ka.map(leafOf)), arrayOf(kb.map(leafOf)));
     if (c) return c;
     for (let i = 0; i < ka.length; i++) {
@@ -203,15 +207,18 @@ export function slice(n: Node, from: Node | null, to: Node | null): Node {
   return n.t === 'a' ? arrayOf(n.v.slice(lo, hi)) : leafOf(cs.slice(lo, hi).join(''));
 }
 
-/* One end of a slice: absent means the default, negative counts from the
-   end, and anything past either end is pulled back to it. A fractional
-   start is rounded down and a fractional end up, so .[1.8:3.2] takes
-   elements 1 to 3 as jq does. */
+/* One end of a slice: absent or NaN means the default, negative counts
+   from the end, and anything past either end is pulled back to it. The
+   count from the end is taken before rounding, and then a start is rounded
+   down and an end up, so .[1.8:3.2] takes elements 1 to 3 and .[:-0.5]
+   takes everything, as jq does. */
 function bound(v: Node | null, dflt: number, len: number, up: boolean): number {
   if (v === null) return dflt;
   if (!is(v, 'number')) throw runErr('a slice bound must be a number');
-  let i = up ? Math.ceil(v.r) : Math.floor(v.r);
+  let i = v.r;
+  if (i !== i) return dflt;
   if (i < 0) i += len;
+  i = up ? Math.ceil(i) : Math.floor(i);
   return i < 0 ? 0 : i > len ? len : i;
 }
 
@@ -295,9 +302,13 @@ export function mod2(a: Node, b: Node): Node {
 }
 
 /* A negative count gives null and a fractional one is rounded down, so
-   "ab" * 2.5 is "abab" and "ab" * -1 is null. */
+   "ab" * 2.5 is "abab" and "ab" * -1 is null. jq builds a string of any
+   length the machine has memory for; here one past REPEAT_LIMIT UTF-16
+   units is more work than a page can take. */
+const REPEAT_LIMIT = 5000000;
 function repeat(s: string, n: number): Node {
   if (n < 0) return NULL;
+  if (n * s.length > REPEAT_LIMIT) throw workErr('query produced too much work');
   let out = '';
   for (let i = Math.floor(n); i > 0; i--) out += s;
   return leafOf(out);

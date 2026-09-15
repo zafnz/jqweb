@@ -122,6 +122,14 @@ test('a repeated key collapses to its last value', () => {
   assert.deepStrictEqual(run('{x: 1, x: 2}', 'null'), ['{"x":2}']);
 });
 
+test('a NaN or an infinity stays a number and prints as jq prints it', () => {
+  assert.deepStrictEqual(run('(-1 | sqrt) | type, not, tostring', 'null'), ['"number"', 'false', '"null"']);
+  assert.deepStrictEqual(run('(1000 | exp) / 2, ((1000 | exp) * 0)', 'null'),
+    ['1.7976931348623157e+308', 'null']);
+  assert.deepStrictEqual(run('[(-1 | sqrt) < (-1 | sqrt), (-1 | sqrt) == (-1 | sqrt)]', 'null'),
+    ['[true,false]']);
+});
+
 test('values sort in jq order across types', () => {
   assert.deepStrictEqual(run('sort', '[{},[],"s",1,true,false,null]'),
     ['[null,false,true,1,"s",[],{}]']);

@@ -33,7 +33,8 @@ does, and `//` reports an error on its left-hand side as jq 1.7 does.
 
 **Fixed:** Values behave as jq's do in the corners: a fractional index
 truncates toward zero and a fractional slice bound rounds outward, `1000 | exp`
-is the largest double rather than null, `round` takes halves away from zero,
+prints as the largest double rather than null and still computes as infinity,
+`round` takes halves away from zero,
 `tonumber` refuses hex and other spellings jq refuses, strings sort and split
 by code point, `@uri` encodes an emoji as one character, `implode` replaces an
 invalid code point, and `contains`, `join` and `from_entries` fail or pass on

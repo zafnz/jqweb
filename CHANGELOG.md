@@ -24,6 +24,13 @@ cannot be checked.
 error instead of producing a broken page. Queries that create deeper values
 also report an error.
 
+**Fixed:** `first`, `limit`, `any`, `all` and `isempty` stop reading a stream
+once they have their answer, so `first(1, error("x"))` is 1 and
+`limit(3; recurse(. + 1))` ends, and a trailing `?` keeps the outputs produced
+before the error. Builtins given an argument with several outputs (`until`,
+`walk`, `sub`, `pow`, `limit` and others) produce results in the order jq
+does, and `//` reports an error on its left-hand side as jq 1.7 does.
+
 **Fixed:** `-O` now opens generated files whose paths contain spaces, `#`, `?`
 or Unicode characters, including paths on Windows.
 

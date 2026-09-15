@@ -202,11 +202,11 @@ export function iterate(n: Node): Node[] {
 
 /* Every value in a subtree, the value itself first, which is what ".." and
    recurse produce. */
-export function descend(n: Node, out: Node[]): void {
-  out.push(n);
+export function descend(n: Node, emit: (n: Node) => void): void {
+  emit(n);
   if (n.t === 'a' || n.t === 'o') {
     const v = n.t === 'o' ? members(n).v : n.v;
-    for (let i = 0; i < v.length; i++) descend(v[i], out);
+    for (let i = 0; i < v.length; i++) descend(v[i], emit);
   }
 }
 

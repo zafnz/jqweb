@@ -11,6 +11,7 @@ export type ErrorKind = 'parse' | 'run';
 export interface JqError extends Error {
   jq: ErrorKind;
   pos?: number;
+  fatal?: boolean;
 }
 
 function fail(kind: ErrorKind, msg: string, pos?: number): JqError {
@@ -18,6 +19,7 @@ function fail(kind: ErrorKind, msg: string, pos?: number): JqError {
 }
 export function parseErr(msg: string, pos: number): JqError { return fail('parse', msg, pos); }
 export function runErr(msg: string): JqError { return fail('run', msg); }
+export function workErr(msg: string): JqError { return Object.assign(runErr(msg), { fatal: true }); }
 
 /* Whether a thrown value is one of the errors above, rather than a fault in
    the engine or the page. */

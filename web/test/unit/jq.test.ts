@@ -18,7 +18,7 @@ import { compile, isJqError } from '../../src/query/engine/index.ts';
    for it, one JSON text per output. */
 interface Corpus {
   input: unknown;
-  cases: { q: string; out: string[] }[];
+  cases: { q: string; out: string[]; error?: 'parse' | 'run' }[];
 }
 
 const corpus: Corpus = JSON.parse(fs.readFileSync(new URL('../testdata/jq-corpus.json', import.meta.url), 'utf8'));
@@ -43,7 +43,8 @@ function error(query: string, doc?: string): string {
 test('every corpus query agrees with jq', () => {
   const doc = JSON.stringify(corpus.input);
   for (const c of corpus.cases) {
-    assert.deepStrictEqual(run(c.q, doc), c.out, `query ${c.q}`);
+    if (c.error) assert.throws(() => run(c.q, doc), e => isJqError(e) && e.jq === c.error, c.q);
+    else assert.deepStrictEqual(run(c.q, doc), c.out, `query ${c.q}`);
   }
 });
 
@@ -125,8 +126,7 @@ test('"//" falls back only when nothing truthy came out', () => {
   assert.deepStrictEqual(run('.a // "d"', '{"a":false}'), ['"d"']);
   assert.deepStrictEqual(run('.a // "d"', '{"a":0}'), ['0']);
   assert.deepStrictEqual(run('[(1,null,2) // 9]', 'null'), ['[1,2]']);
-  /* A left-hand side that fails outright counts as producing nothing. */
-  assert.deepStrictEqual(run('.a.b // "d"', '{"a":3}'), ['"d"']);
+  assert.strictEqual(error('.a.b // "d"', '{"a":3}'), 'run: cannot index number with "b"');
 });
 
 test('and/or stop once the left-hand value settles the answer', () => {
@@ -274,8 +274,7 @@ test('a runaway query stops instead of hanging', () => {
 });
 
 test('a query can be run more than once', () => {
-  /* The step counter is shared, so it has to be reset per run rather than
-     accumulating until a later run trips it. */
+  /* Each run owns a fresh budget. */
   const q = compile('[range(100)] | length');
   const doc = parseJSON('null');
   for (let i = 0; i < 200; i++) {

@@ -19,12 +19,19 @@ export function broken(secs: number): ArrayNode {
 
 /* Seconds from a broken-out time, or from a number left as it is. */
 export function seconds(x: Node, name: string): number {
-  if (is(x, 'number')) return x.r;
+  if (name !== 'mktime' && is(x, 'number')) return x.r;
   const v = wantType(x, 'array', name).v;
-  if (v.length < 6) throw runErr(name + ' needs a broken-out time of at least six parts');
-  return Date.UTC(num(v[0], name), num(v[1], name), num(v[2], name),
-    num(v[3], name), num(v[4], name), Math.floor(num(v[5], name))) / 1000 +
-    (num(v[5], name) % 1);
+  if (v.length < 8) throw runErr(name + ' needs a broken-out time of at least eight parts');
+  const parts = v.slice(0, 8).map(n => num(n, name));
+  return utc(parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]);
+}
+
+function utc(year: number, month: number, day: number, hour: number, minute: number, second: number): number {
+  // Date.UTC treats years 0–99 as 1900–1999; setUTCFullYear does not.
+  const d = new Date(0);
+  d.setUTCFullYear(year, month, day);
+  d.setUTCHours(hour, minute, Math.floor(second), 0);
+  return d.getTime() / 1000 + second % 1;
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -59,7 +66,11 @@ export function strftime(secs: number, fmt: string): string {
 
 export function parseDate(x: Node, name: string): number {
   const s = wantType(x, 'string', name).r;
-  const at = Date.parse(s);
-  if (isNaN(at)) throw runErr('cannot read "' + s + '" as a date');
-  return at / 1000;
+  const m = /^(\d{1,4})-(\d{1,2})-(\d{1,2})T(\d{1,2}):(\d{1,2}):(\d{1,2})Z$/.exec(s);
+  if (!m) throw runErr('cannot read "' + s + '" as a date');
+  const [year, month, day, hour, minute, second] = m.slice(1).map(Number);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 || second > 60) {
+    throw runErr('cannot read "' + s + '" as a date');
+  }
+  return utc(year, month - 1, day, hour, minute, second);
 }

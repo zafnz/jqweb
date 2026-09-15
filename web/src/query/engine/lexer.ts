@@ -73,6 +73,7 @@ export function lex(src: string): Token[] {
       if (src.charAt(j) === 'e' || src.charAt(j) === 'E') {
         j++;
         if (src.charAt(j) === '+' || src.charAt(j) === '-') j++;
+        if (j >= src.length || !DIGIT.test(src.charAt(j))) throw parseErr('expected exponent digits', j);
         while (j < src.length && DIGIT.test(src.charAt(j))) j++;
       }
       toks.push({ k: 'num', v: +src.slice(i, j), p: p });

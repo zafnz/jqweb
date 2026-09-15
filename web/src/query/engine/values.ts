@@ -5,7 +5,7 @@
 import { leafOf } from '../../model/node.ts';
 import type { ArrayNode, LeafNode, Node, ObjectNode } from '../../model/node.ts';
 import { checkNesting, NestingError } from '../../model/nesting.ts';
-import { runErr } from './errors.ts';
+import { runErr, workErr } from './errors.ts';
 
 export const NULL = leafOf(null);
 export const TRUE = leafOf(true);
@@ -81,6 +81,23 @@ export function members(n: ObjectNode): { k: string[]; v: Node[] } {
    so an emoji is two units and one character; jq counts characters. */
 export function chars(s: string): string[] { return Array.from(s); }
 
+export function splitText(s: string, separator: string): string[] {
+  return separator === '' ? chars(s) : s.split(separator);
+}
+
+export function compareText(a: string, b: string): number {
+  let i = 0;
+  let j = 0;
+  while (i < a.length && j < b.length) {
+    const x = a.codePointAt(i)!;
+    const y = b.codePointAt(j)!;
+    if (x !== y) return x < y ? -1 : 1;
+    i += x > 0xFFFF ? 2 : 1;
+    j += y > 0xFFFF ? 2 : 1;
+  }
+  return i < a.length ? 1 : j < b.length ? -1 : 0;
+}
+
 /* ---- ordering ----
 
    jq orders values across types as null < false < true < numbers < strings
@@ -108,6 +125,9 @@ export function cmp(a: Node, b: Node): number {
   if (ra <= 4) {
     const x = (a as OrderedLeaf).r;
     const y = (b as OrderedLeaf).r;
+    if (typeof x === 'string' && typeof y === 'string') return compareText(x, y);
+    if (Number.isNaN(x)) return -1;
+    if (Number.isNaN(y)) return 1;
     return x < y ? -1 : x > y ? 1 : 0;
   }
   if (ra === 5) {
@@ -124,8 +144,8 @@ export function cmp(a: Node, b: Node): number {
        values taken in that order. */
     const ma = members(a);
     const mb = members(b);
-    const ka = ma.k.slice().sort();
-    const kb = mb.k.slice().sort();
+    const ka = ma.k.slice().sort(compareText);
+    const kb = mb.k.slice().sort(compareText);
     const c = cmp(arrayOf(ka.map(leafOf)), arrayOf(kb.map(leafOf)));
     if (c) return c;
     for (let i = 0; i < ka.length; i++) {
@@ -153,10 +173,11 @@ export function field(n: Node, key: string): Node {
 }
 
 /* One element of an array. A negative index counts from the end and a
-   fractional one is rounded down, both as in jq; out of range gives null. */
+   fractional one is truncated toward zero; out of range gives null. */
 export function elem(n: Node, i: number): Node {
   if (n.t === 'a') {
-    i = Math.floor(i);
+    i = Math.trunc(i);
+    if (!Number.isFinite(i)) return NULL;
     if (i < 0) i += n.v.length;
     return i < 0 || i >= n.v.length ? NULL : n.v[i];
   }
@@ -178,19 +199,21 @@ export function slice(n: Node, from: Node | null, to: Node | null): Node {
   if (n.t === 'l' && n.r === null) return NULL;
   const cs = n.t === 'a' ? n.v : is(n, 'string') ? chars(n.r) : null;
   if (cs === null) throw runErr('cannot slice ' + typeOf(n));
-  const lo = bound(from, 0, cs.length);
-  let hi = bound(to, cs.length, cs.length);
+  const lo = bound(from, 0, cs.length, Math.floor);
+  let hi = bound(to, cs.length, cs.length, Math.ceil);
   if (hi < lo) hi = lo;
   return n.t === 'a' ? arrayOf(n.v.slice(lo, hi)) : leafOf(cs.slice(lo, hi).join(''));
 }
 
 /* One end of a slice: absent means the default, negative counts from the
    end, and anything past either end is pulled back to it. */
-function bound(v: Node | null, dflt: number, len: number): number {
-  if (v === null) return dflt;
+function bound(v: Node | null, dflt: number, len: number, round: (n: number) => number): number {
+  if (v === null || is(v, 'null')) return dflt;
   if (!is(v, 'number')) throw runErr('a slice bound must be a number');
-  let i = Math.floor(v.r);
+  if (Number.isNaN(v.r)) return dflt;
+  let i = v.r;
   if (i < 0) i += len;
+  i = round(i);
   return i < 0 ? 0 : i > len ? len : i;
 }
 
@@ -198,16 +221,6 @@ export function iterate(n: Node): Node[] {
   if (n.t === 'a') return n.v;
   if (n.t === 'o') return members(n).v;
   throw runErr('cannot iterate over ' + typeOf(n));
-}
-
-/* Every value in a subtree, the value itself first, which is what ".." and
-   recurse produce. */
-export function descend(n: Node, out: Node[]): void {
-  out.push(n);
-  if (n.t === 'a' || n.t === 'o') {
-    const v = n.t === 'o' ? members(n).v : n.v;
-    for (let i = 0; i < v.length; i++) descend(v[i], out);
-  }
 }
 
 /* ---- arithmetic ----
@@ -251,7 +264,7 @@ export function div2(a: Node, b: Node): Node {
     if (b.r === 0) throw runErr('cannot divide by zero');
     return leafOf(a.r / b.r);
   }
-  if (is(a, 'string') && is(b, 'string')) return arrayOf(a.r.split(b.r).map(leafOf));
+  if (is(a, 'string') && is(b, 'string')) return arrayOf(splitText(a.r, b.r).map(leafOf));
   throw runErr(typeOf(a) + ' and ' + typeOf(b) + ' cannot be divided');
 }
 
@@ -270,9 +283,11 @@ export function mod2(a: Node, b: Node): Node {
    "ab" * 2.5 is "abab" and "ab" * -1 is null. */
 function repeat(s: string, n: number): Node {
   if (n < 0) return NULL;
-  let out = '';
-  for (let i = Math.floor(n); i > 0; i--) out += s;
-  return leafOf(out);
+  if (s === '' || Number.isNaN(n)) return leafOf('');
+  if (!Number.isFinite(n) || s.length * Math.floor(n) > 5000000) {
+    throw workErr('query produced too much work');
+  }
+  return leafOf(s.repeat(Math.floor(n)));
 }
 
 /* Object "+" takes the right-hand value wherever both have a key; object

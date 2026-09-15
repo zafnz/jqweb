@@ -9,6 +9,12 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+### jq operator compatibility
+
+Queries now stop when `first`, `limit`, `any` or `all` has its answer, and keep
+earlier results when `?` catches a later error. Corrected stream branching and
+argument order, numeric and Unicode handling, and several builtin validations.
+
 ### Back and Forward step through searches
 
 The browser's Back and Forward buttons step through the searches and queries

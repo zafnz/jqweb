@@ -167,9 +167,11 @@ number text intact, and the document is parsed once rather than twice. `r` is
 what comparisons and arithmetic read; `leafOf` builds a node from a computed
 scalar.
 
-In the engine, a stream is an array. Every jq expression maps one input to many
-outputs, and an array makes `,`, `[]` and `select` fall out for free. Nothing
-short-circuits as a result, so no builtin may produce an endless stream.
+In the engine, a stream is lazy. Collect one only when the operation needs all
+of it: a later error must not erase earlier outputs, and `first` must not run
+the rest. Value arguments use the evaluator's argument helper; filter arguments
+remain expressions. Check argument evaluation order against jq, including empty
+streams and errors, rather than inferring it from the order of successful results.
 
 ## Rules that bite
 

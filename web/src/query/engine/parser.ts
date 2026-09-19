@@ -58,7 +58,7 @@ const OBJ_VALUE_LEVEL = 2;
 
 /* Syntax this subset leaves out, by the token that gives it away, and what
    to say about it. */
-const MISSING: Record<string, string> = {
+const MISSING: Record<string, string> = Object.assign(Object.create(null), {
   '=': 'assignment is not supported',
   '|=': 'assignment is not supported',
   '+=': 'assignment is not supported',
@@ -76,7 +76,7 @@ const MISSING: Record<string, string> = {
   'label': 'labels are not supported',
   'import': 'imports are not supported',
   'include': 'imports are not supported'
-};
+});
 
 /* Whether an operator's text is one of ops, narrowing it to that type. */
 function among<T extends string>(v: string, ops: readonly T[]): v is T {
@@ -96,7 +96,7 @@ function orList(ns: number[]): string {
 let arityCache: Record<string, number[]> | null = null;
 function arities(): Record<string, number[]> {
   if (!arityCache) {
-    const found: Record<string, number[]> = {};
+    const found: Record<string, number[]> = Object.create(null);
     for (const key in builtins) {
       const cut = key.lastIndexOf('/');
       const name = key.slice(0, cut);

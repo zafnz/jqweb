@@ -47,6 +47,10 @@ an emoji. `fromdate` reads only `%Y-%m-%dT%H:%M:%SZ`, and `mktime` and
 `strftime` take the eight-part broken-out time jq's `gmtime` produces and
 refuse a shorter one.
 
+**Fixed:** An unknown filter whose name is also an `Object.prototype` member
+now reports that the filter is not supported instead of exposing JavaScript
+source.
+
 **Fixed:** `-O` now opens generated files whose paths contain spaces, `#`, `?`
 or Unicode characters, including paths on Windows.
 

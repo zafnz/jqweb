@@ -100,16 +100,6 @@ export function startSearch(jqui: StartQuery | null, value: ValueNode, root: HTM
     if (e.key === 'Escape' && e.target === input) { input.value = ''; step('push'); }
   });
 
-  /* A phone gets the tree and the fold button only: page.css hides the search
-     box, the mode select, the count and the line buttons at this same width.
-     A window narrowed to it with a search in the box would be left filtered,
-     or showing query results, with no box to clear them from, so the search
-     is cleared on the way in. */
-  const phone = window.matchMedia('(max-width: 600px)');
-  phone.addEventListener('change', function () {
-    if (phone.matches && input.value) { input.value = ''; step('replace'); }
-  });
-
   /* Back and Forward step through what the box has held. Going to an entry
      puts the box and the mode select back and runs the box as written: an
      entry is only recorded for a run that was not held back to offer

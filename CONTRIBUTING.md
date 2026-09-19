@@ -85,24 +85,16 @@ as written, so a comment in `page.css` or `query.css` ships in every page.
 
 ## Phone width
 
-At 600px and below the page shows the tree, the fold button and the theme
-button. The rule is `@media (max-width: 600px)` in `web/styles/page.css`, and
-`web/src/page/search.ts` runs `matchMedia` on the same query, so the two
-have to agree.
-
-The stylesheet hides the search box, the mode select, the count and the line
-buttons rather than leaving them out of the markup, because a phone turned on
-its side is wider than 600px and gets the full page back without a reload. The
-script covers a window narrowed across the line with a search in the box: it
-clears the search, since the filtered tree or the query results would
-otherwise stay on screen with no box left to clear them from.
+At 600px and below the page shows the tree, search box, fold button and theme
+button. The `@media (max-width: 600px)` rule in `web/styles/page.css` hides the
+mode select, count and line buttons rather than leaving them out of the markup,
+because a phone turned on its side is wider than 600px and gets the full page
+back without a reload.
 
 The breakpoint is 600 rather than a phone's own width because it was chosen
-when headless Chrome would not open a window narrower than 500px and a lower
-breakpoint could not be driven. `phone.spec.ts` runs at 500 and
-`narrow.spec.ts` at 640, either side of it. Phones in portrait are 430px and
-under; Playwright sets the viewport exactly, so a narrower one can be driven
-now if the breakpoint ever moves.
+when headless Chrome could not drive a realistic portrait viewport.
+`phone.spec.ts` now runs at 390px and `narrow.spec.ts` at 640px, either side of
+it.
 
 ## The jq subset
 

@@ -233,12 +233,10 @@ pasting the subtree into the query would give a row nobody can read.
 
 ## On a phone
 
-At 600px wide and below the page is the tree and the buttons to fold it:
-`Collapse all`, the arrow on each branch, and the theme button. The search box,
-the mode dropdown, the match count and the two buttons on each line are left
-off, since a phone has no room to write a query and the browser's own find in
-page covers text search. A wider window, or a phone turned on its side, gets
-the whole page back.
+At 600px wide and below the search box stays available in automatic mode,
+alongside the tree, its folding controls and the theme button. The mode
+dropdown, match count and two buttons on each line are left off to save room.
+A wider window, or a phone turned on its side, gets those controls back.
 
 ## Update check
 

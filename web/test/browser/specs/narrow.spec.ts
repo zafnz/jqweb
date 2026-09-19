@@ -2,8 +2,9 @@
    wrap; what it may not do is push the page sideways, leave the search box
    below its floor, or put anything out of reach.
 
-   The window is just wider than a phone. At 600px and below the toolbar loses
-   the search box altogether, which phone.spec.ts covers. */
+   The window is just wider than a phone. At 600px and below the toolbar keeps
+   the search box but loses its mode select and count, which phone.spec.ts
+   covers. */
 
 import { test, expect, settle, type, clickAway, near } from '../fixtures.ts';
 

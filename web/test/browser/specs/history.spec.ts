@@ -1,22 +1,23 @@
 /* Back and Forward over what the search box has held. Each history entry keeps
    the box and the mode select, and going to one runs the box again. */
 
-import { test, expect, settle, type } from '../fixtures.js';
+import { test, expect, settle, type } from '../fixtures.ts';
+import type { Page } from '@playwright/test';
 
-const view = (page) => page.evaluate(() => ({
-  box: __t.$('#q').value,
-  mode: __t.$('#mode').value,
-  results: !__t.$('#results').hidden,
-  suggest: !__t.$('#suggest').hidden,
+const view = (page: Page) => page.evaluate(() => ({
+  box: __t.get('#q', HTMLInputElement).value,
+  mode: __t.get('#mode', HTMLSelectElement).value,
+  results: !__t.get('#results', HTMLElement).hidden,
+  suggest: !__t.get('#suggest', HTMLElement).hidden,
   stats: __t.text('#stats')
 }));
 
 /* The ?q= in the page's address, or null for none. */
-const addressQ = (page) => page.evaluate(() => new URLSearchParams(location.search).get('q'));
+const addressQ = (page: Page) => page.evaluate(() => new URLSearchParams(location.search).get('q'));
 
 /* Writes within a second of each other rewrite one entry, so a step that is
    meant to make an entry of its own waits past that. */
-async function typeAlone(page, text) {
+async function typeAlone(page: Page, text: string) {
   await type(page, text);
   await settle(page, 2000);
 }

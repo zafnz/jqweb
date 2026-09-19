@@ -2,20 +2,20 @@
    again. What renderTree writes is markup rather than DOM calls, so nothing in
    model.test.ts can say whether the browser makes a tree out of it. */
 
-import { test, expect, settle } from '../fixtures.js';
+import { test, expect, settle } from '../fixtures.ts';
 
 test.use({ variant: 'default' });
 
 test('the document renders as a tree', async ({ page }) => {
   const got = await page.evaluate(() => {
-    const root = __t.$('#tree > .node');
+    const root = __t.get('#tree > .node', HTMLElement);
     const notes = __t.at('.notes');
     return {
       root: !!root,
       branch: root.classList.contains('branch'),
       /* Keys in document order, which is the reason parse.ts parses JSON by
          hand: JSON.parse hands back an object, and an object has no order. */
-      keys: __t.$$(':scope > .kids > .node', root).map((n) => n.dataset.key).join(','),
+      keys: __t.$$(':scope > .kids > .node', root).map((n) => n.getAttribute('data-key')).join(','),
       /* Numbers exactly as written, for the same reason: JSON.parse turns 1.50
          into 1.5 and 1e3 into 1000, and the tree is meant to show the file. */
       ratio: __t.text(__t.$('.v', __t.at('.counts.ratio'))),
@@ -23,7 +23,7 @@ test('the document renders as a tree', async ({ page }) => {
       zero: __t.text(__t.$('.v', __t.at('.counts.zero'))),
       /* A value with markup in it is text, not elements. */
       notesText: __t.text(__t.$('.v', notes)),
-      notesChildren: __t.$('.v', notes).children.length,
+      notesChildren: __t.get('.v', HTMLElement, notes).children.length,
       /* An empty container has nothing to expand, so it is one line with both
          brackets rather than a branch with no children. */
       emptyClass: __t.at('.empty').className,
@@ -106,9 +106,9 @@ test('the fold button folds the lot', async ({ page }) => {
     const open = __t.$$('#tree .node.branch').filter((n) => !n.classList.contains('collapsed'));
     return {
       label: __t.text('#fold'),
-      rootOpen: __t.$('#tree > .node').classList.contains('collapsed'),
+      rootOpen: __t.get('#tree > .node', HTMLElement).classList.contains('collapsed'),
       open: open.length,
-      openIsRoot: open[0] === __t.$('#tree > .node')
+      openIsRoot: open[0] === __t.get('#tree > .node', HTMLElement)
     };
   });
 

@@ -9,8 +9,10 @@
    and gets `page` already loaded and settled. */
 
 import { test as base, expect, selectors } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import path from 'node:path';
-import { pageURL } from './pages.js';
+import { pageURL } from './pages.ts';
+import type { Variant } from './pages.ts';
 
 const helpers = path.join(import.meta.dirname, 'helpers.js');
 
@@ -27,21 +29,24 @@ const SETTLE = 1000;
    selector engine into the page on its own, so it cannot share that one. */
 function atEngine() {
   return {
-    query(root, selector) {
-      const doc = root.ownerDocument || root;
+    query(root: Node, selector: string): Element | null {
+      const doc = root instanceof Document ? root : root.ownerDocument;
+      if (!doc?.defaultView) return null;
       const segs = doc.defaultView.jqweb.parsePath(selector);
       if (!segs) return null;
-      let node = (root.querySelector ? root : doc).querySelector('#tree > .node');
+      let node: Element | null | undefined =
+        (root instanceof Element || root instanceof Document || root instanceof DocumentFragment ? root : doc)
+          .querySelector('#tree > .node');
       for (const seg of segs) {
         if (!node) return null;
-        const kids = Array.from(node.querySelectorAll(':scope > .kids > .node'));
+        const kids: Element[] = Array.from(node.querySelectorAll(':scope > .kids > .node'));
         node = seg.key !== undefined
-          ? kids.find((k) => k.dataset.key === seg.key)
+          ? kids.find((k) => k.getAttribute('data-key') === seg.key)
           : kids[seg.index < 0 ? kids.length + seg.index : seg.index];
       }
       return node || null;
     },
-    queryAll(root, selector) {
+    queryAll(root: Node, selector: string): Element[] {
       const one = this.query(root, selector);
       return one ? [one] : [];
     }
@@ -52,7 +57,7 @@ function atEngine() {
    for the whole run. */
 let registered = false;
 
-const test = base.extend({
+const test = base.extend<{ variant: Variant; address: string }, { atSelector: void }>({
   /* Which rendered page this spec drives, and anything added after its file
      name in the address. */
   variant: ['default', { option: true }],
@@ -79,13 +84,13 @@ const test = base.extend({
 
 /* Winding the clock forward is how an action is followed through: the search
    box debounce and the copy-button tick both come back on a timer. */
-async function settle(page, ms) {
+async function settle(page: Page, ms?: number) {
   await page.clock.runFor(ms === undefined ? SETTLE : ms);
 }
 
 /* Typing into the search box. fill() sets the value and fires the input event
    the page debounces, which is what a person typing produces. */
-async function type(page, text) {
+async function type(page: Page, text: string) {
   await page.locator('#q').fill(text);
   await settle(page);
 }
@@ -94,7 +99,7 @@ async function type(page, text) {
    puts the list away. It is dispatched rather than aimed, because everywhere
    on the page that is neither of those is a line of the document or a link,
    and clicking one of those does something of its own. */
-async function clickAway(page) {
+async function clickAway(page: Page) {
   await page.evaluate(() => document.body.dispatchEvent(
     new MouseEvent('mousedown', { bubbles: true, cancelable: true })));
   await settle(page);
@@ -103,7 +108,7 @@ async function clickAway(page) {
 /* Attention leaving the search box and coming back to it. Focusing the element
    that already has it fires nothing, so a spec that only focuses is not doing
    what a person does. */
-async function refocus(page, selector) {
+async function refocus(page: Page, selector?: string) {
   const box = page.locator(selector || '#q');
   await box.blur();
   await settle(page, 100);
@@ -115,7 +120,7 @@ async function refocus(page, selector) {
    measurement, so that the name stays the same whatever the page measured and a
    failure still reads as "expected <= 1, received 3.2". toBeCloseTo counts
    decimal places instead, which is not what any of these tolerances mean. */
-function near(got, want, tol, name) {
+function near(got: number, want: number, tol: number, name: string) {
   expect.soft(Math.abs(got - want), name).toBeLessThanOrEqual(tol);
 }
 

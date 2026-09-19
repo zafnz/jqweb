@@ -1,13 +1,14 @@
 /* The search box read as a query, and the results view that replaces the
    document when one produces values that are not in it. */
 
-import { test, expect, settle, type } from '../fixtures.js';
+import { test, expect, settle, type } from '../fixtures.ts';
+import type { Page } from '@playwright/test';
 
 test.use({ variant: 'default' });
 
 /* Picking a value out of the mode select the way a person does: query/ui.ts
    listens for the change event, and assigning value fires nothing. */
-async function mode(page, value) {
+async function mode(page: Page, value: 'auto' | 'filter' | 'jq') {
   await page.locator('#mode').selectOption(value);
   await settle(page);
 }
@@ -17,9 +18,9 @@ test('the mode select is there and starts on auto', async ({ page }) => {
      with the engine in it is the only page that shows one. */
   const got = await page.evaluate(() => ({
     visible: __t.visible(__t.$('#mode')),
-    options: __t.$$('option', __t.$('#mode')).map((o) => o.value).join(','),
-    value: __t.$('#mode').value,
-    placeholder: __t.$('#q').placeholder
+    options: Array.from(__t.get('#mode', HTMLSelectElement).options).map((o) => o.value).join(','),
+    value: __t.get('#mode', HTMLSelectElement).value,
+    placeholder: __t.get('#q', HTMLInputElement).placeholder
   }));
 
   expect.soft(got.visible, 'the mode select is on screen').toBe(true);
@@ -31,7 +32,7 @@ test('the mode select is there and starts on auto', async ({ page }) => {
 test('what auto reads as a query', async ({ page }) => {
   await type(page, 'cron');
   const word = await page.evaluate(() => ({
-    resultsHidden: __t.$('#results').hidden,
+    resultsHidden: __t.get('#results', HTMLElement).hidden,
     stats: __t.text('#stats')
   }));
   expect.soft(word.resultsHidden, 'a bare word is still text to find').toBe(true);
@@ -39,14 +40,14 @@ test('what auto reads as a query', async ({ page }) => {
 
   await type(page, '.items[] | select(.kind == "Pod")');
   const query = await page.evaluate(() => ({
-    resultsHidden: __t.$('#results').hidden,
-    treeHidden: __t.$('#tree').hidden,
+    resultsHidden: __t.get('#results', HTMLElement).hidden,
+    treeHidden: __t.get('#tree', HTMLElement).hidden,
     results: __t.$$('#results .result').length,
     stats: __t.text('#stats'),
     /* The gutter number is the position in the output, which is the only thing
        that distinguishes one result from another. */
-    numbers: __t.$$('#results .result').map((r) => r.dataset.n).join(','),
-    gutter: getComputedStyle(__t.$('#results .result'), '::before').content
+    numbers: __t.$$('#results .result').map((r) => r.getAttribute('data-n')).join(','),
+    gutter: getComputedStyle(__t.get('#results .result', HTMLElement), '::before').content
   }));
 
   expect.soft(query.resultsHidden, 'a leading dot is a query').toBe(false);
@@ -60,7 +61,7 @@ test('what auto reads as a query', async ({ page }) => {
      types select(...) meaning to search the document for that text. */
   await type(page, 'select(.kind == "List")');
   const call = await page.evaluate(() => ({
-    resultsHidden: __t.$('#results').hidden,
+    resultsHidden: __t.get('#results', HTMLElement).hidden,
     stats: __t.text('#stats')
   }));
   expect.soft(call.resultsHidden, 'a call is a query without a leading dot').toBe(false);
@@ -72,8 +73,8 @@ test('what one result means', async ({ page }) => {
   const object = await page.evaluate(() => ({
     results: __t.$$('#results .result').length,
     stats: __t.text('#stats'),
-    one: __t.$('#results').classList.contains('one'),
-    gutter: getComputedStyle(__t.$('#results .result'), '::before').content
+    one: __t.get('#results', HTMLElement).classList.contains('one'),
+    gutter: getComputedStyle(__t.get('#results .result', HTMLElement), '::before').content
   }));
   expect.soft(object.results, 'a single object is one result').toBe(1);
   expect.soft(object.stats, 'and is described by what is in it').toBe('1 result, 5 keys');
@@ -96,7 +97,7 @@ test('what one result means', async ({ page }) => {
   const none = await page.evaluate(() => ({
     stats: __t.text('#stats'),
     results: __t.$$('#results .result').length,
-    treeHidden: __t.$('#tree').hidden
+    treeHidden: __t.get('#tree', HTMLElement).hidden
   }));
   expect.soft(none.stats, 'a query that matches nothing says so').toBe('0 results');
   expect.soft(none.results, 'and shows nothing').toBe(0);
@@ -117,8 +118,8 @@ test('what one result means', async ({ page }) => {
      because the value is in there and its surroundings are the answer. */
   await type(page, '.items[0].metadata.name');
   const path = await page.evaluate(() => ({
-    resultsHidden: __t.$('#results').hidden,
-    treeHidden: __t.$('#tree').hidden,
+    resultsHidden: __t.get('#results', HTMLElement).hidden,
+    treeHidden: __t.get('#tree', HTMLElement).hidden,
     stats: __t.text('#stats')
   }));
   expect.soft(path.resultsHidden, 'a path stays in the document').toBe(true);
@@ -134,14 +135,14 @@ test('the document is put aside, not thrown away', async ({ page }) => {
     'a branch was collapsed by hand').toBe(true);
 
   await type(page, '.items[] | .kind');
-  expect.soft(await page.evaluate(() => __t.$('#results').hidden),
+  expect.soft(await page.evaluate(() => __t.get('#results', HTMLElement).hidden),
     'the results are showing').toBe(false);
 
   await type(page, '');
   const back = await page.evaluate(() => ({
-    treeHidden: __t.$('#tree').hidden,
+    treeHidden: __t.get('#tree', HTMLElement).hidden,
     collapsed: __t.at('.items').classList.contains('collapsed'),
-    resultsHTML: __t.$('#results').innerHTML
+    resultsHTML: __t.get('#results', HTMLElement).innerHTML
   }));
   expect.soft(back.treeHidden, 'the document comes back').toBe(false);
   expect.soft(back.collapsed, 'with the collapsing left as it was').toBe(true);
@@ -165,7 +166,7 @@ test('the mode select overrides what auto would read', async ({ page }) => {
 
   await mode(page, 'jq');
   const compiled = await page.evaluate(() => ({
-    bad: __t.$('#q').classList.contains('bad'),
+    bad: __t.get('#q', HTMLInputElement).classList.contains('bad'),
     fault: __t.text('#fault')
   }));
   expect.soft(compiled.bad, 'jq mode compiles what text mode searched for').toBe(true);

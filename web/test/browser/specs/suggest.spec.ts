@@ -3,7 +3,8 @@
    browser can say is whether the list is right about what they return, and
    whether picking one leaves you able to try the next. */
 
-import { test, expect, settle, type, clickAway, refocus, near } from '../fixtures.js';
+import { test, expect, settle, type, clickAway, refocus, near } from '../fixtures.ts';
+import type { Page } from '@playwright/test';
 
 test.use({ variant: 'default' });
 
@@ -13,26 +14,26 @@ const DEEP = '.items[0].metadata.labels.app';
 
 /* Every row as the spec talks about it: the query it offers and the count it
    promises. */
-const readings = (page) => page.evaluate(() => __t.$$('#suggest .sg').map((row) => ({
-  query: __t.text(__t.$('.sgt', row)),
-  label: __t.text(__t.$('.sgn', row)),
+const readings = (page: Page) => page.evaluate(() => __t.$$('#suggest .sg').map((row) => ({
+  query: __t.get('.sgt', HTMLElement, row).textContent,
+  label: __t.get('.sgn', HTMLElement, row).textContent,
   on: row.classList.contains('on')
 })));
 
-async function openOn(page, path) {
+async function openOn(page: Page, path: string) {
   await page.locator('at=' + path).locator('> .line > .fq').click();
   await settle(page);
 }
 
 test('the list opens on the line it was asked about', async ({ page }) => {
-  expect.soft(await page.evaluate(() => __t.$('#suggest').hidden),
+  expect.soft(await page.evaluate(() => __t.get('#suggest', HTMLElement).hidden),
     'nothing is open to begin with').toBe(true);
 
   await openOn(page, DEEP);
   const rows = await readings(page);
   const got = await page.evaluate(() => ({
-    hidden: __t.$('#suggest').hidden,
-    box: __t.$('#q').value,
+    hidden: __t.get('#suggest', HTMLElement).hidden,
+    box: __t.get('#q', HTMLInputElement).value,
     marked: __t.$$('#suggest .sg.on').length,
     ran: __t.text('#stats') !== ''
   }));
@@ -53,7 +54,7 @@ test('every label is what its query really returns', async ({ page }) => {
      the list -- picking by outcome rather than by reasoning about jq -- so it
      is checked against the engine rather than taken on trust. */
   const measured = await page.evaluate((queries) => {
-    const doc = window.jqweb.parseJSON(__t.text('#data'));
+    const doc = window.jqweb.parseJSON(__t.get('#data', HTMLScriptElement).textContent);
     return queries.map(({ query, label }) => {
       const out = window.jqjs.compile(query).run(doc);
       /* The label says which way the row was counted. */
@@ -84,9 +85,9 @@ test('the arrows step through the readings', async ({ page }) => {
   await q.press('ArrowDown');
   await settle(page);
   const down = await page.evaluate(() => ({
-    box: __t.$('#q').value,
+    box: __t.get('#q', HTMLInputElement).value,
     on: __t.$$('#suggest .sg')[1].classList.contains('on'),
-    hidden: __t.$('#suggest').hidden,
+    hidden: __t.get('#suggest', HTMLElement).hidden,
     stats: __t.text('#stats')
   }));
 
@@ -124,9 +125,9 @@ test('a reading can be picked, and copied without picking', async ({ page }) => 
   await page.locator('#suggest .sg').first().locator('.sgq').click();
   await settle(page);
   const clicked = await page.evaluate(() => ({
-    box: __t.$('#q').value,
-    hidden: __t.$('#suggest').hidden,
-    focused: document.activeElement === __t.$('#q')
+    box: __t.get('#q', HTMLInputElement).value,
+    hidden: __t.get('#suggest', HTMLElement).hidden,
+    focused: document.activeElement === __t.get('#q', HTMLInputElement)
   }));
 
   expect.soft(clicked.box, 'clicking a row puts it in the box').toBe(rows[0].query);
@@ -138,8 +139,8 @@ test('a reading can be picked, and copied without picking', async ({ page }) => 
   await page.locator('#suggest .sg').last().locator('.sgc').click();
   await settle(page);
   const copied = await page.evaluate(() => ({
-    box: __t.$('#q').value,
-    hidden: __t.$('#suggest').hidden
+    box: __t.get('#q', HTMLInputElement).value,
+    hidden: __t.get('#suggest', HTMLElement).hidden
   }));
   expect.soft(copied.box, 'the copy button does not pick the row').toBe(before);
   expect.soft(copied.hidden, 'and the list stays open').toBe(false);
@@ -149,11 +150,11 @@ test('what puts the list away, and what brings it back', async ({ page }) => {
   await openOn(page, DEEP);
 
   await clickAway(page);
-  expect.soft(await page.evaluate(() => __t.$('#suggest').hidden),
+  expect.soft(await page.evaluate(() => __t.get('#suggest', HTMLElement).hidden),
     'clicking elsewhere hides it').toBe(true);
 
   await refocus(page);
-  expect.soft(await page.evaluate(() => __t.$('#suggest').hidden),
+  expect.soft(await page.evaluate(() => __t.get('#suggest', HTMLElement).hidden),
     'focusing the box brings it back').toBe(false);
 
   /* Typing is different: the list answered a question about one line of the
@@ -161,14 +162,14 @@ test('what puts the list away, and what brings it back', async ({ page }) => {
      answering a question that is no longer being asked. */
   await type(page, 'cron');
   const typed = await page.evaluate(() => ({
-    hidden: __t.$('#suggest').hidden,
+    hidden: __t.get('#suggest', HTMLElement).hidden,
     rows: __t.$$('#suggest .sg').length
   }));
   expect.soft(typed.hidden, 'typing takes the list away').toBe(true);
   expect.soft(typed.rows, 'and drops what was on it').toBe(0);
 
   await refocus(page);
-  expect.soft(await page.evaluate(() => __t.$('#suggest').hidden),
+  expect.soft(await page.evaluate(() => __t.get('#suggest', HTMLElement).hidden),
     'focus does not bring back what was dropped').toBe(true);
 });
 
@@ -177,7 +178,7 @@ test('Escape puts the list away', async ({ page }) => {
 
   await page.locator('#q').press('Escape');
   await settle(page);
-  expect.soft(await page.evaluate(() => __t.$('#suggest').hidden),
+  expect.soft(await page.evaluate(() => __t.get('#suggest', HTMLElement).hidden),
     'Escape hides the list').toBe(true);
 });
 
@@ -190,19 +191,19 @@ test('Escape leaves the box as it was', async ({ page }) => {
   expect(await page.locator('#q').inputValue(), 'and leaves the box as it was').toBe(before);
 
   await refocus(page);
-  expect(await page.evaluate(() => __t.$('#suggest').hidden),
+  expect(await page.evaluate(() => __t.get('#suggest', HTMLElement).hidden),
     'and focus brings that back too').toBe(false);
 });
 
 test('where the list sits', async ({ page }) => {
   await openOn(page, '.items[0].kind');
   const got = await page.evaluate(() => ({
-    box: __t.box(__t.$('#q')),
-    menu: __t.box(__t.$('#suggest')),
-    wrap: __t.box(__t.$('.qwrap')),
+    box: __t.box(__t.get('#q', HTMLInputElement)),
+    menu: __t.box(__t.get('#suggest', HTMLElement)),
+    wrap: __t.box(__t.get('.qwrap', HTMLElement)),
     inner: window.innerHeight,
-    listZ: +getComputedStyle(__t.$('#suggest')).zIndex,
-    headerZ: +getComputedStyle(__t.$('header')).zIndex
+    listZ: +getComputedStyle(__t.get('#suggest', HTMLElement)).zIndex,
+    headerZ: +getComputedStyle(__t.get('header', HTMLElement)).zIndex
   }));
 
   expect.soft(Math.round(got.menu.top), 'the list hangs below the box')

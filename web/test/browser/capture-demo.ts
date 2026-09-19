@@ -1,7 +1,7 @@
 /* Builds a deterministic README screenshot from the committed example.
 
-     node web/test/browser/capture-demo.js
-     node web/test/browser/capture-demo.js /tmp/demo.png
+     node web/test/browser/capture-demo.ts
+     node web/test/browser/capture-demo.ts /tmp/demo.png
 
    The browser chrome is part of the page being captured. Headless browsers do
    not include their own window chrome, and drawing this small frame keeps its
@@ -138,7 +138,7 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error(e.message || e);
+main().catch((e: unknown) => {
+  console.error(e instanceof Error ? e.message : e);
   process.exitCode = 1;
 });

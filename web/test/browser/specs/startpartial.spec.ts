@@ -3,15 +3,15 @@
    command line or in the address is the whole query, so it runs as written --
    nulls and all -- rather than opening on a list of completions. */
 
-import { test, expect, type } from '../fixtures.js';
+import { test, expect, type } from '../fixtures.ts';
 
 test.use({ variant: 'default', address: '?q=.items[].ki' });
 
 test('a half-typed query in the address runs rather than completing', async ({ page }) => {
   const got = await page.evaluate(() => ({
-    box: __t.$('#q').value,
-    suggestHidden: __t.$('#suggest').hidden,
-    resultsHidden: __t.$('#results').hidden,
+    box: __t.get('#q', HTMLInputElement).value,
+    suggestHidden: __t.get('#suggest', HTMLElement).hidden,
+    resultsHidden: __t.get('#results', HTMLElement).hidden,
     results: __t.$$('#results .result').length,
     stats: __t.text('#stats')
   }));
@@ -25,7 +25,7 @@ test('a half-typed query in the address runs rather than completing', async ({ p
   /* Typing the same text is a person still typing it, which completes. */
   await type(page, '.items[].ki');
   const typed = await page.evaluate(() => ({
-    suggestHidden: __t.$('#suggest').hidden,
+    suggestHidden: __t.get('#suggest', HTMLElement).hidden,
     first: __t.text('#suggest .sgt')
   }));
 

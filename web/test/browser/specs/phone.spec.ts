@@ -7,7 +7,7 @@
    that this covers the same window it always did. Phones in portrait are 430px
    and under, so they are narrower than this and inside the same rule. */
 
-import { test, expect, settle } from '../fixtures.js';
+import { test, expect, settle } from '../fixtures.ts';
 
 test.use({ variant: 'default', viewport: { width: 500, height: 800 } });
 
@@ -27,8 +27,8 @@ test('the page keeps the tree and loses the rest', async ({ page }) => {
     filters: __t.$$('#tree .fq').filter(__t.visible).length,
     lines: __t.$$('#tree .node > .line').length,
     visible: kept.map(([, sel]) => __t.visible(__t.$(sel))),
-    boxes: kept.map(([, sel]) => __t.box(__t.$(sel))),
-    rows: __t.rows(kept.map(([, sel]) => __t.$(sel))),
+    boxes: kept.map(([, sel]) => __t.box(__t.get(sel, HTMLElement))),
+    rows: __t.rows(kept.map(([, sel]) => __t.get(sel, HTMLElement))),
     noSideways: document.documentElement.scrollWidth <= window.innerWidth
   }), KEPT);
 
@@ -80,6 +80,6 @@ test('folding is what the page is for here', async ({ page }) => {
   /* "/" would focus a box nobody can see. */
   await page.keyboard.press('/');
   await settle(page);
-  expect.soft(await page.evaluate(() => document.activeElement === __t.$('#q')),
+  expect.soft(await page.evaluate(() => document.activeElement === __t.get('#q', HTMLInputElement)),
     '"/" does not put focus in the hidden box').toBe(false);
 });

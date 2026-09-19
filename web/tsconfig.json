@@ -6,6 +6,8 @@
     "moduleResolution": "Bundler",
     "noEmit": true,
     "strict": true,
+    "allowJs": true,
+    "checkJs": true,
     "target": "ES2022",
     "types": [
       "node"
@@ -14,6 +16,8 @@
   },
   "include": [
     "test/unit/*.ts",
+    "test/browser/**/*.ts",
+    "test/browser/helpers.js",
     "*.ts",
     "src/**/*.ts"
   ]

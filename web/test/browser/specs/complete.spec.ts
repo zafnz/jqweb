@@ -5,12 +5,13 @@
    browser can say is that the view survives the typing and that the run really
    is held back. */
 
-import { test, expect, settle, type } from '../fixtures.js';
+import { test, expect, settle, type } from '../fixtures.ts';
+import type { Page } from '@playwright/test';
 
 test.use({ variant: 'default' });
 
 /* What the list is offering, top row first. */
-const offered = (page) => page.evaluate(() =>
+const offered = (page: Page) => page.evaluate(() =>
   __t.$$('#suggest .sg').map((row) => __t.text(__t.$('.sgt', row))));
 
 test('a half-typed name offers the keys it starts', async ({ page }) => {
@@ -18,10 +19,10 @@ test('a half-typed name offers the keys it starts', async ({ page }) => {
      "no such path". */
   await type(page, '.ite');
   const got = await page.evaluate(() => ({
-    hidden: __t.$('#suggest').hidden,
+    hidden: __t.get('#suggest', HTMLElement).hidden,
     rows: __t.$$('#suggest .sg').length,
     first: __t.text(__t.$('#suggest .sg .sgt')),
-    treeHidden: __t.$('#tree').hidden,
+    treeHidden: __t.get('#tree', HTMLElement).hidden,
     stats: __t.text('#stats')
   }));
 
@@ -36,7 +37,7 @@ test('the run is held back while a name is unfinished', async ({ page }) => {
   /* A finished query runs as it always did. */
   await type(page, '.items[]');
   const whole = await page.evaluate(() => ({
-    resultsHidden: __t.$('#results').hidden,
+    resultsHidden: __t.get('#results', HTMLElement).hidden,
     stats: __t.text('#stats')
   }));
   expect.soft(whole.resultsHidden, 'a finished query runs').toBe(false);
@@ -46,7 +47,7 @@ test('the run is held back while a name is unfinished', async ({ page }) => {
      ten items with ten nulls. */
   await type(page, '.items[].ki');
   const held = await page.evaluate(() => ({
-    resultsHidden: __t.$('#results').hidden,
+    resultsHidden: __t.get('#results', HTMLElement).hidden,
     stats: __t.text('#stats'),
     first: __t.text(__t.$('#results .result .v')),
     offered: __t.text(__t.$('#suggest .sg .sgt'))
@@ -62,7 +63,7 @@ test('the run is held back while a name is unfinished', async ({ page }) => {
   const ran = await page.evaluate(() => ({
     first: __t.text(__t.$('#results .result .v')),
     stats: __t.text('#stats'),
-    hidden: __t.$('#suggest').hidden
+    hidden: __t.get('#suggest', HTMLElement).hidden
   }));
   expect.soft(ran.first, 'a name nothing starts with runs').toBe('null');
   expect.soft(ran.stats, 'one null per item').toBe('10 results');
@@ -81,7 +82,7 @@ test('which keys are offered', async ({ page }) => {
   await type(page, '.items[].metadata.name');
   const exact = await page.evaluate(() => ({
     stats: __t.text('#stats'),
-    hidden: __t.$('#suggest').hidden
+    hidden: __t.get('#suggest', HTMLElement).hidden
   }));
   expect.soft(exact.stats, 'an exact key runs').toBe('10 results');
   expect.soft(exact.hidden, 'with no list over it').toBe(true);
@@ -93,7 +94,7 @@ test('which keys are offered', async ({ page }) => {
   const bare = await page.evaluate(() => ({
     rows: __t.$$('#suggest .sg').length,
     stats: __t.text('#stats'),
-    faultHidden: __t.$('#fault').hidden
+    faultHidden: __t.get('#fault', HTMLElement).hidden
   }));
   expect.soft(bare.rows, 'a bare dot offers every key').toBe(4);
   expect.soft(bare.stats, 'the view stays').toBe('10 results');
@@ -112,7 +113,7 @@ test('a completion can be picked', async ({ page }) => {
   await page.locator('#suggest .sg').first().locator('.sgq').click();
   await settle(page);
   const clicked = await page.evaluate(() => ({
-    box: __t.$('#q').value,
+    box: __t.get('#q', HTMLInputElement).value,
     stats: __t.text('#stats')
   }));
   expect.soft(clicked.box, 'clicking one puts it in the box').toBe('.items[] | .spec');
@@ -123,7 +124,7 @@ test('a completion can be picked', async ({ page }) => {
   await page.locator('#q').press('ArrowDown');
   await settle(page);
   const arrowed = await page.evaluate(() => ({
-    box: __t.$('#q').value,
+    box: __t.get('#q', HTMLInputElement).value,
     stats: __t.text('#stats')
   }));
   expect.soft(arrowed.box, 'down picks the first completion').toBe('.items[].metadata');
@@ -137,7 +138,7 @@ test('a completion can be picked', async ({ page }) => {
   await settle(page);
   const entered = await page.evaluate(() => ({
     first: __t.text(__t.$('#results .result .v')),
-    hidden: __t.$('#suggest').hidden
+    hidden: __t.get('#suggest', HTMLElement).hidden
   }));
   expect.soft(entered.first, 'Enter runs it as written').toBe('null');
   expect.soft(entered.hidden, 'and puts the list away').toBe(true);

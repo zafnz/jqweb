@@ -1,13 +1,14 @@
 /* A page jqweb serves holds /alive open for as long as it is open, which is
    how -C knows when the last tab has closed. Every other spec drives a page
    from a file; the ones here that need a server start the jqweb binary
-   global-setup.js built. */
+   global-setup.ts built. */
 
 import { spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import net from 'node:net';
 import path from 'node:path';
-import { test, expect, settle } from '../fixtures.js';
-import { built, pageURL } from '../pages.js';
+import { test, expect, settle } from '../fixtures.ts';
+import { built, pageURL } from '../pages.ts';
 
 const binary = path.join(built, 'jqweb');
 const doc = path.join(import.meta.dirname, '..', 'testdata', 'doc.json');
@@ -15,8 +16,8 @@ const doc = path.join(import.meta.dirname, '..', 'testdata', 'doc.json');
 /* Starts jqweb with args and resolves with the process, the address in its
    "serving on" line, and everything it wrote to stderr, once the line has
    arrived and, with -C, once the parent has exited. */
-function start(args, background) {
-  return new Promise((resolve, reject) => {
+function start(args: string[], background: boolean) {
+  return new Promise<{ proc: ChildProcess; addr: string; pid: number | null; stderr: string }>((resolve, reject) => {
     const env = { ...process.env, JQWEB_NO_UPDATE_CHECK: '1' };
     const proc = spawn(binary, args, { env, stdio: ['ignore', 'ignore', 'pipe'] });
     let stderr = '';
@@ -40,9 +41,9 @@ function start(args, background) {
 }
 
 /* Whether anything accepts a connection at addr. */
-function answers(addr) {
+function answers(addr: string) {
   const [host, port] = addr.split(':');
-  return new Promise((resolve) => {
+  return new Promise<boolean>((resolve) => {
     const sock = net.connect(Number(port), host);
     sock.once('connect', () => { sock.destroy(); resolve(true); });
     sock.once('error', () => resolve(false));
@@ -54,10 +55,10 @@ test('a page written to a file makes no request for /alive', async ({ page }) =>
     window.__sources = [];
     const Source = window.EventSource;
     window.EventSource = class extends Source {
-      constructor(url, init) { super(url, init); window.__sources.push(String(url)); }
+      constructor(url: string | URL, init?: EventSourceInit) { super(url, init); window.__sources.push(String(url)); }
     };
   });
-  const requests = [];
+  const requests: string[] = [];
   page.on('request', (r) => requests.push(r.url()));
   await page.goto(pageURL('default'));
   await settle(page);
@@ -107,6 +108,8 @@ test('with -C the server outlives its tab by the close delay and no more', async
     expect.soft(await answers(server.addr), 'stopped once the tab closed').toBe(false);
     expect.soft(Date.now() - closed, 'no sooner than the delay').toBeGreaterThanOrEqual(250);
   } finally {
-    try { process.kill(server.pid); } catch {}
+    if (server.pid !== null) {
+      try { process.kill(server.pid); } catch {}
+    }
   }
 });

@@ -1,13 +1,13 @@
 /* The search box as text to find and as a path: what a page did before the
    engine existed and still does for anything that is not a query. */
 
-import { test, expect, settle, type } from '../fixtures.js';
+import { test, expect, settle, type } from '../fixtures.ts';
 
 test.use({ variant: 'default' });
 
 test('text is counted and marked', async ({ page }) => {
   const start = await page.evaluate(() => ({
-    box: __t.$('#q').value,
+    box: __t.get('#q', HTMLInputElement).value,
     stats: __t.text('#stats')
   }));
   expect.soft(start.box, 'the box starts empty').toBe('');
@@ -15,9 +15,9 @@ test('text is counted and marked', async ({ page }) => {
 
   await type(page, 'cron');
   const got = await page.evaluate(() => {
-    const hit = __t.$('#tree .node.hit');
+    const hit = __t.get('#tree .node.hit', HTMLElement);
     const ancestors = [];
-    for (let n = hit.parentElement.closest('.node'); n; n = n.parentElement.closest('.node')) {
+    for (let n = hit.parentElement?.closest('.node'); n; n = n.parentElement?.closest('.node')) {
       ancestors.push({
         hidden: n.classList.contains('hidden'),
         collapsed: n.classList.contains('collapsed')
@@ -34,7 +34,7 @@ test('text is counted and marked', async ({ page }) => {
          hidden. Counting the marks rather than trusting the number is the
          point: the count comes from the same walk that does the hiding. */
       allHold: marked.every((n) => {
-        const key = n.dataset.key === undefined ? '' : n.dataset.key;
+        const key = n.getAttribute('data-key') ?? '';
         const v = __t.$(':scope > .line > .v', n);
         return (key + '\n' + (v ? v.textContent : '')).toLowerCase().includes('cron');
       })
@@ -86,7 +86,7 @@ test('a path says where it landed', async ({ page }) => {
   await type(page, '.counts.pods');
   const pods = await page.evaluate(() => ({
     stats: __t.text('#stats'),
-    marked: __t.$('#tree .node.hit') === __t.at('.counts.pods')
+    marked: __t.get('#tree .node.hit', HTMLElement) === __t.at('.counts.pods')
   }));
   expect.soft(pods.stats, 'a path says where it landed').toBe('.counts.pods');
   expect.soft(pods.marked, 'the node it names is the one marked').toBe(true);
@@ -94,7 +94,7 @@ test('a path says where it landed', async ({ page }) => {
   await type(page, '.items[2].metadata.name');
   const indexed = await page.evaluate(() => ({
     stats: __t.text('#stats'),
-    value: __t.text(__t.$(':scope > .line > .v', __t.$('#tree .node.hit')))
+    value: __t.text(__t.$(':scope > .line > .v', __t.get('#tree .node.hit', HTMLElement)))
   }));
   expect.soft(indexed.stats, 'an index in a path resolves').toBe('.items[2].metadata.name');
   expect.soft(indexed.value, 'and lands on that element').toBe('"api-0"');
@@ -130,19 +130,19 @@ test('a path says where it landed', async ({ page }) => {
 test('the keys the box answers to', async ({ page }) => {
   await type(page, '');
   await page.locator('#fold').focus();
-  expect.soft(await page.evaluate(() => document.activeElement === __t.$('#q')),
+  expect.soft(await page.evaluate(() => document.activeElement === __t.get('#q', HTMLInputElement)),
     'something else has the focus').toBe(false);
 
   await page.keyboard.press('/');
   await settle(page);
-  expect.soft(await page.evaluate(() => document.activeElement === __t.$('#q')),
+  expect.soft(await page.evaluate(() => document.activeElement === __t.get('#q', HTMLInputElement)),
     '/ focuses the box').toBe(true);
 
   await type(page, 'cron');
   await page.locator('#q').press('Escape');
   await settle(page);
   const escaped = await page.evaluate(() => ({
-    box: __t.$('#q').value,
+    box: __t.get('#q', HTMLInputElement).value,
     stats: __t.text('#stats'),
     hidden: __t.$$('#tree .node.hidden').length
   }));

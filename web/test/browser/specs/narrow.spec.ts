@@ -3,9 +3,9 @@
    below its floor, or put anything out of reach.
 
    The window is just wider than a phone. At 600px and below the toolbar loses
-   the search box altogether, which phone.spec.js covers. */
+   the search box altogether, which phone.spec.ts covers. */
 
-import { test, expect, settle, type, clickAway, near } from '../fixtures.js';
+import { test, expect, settle, type, clickAway, near } from '../fixtures.ts';
 
 test.use({ variant: 'default', viewport: { width: 640, height: 800 } });
 
@@ -21,12 +21,12 @@ const ITEMS = [
 test('the toolbar wraps rather than overflowing', async ({ page }) => {
   const got = await page.evaluate((items) => ({
     width: window.innerWidth,
-    rows: __t.rows(items.map(([, sel]) => __t.$(sel))),
-    bar: __t.box(__t.$('header')),
-    boxes: items.map(([, sel]) => __t.box(__t.$(sel))),
+    rows: __t.rows(items.map(([, sel]) => __t.get(sel, HTMLElement))),
+    bar: __t.box(__t.get('header', HTMLElement)),
+    boxes: items.map(([, sel]) => __t.box(__t.get(sel, HTMLElement))),
     visible: items.map(([, sel]) => __t.visible(__t.$(sel))),
     noSideways: document.documentElement.scrollWidth <= window.innerWidth,
-    q: __t.box(__t.$('#q'))
+    q: __t.box(__t.get('#q', HTMLInputElement))
   }), ITEMS);
 
   expect.soft(got.width, 'the window really is a narrow one').toBeLessThanOrEqual(700);
@@ -53,9 +53,9 @@ test('the toolbar wraps rather than overflowing', async ({ page }) => {
 test('what hangs off the box follows it down', async ({ page }) => {
   await type(page, '.items[');
   const err = await page.evaluate(() => ({
-    fault: __t.box(__t.$('#fault')),
-    q: __t.box(__t.$('#q')),
-    wrap: __t.box(__t.$('.qwrap')),
+    fault: __t.box(__t.get('#fault', HTMLElement)),
+    q: __t.box(__t.get('#q', HTMLInputElement)),
+    wrap: __t.box(__t.get('.qwrap', HTMLElement)),
     inner: window.innerWidth
   }));
 
@@ -69,12 +69,12 @@ test('what hangs off the box follows it down', async ({ page }) => {
   await page.locator('at=.items[0].kind').locator('> .line > .fq').click();
   await settle(page);
   const menu = await page.evaluate(() => ({
-    suggest: __t.box(__t.$('#suggest')),
-    q: __t.box(__t.$('#q')),
+    suggest: __t.box(__t.get('#suggest', HTMLElement)),
+    q: __t.box(__t.get('#q', HTMLInputElement)),
     inner: window.innerWidth,
     /* A query too long to show is broken across lines rather than widening the
        list until the page scrolls sideways. */
-    wordBreak: getComputedStyle(__t.$('#suggest .sgt')).wordBreak,
+    wordBreak: getComputedStyle(__t.get('#suggest .sgt', HTMLElement)).wordBreak,
     noSideways: document.documentElement.scrollWidth <= window.innerWidth
   }));
 
@@ -90,7 +90,7 @@ test('what hangs off the box follows it down', async ({ page }) => {
   await clickAway(page);
   await type(page, '');
   const doc = await page.evaluate(() => ({
-    whiteSpace: getComputedStyle(__t.$('#tree .line')).whiteSpace,
+    whiteSpace: getComputedStyle(__t.get('#tree .line', HTMLElement)).whiteSpace,
     noSideways: document.documentElement.scrollWidth <= window.innerWidth
   }));
   expect.soft(doc.whiteSpace, 'a line of the document wraps').toBe('pre-wrap');

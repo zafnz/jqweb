@@ -2,7 +2,7 @@
    does not, so everything that reads the box as a query has to be absent
    without leaving a hole where it was. */
 
-import { test, expect, settle, type } from '../fixtures.js';
+import { test, expect, settle, type } from '../fixtures.ts';
 
 test.use({ variant: 'simple' });
 
@@ -18,10 +18,10 @@ test('the query half of the page is absent', async ({ page }) => {
     /* The shell ships the mode select hidden and jqui() is what turns it on,
        so without jqui it stays hidden rather than offering readings nothing
        can act on. */
-    modeHidden: __t.$('#mode').hidden,
+    modeHidden: __t.get('#mode', HTMLSelectElement).hidden,
     modeVisible: __t.visible(__t.$('#mode')),
-    placeholder: __t.$('#q').placeholder,
-    mentionsJq: __t.$('#q').placeholder.includes('jq'),
+    placeholder: __t.get('#q', HTMLInputElement).placeholder,
+    mentionsJq: __t.get('#q', HTMLInputElement).placeholder.includes('jq'),
     /* The filter button opens a list of queries, so there is nothing for it to
        do here and it is not drawn. The copy button is on every line either
        way. */
@@ -62,7 +62,7 @@ test('what is left still works', async ({ page }) => {
   await type(page, '.counts.pods');
   const path = await page.evaluate(() => ({
     stats: __t.text('#stats'),
-    marked: __t.$('#tree .node.hit') === __t.at('.counts.pods')
+    marked: __t.get('#tree .node.hit', HTMLElement) === __t.at('.counts.pods')
   }));
   expect.soft(path.stats, 'a path resolves').toBe('.counts.pods');
   expect.soft(path.marked, 'and is marked').toBe(true);
@@ -76,7 +76,7 @@ test('what is left still works', async ({ page }) => {
   await type(page, '.items[] | select(.kind == "Pod")');
   const query = await page.evaluate(() => ({
     stats: __t.text('#stats'),
-    bad: __t.$('#q').classList.contains('bad')
+    bad: __t.get('#q', HTMLInputElement).classList.contains('bad')
   }));
   expect.soft(query.stats, 'a query is searched for as text').toBe('0 matches');
   expect.soft(query.bad, 'and nothing is reported as broken').toBe(false);
@@ -89,9 +89,9 @@ test('what is left still works', async ({ page }) => {
 
   /* Nothing ever replaces the document, so the results view stays empty. */
   const views = await page.evaluate(() => ({
-    resultsHidden: __t.$('#results').hidden,
-    resultsHTML: __t.$('#results').innerHTML,
-    treeHidden: __t.$('#tree').hidden
+    resultsHidden: __t.get('#results', HTMLElement).hidden,
+    resultsHTML: __t.get('#results', HTMLElement).innerHTML,
+    treeHidden: __t.get('#tree', HTMLElement).hidden
   }));
   expect.soft(views.resultsHidden, 'the results view is never used').toBe(true);
   expect.soft(views.resultsHTML, 'and holds nothing').toBe('');
@@ -127,7 +127,7 @@ test('the rest of the toolbar still works', async ({ page }) => {
   await page.locator('#fold').focus();
   await page.keyboard.press('/');
   await settle(page);
-  expect.soft(await page.evaluate(() => document.activeElement === __t.$('#q')),
+  expect.soft(await page.evaluate(() => document.activeElement === __t.get('#q', HTMLInputElement)),
     '/ still focuses the box').toBe(true);
 
   await type(page, 'cron');

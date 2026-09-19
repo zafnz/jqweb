@@ -3,9 +3,9 @@
 ## Building and testing
 
     npm --prefix web ci            # install the pinned frontend build tools
-    npm --prefix web run check     # type-check the frontend
+    npm --prefix web run check     # type-check the frontend, tests and screenshot script
     npm --prefix web run build     # rebuild the committed scripts
-    npm --prefix web test          # JavaScript and TypeScript unit tests
+    npm --prefix web test          # TypeScript unit tests
     go build .                     # a jqweb binary in the working directory
     go test ./...                  # Go: argument handling, input validation, page assembly
     npm --prefix web run test:browser   # the page in a browser (needs Chrome)
@@ -99,8 +99,8 @@ otherwise stay on screen with no box left to clear them from.
 
 The breakpoint is 600 rather than a phone's own width because it was chosen
 when headless Chrome would not open a window narrower than 500px and a lower
-breakpoint could not be driven. `phone.spec.js` runs at 500 and
-`narrow.spec.js` at 640, either side of it. Phones in portrait are 430px and
+breakpoint could not be driven. `phone.spec.ts` runs at 500 and
+`narrow.spec.ts` at 640, either side of it. Phones in portrait are 430px and
 under; Playwright sets the viewport exactly, so a narrower one can be driven
 now if the breakpoint ever moves.
 
@@ -173,7 +173,7 @@ browser frame around the page, and writes `demo.png`. It drives the page with
 Playwright, so it needs `npm --prefix web ci` first; two runs of it produce the
 same bytes.
 
-    node web/test/browser/capture-demo.js
+    node web/test/browser/capture-demo.ts
 
 ## Bugs and wanted features
 

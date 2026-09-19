@@ -300,7 +300,8 @@ test('syntax the subset leaves out is named, not mis-parsed', () => {
 });
 
 test('a filter that does not exist says so', () => {
-  for (const name of ['tostream', 'env', 'inputs', 'leaf_paths']) {
+  for (const name of ['tostream', 'env', 'inputs', 'leaf_paths',
+    'toString', 'constructor', 'hasOwnProperty', 'valueOf', '__proto__']) {
     assert.strictEqual(error(name), `parse: ${name} is not a supported filter`);
   }
   assert.strictEqual(error('sort_by(.a; .b)'), 'parse: sort_by takes 1 argument, not 2');

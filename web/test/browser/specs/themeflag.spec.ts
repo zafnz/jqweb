@@ -1,8 +1,8 @@
-/* --theme sets what a page starts with. This is the same page as theme.spec.js
+/* --theme sets what a page starts with. This is the same page as theme.spec.ts
    drives, rendered with --theme light, so the only thing it can say is whether
    the flag reaches the browser. */
 
-import { test, expect, settle } from '../fixtures.js';
+import { test, expect, settle } from '../fixtures.ts';
 
 test.use({ variant: 'light' });
 
@@ -14,7 +14,7 @@ test('--theme light reaches the browser', async ({ page }) => {
     button: __t.text('#theme'),
     /* Painting light means the light palette, not merely the attribute. */
     background: __t.ratio(__t.rgba(getComputedStyle(document.body).backgroundColor), [0, 0, 0, 1]),
-    text: __t.contrast(__t.$('#tree .num'))
+    text: __t.contrast(__t.get('#tree .num', HTMLElement))
   }));
 
   expect.soft(got.pref, 'the flag is written into the page').toBe('light');

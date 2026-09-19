@@ -6,7 +6,7 @@
        npm --prefix web run test:browser -- suggest theme
        npm --prefix web run test:browser -- --headed
 
-   global-setup.js builds jqweb and renders the pages first. Everything either
+   global-setup.ts builds jqweb and renders the pages first. Everything either
    of them writes goes under .out, which is not committed. */
 
 import { defineConfig } from '@playwright/test';
@@ -16,7 +16,7 @@ const out = path.join(import.meta.dirname, '.out');
 
 export default defineConfig({
   testDir: path.join(import.meta.dirname, 'specs'),
-  globalSetup: path.join(import.meta.dirname, 'global-setup.js'),
+  globalSetup: path.join(import.meta.dirname, 'global-setup.ts'),
   outputDir: path.join(out, 'results'),
 
   /* The pages are rendered once and only read, so nothing here shares state

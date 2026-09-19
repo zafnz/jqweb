@@ -1,6 +1,6 @@
 /* The palette in force, and the button that changes it. */
 
-import { test, expect, settle } from '../fixtures.js';
+import { test, expect, settle } from '../fixtures.ts';
 
 test.use({ variant: 'default' });
 
@@ -38,7 +38,7 @@ test('the button reports and changes the preference', async ({ page }) => {
   const at = await page.evaluate(() => ({
     current: window.jqtheme.current(),
     button: __t.text('#theme'),
-    title: __t.$('#theme').title
+    title: __t.get('#theme', HTMLElement).title
   }));
 
   expect.soft(at.button, 'the button reports the preference').toBe(GLYPH[at.current]);
@@ -53,7 +53,7 @@ test('the button reports and changes the preference', async ({ page }) => {
       return {
         current,
         button: __t.text('#theme'),
-        title: __t.$('#theme').title,
+        title: __t.get('#theme', HTMLElement).title,
         pref: document.documentElement.getAttribute('data-pref'),
         theme: document.documentElement.getAttribute('data-theme'),
         /* auto follows the operating system and keeps following it; the other

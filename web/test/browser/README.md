@@ -14,7 +14,12 @@ Playwright Test drives Google Chrome, the one already installed rather than a
 downloaded copy, so `npm ci` is the whole install. CI runs the suite in a job of
 its own; the runner image ships Chrome.
 
-`global-setup.js` builds jqweb and renders the pages once per run into `.out`,
+Playwright loads the TypeScript specs and config directly. Run
+`npm --prefix web run check` to type-check them; Playwright does not check
+types. This also checks `capture-demo.ts` and the JSDoc in `helpers.js`,
+which stays JavaScript because it is injected into the page as written.
+
+`global-setup.ts` builds jqweb and renders the pages once per run into `.out`,
 which is not committed. `.out` also holds the traces and screenshots a failure
 leaves behind.
 
@@ -23,12 +28,12 @@ leaves behind.
 A spec is one file in `specs/`, named for the area it covers. `test.use` says
 which page it wants and how big a window to open it in:
 
-    import { test, expect } from '../fixtures.js';
+    import { test, expect } from '../fixtures.ts';
 
     test.use({ variant: 'simple', viewport: { width: 460, height: 800 } });
 
     test('the mode select stays hidden', async ({ page }) => {
-      expect.soft(await page.evaluate(() => __t.$('#mode').hidden),
+      expect.soft(await page.evaluate(() => __t.get('#mode', HTMLSelectElement).hidden),
         'the mode select stays hidden').toBe(true);
     });
 
@@ -42,8 +47,8 @@ them gets `default`, and a window of 1200x800.
 name in the address, so `test.use({ address: '?q=keys' })` is how a spec checks
 what the page reads out of its own URL.
 
-`alive.spec.js` is the one spec that needs a server behind the page. It starts
-the binary `global-setup.js` built, drives the page over HTTP in a page of its
+`alive.spec.ts` is the one spec that needs a server behind the page. It starts
+the binary `global-setup.ts` built, drives the page over HTTP in a page of its
 own, and stops the server when it is done.
 
 The fixture document is `testdata/doc.json`: ten records with repeated fields,
@@ -58,7 +63,7 @@ box happens inside `page.evaluate`, where `__t` is the set of helpers in
 
 | | |
 |---|---|
-| `$` `$$` `at` `shown` `text` `visible` | find things |
+| `$` `$$` `get` `at` `shown` `text` `visible` | find things |
 | `box` `rows` | measure them |
 | `contrast` `ratio` `rgba` `bg` `prop` `customProps` `paint` | colour |
 
@@ -66,11 +71,14 @@ Elements move around freely inside such a body; only what the body returns has
 to survive the trip out, so return numbers, strings and objects of them and
 assert on those.
 
+`get(selector, ElementType, root?)` checks that a required element exists and
+has the expected type. Use `$` when absence is allowed; it returns null.
+
 `expect.soft` is what the checks use. A hard `expect` stops the test at the
 first failure, which for a spec measuring 30 things means finding out about one
 of them per run.
 
-`fixtures.js` also exports the actions that need more than one step: `type`,
+`fixtures.ts` also exports the actions that need more than one step: `type`,
 `settle`, `clickAway`, `refocus` and `near`.
 
 `at=` is a selector engine, so a line of the document can be named by its jq
@@ -102,7 +110,7 @@ which is what "not swallowed by the shortcut" means for a real one.
 
 One found a defect. `Escape` is meant to put the suggestion list away and leave
 the box alone, and Chrome empties an `input` of `type=search` on `Escape` before
-any of that. See `suggest.spec.js` and zafnz/jqweb#61.
+any of that. See `suggest.spec.ts` and zafnz/jqweb#61.
 
 ## When one fails
 
@@ -127,7 +135,7 @@ a smaller `scrollY` than it started at.
 
 ## Contrast
 
-`contrast.spec.js` holds words to 4.5:1 and shapes to 3:1. Six colours in the
+`contrast.spec.ts` holds words to 4.5:1 and shapes to 3:1. Six colours in the
 palette do not reach that. Each is pinned to the ratio it reaches today in the
 `BELOW` table in that file, so a change that dims one further still fails.
 Raising them is tracked in zafnz/jqweb#23, and that table is what to delete as

@@ -9,7 +9,7 @@
     "build": "node build.ts",
     "check": "tsc --noEmit",
     "test": "node --test test/unit/*.test.ts",
-    "test:browser": "playwright test --config=test/browser/playwright.config.js"
+    "test:browser": "playwright test --config=test/browser/playwright.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

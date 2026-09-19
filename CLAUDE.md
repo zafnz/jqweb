@@ -190,8 +190,8 @@ nothing.
 **The phone breakpoint is written twice.** `@media (max-width: 600px)` in
 `page.css` hides the search box and the line buttons, and `page/search.ts`
 runs `matchMedia` on the same query to clear a search when the window crosses
-it. Change one and change the other. `phone.spec.js` runs at 500px and
-`narrow.spec.js` at 640px, so a breakpoint moved outside that range fails one of
+it. Change one and change the other. `phone.spec.ts` runs at 500px and
+`narrow.spec.ts` at 640px, so a breakpoint moved outside that range fails one of
 them. The viewport is set exactly now rather than being whatever headless Chrome
 would open, so a spec at a real phone width is available if one is wanted.
 
@@ -250,7 +250,7 @@ and the `curl` in `README.md` fetches it from there. Examples that need a
 document use this one.
 
 **`demo.png` is generated and committed.** Regenerate it for every new release,
-after the example page is current, with `node web/test/browser/capture-demo.js`.
+after the example page is current, with `node web/test/browser/capture-demo.ts`.
 The script drives `docs/k8s.json` into the screenshot query and draws the browser
 frame; do not replace it with a hand capture.
 
@@ -295,7 +295,7 @@ success for a run that failed and the output is lost.
 
 **The unit tests are named by glob, `test/unit/*.test.ts`.** A bare `node
 --test` runs every `.js` file under a directory called `test`, which takes in
-the browser specs and `capture-demo.js`.
+the browser specs and `capture-demo.ts`.
 
 **The jq engine is checked against real jq.**
 `web/test/testdata/jq-corpus.json` holds queries with the output jq itself gave
@@ -333,7 +333,7 @@ scrolled halfway down because `.` resolves to the root and centring an element
 taller than the window puts its middle in the middle; a suggestion beginning
 with a name was text-searched because auto mode read the first character; the
 line buttons were invisible in light mode at 1.6:1. All three have a spec on
-them now, and reintroducing the first one fails `scroll.spec.js` with the node
+them now, and reintroducing the first one fails `scroll.spec.ts` with the node
 1803px off the top.
 
 **Assert the property that matters, not a particular pixel.** Several of these
@@ -344,7 +344,7 @@ shortens the document, so a text search that scrolls nowhere still ends at a
 smaller `scrollY` than it started at.
 
 **The contrast bar the specs hold to is not the one the palette meets.** Six
-colours land under 4.5:1 for words or 3:1 for shapes, and `contrast.spec.js`
+colours land under 4.5:1 for words or 3:1 for shapes, and `contrast.spec.ts`
 holds each to what it reaches today so a change that dims one further still
 fails. The `BELOW` table in that file is what to delete as zafnz/jqweb#23 is
 worked through.

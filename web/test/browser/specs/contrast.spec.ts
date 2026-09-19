@@ -7,18 +7,20 @@
    the buttons on a line, the result gutter -- to 3:1, which is what WCAG asks
    of each. */
 
-import { test, expect, settle, type } from '../fixtures.js';
+import { test, expect, settle, type } from '../fixtures.ts';
+import type { Page } from '@playwright/test';
 
 test.use({ variant: 'default' });
 
 const TEXT = 4.5;
 const SHAPE = 3;
-const THEMES = ['dark', 'light'];
+const THEMES = ['dark', 'light'] as const;
+type Measurement = [name: string, selector: string, want: number, pseudo?: string];
 
 /* Six places do not reach that today. They are held to what they do reach, so
    that a change making any of them dimmer still fails, and raising them is
    tracked in zafnz/jqweb#23 rather than here. */
-const BELOW = {
+const BELOW: Partial<Record<string, number>> = {
   'the result count in light': 4.25,
   'the gutter number on a result in light': 2.73,
   'the summary on a collapsed branch in light': 3.14,
@@ -29,16 +31,16 @@ const BELOW = {
 
 /* Every measurement is named the way the failure should read, and held to what
    the palette reaches today wherever that is short of the bar. */
-function holds(got, name, want) {
+function holds(got: number, name: string, want: number) {
   expect.soft(got, name).toBeGreaterThanOrEqual(BELOW[name] === undefined ? want : BELOW[name]);
 }
 
 /* Paints one palette and measures a list of [name, selector, want, pseudo]. */
-async function measure(page, theme, wanted) {
-  return page.evaluate(([theme, wanted]) => {
+async function measure(page: Page, theme: typeof THEMES[number], wanted: Measurement[]) {
+  return page.evaluate(({ theme, wanted }) => {
     __t.paint(theme);
-    return wanted.map(([, sel, , pseudo]) => __t.contrast(__t.$(sel), pseudo));
-  }, [theme, wanted]);
+    return wanted.map(([, sel, , pseudo]) => __t.contrast(__t.get(sel, HTMLElement), pseudo));
+  }, { theme, wanted });
 }
 
 test('every colour is a custom property, defined in both palettes', async ({ page }) => {
@@ -49,10 +51,10 @@ test('every colour is a custom property, defined in both palettes', async ({ pag
     .toBeGreaterThanOrEqual(20);
 
   for (const theme of THEMES) {
-    const values = await page.evaluate(([theme, names]) => {
+    const values = await page.evaluate(({ theme, names }) => {
       __t.paint(theme);
       return names.map((n) => __t.prop(n));
-    }, [theme, names]);
+    }, { theme, names });
 
     names.forEach((name, i) => {
       expect.soft(values[i], name + ' is defined in ' + theme).not.toBe('');
@@ -66,7 +68,7 @@ test('the results view', async ({ page }) => {
     'a result is on screen to measure').toBe(true);
 
   for (const theme of THEMES) {
-    const wanted = [
+    const wanted: Measurement[] = [
       ['a value against the page in ' + theme, '#results .v', TEXT],
       ['the toolbar title in ' + theme, 'header .name a', TEXT],
       ['a toolbar button in ' + theme, '#fold', TEXT],
@@ -83,7 +85,7 @@ test('the document, its keys and its strings', async ({ page }) => {
   await type(page, '');
 
   for (const theme of THEMES) {
-    const wanted = [
+    const wanted: Measurement[] = [
       ['a key in ' + theme, '#tree .key', TEXT],
       ['a string in ' + theme, '#tree .str', TEXT],
       ['a number in ' + theme, '#tree .num', TEXT],
@@ -103,7 +105,7 @@ test('the document, its keys and its strings', async ({ page }) => {
       __t.paint(theme);
       const items = __t.at('.items');
       items.classList.add('collapsed');
-      const got = __t.contrast(__t.$(':scope > .line > .fold', items));
+      const got = __t.contrast(__t.get(':scope > .line > .fold', HTMLElement, items));
       items.classList.remove('collapsed');
       return got;
     }, theme);
@@ -114,7 +116,7 @@ test('the document, its keys and its strings', async ({ page }) => {
     await type(page, 'cron');
     const marked = await page.evaluate((theme) => {
       __t.paint(theme);
-      return __t.contrast(__t.$('#tree .node.hit > .line .v'));
+      return __t.contrast(__t.get('#tree .node.hit > .line .v', HTMLElement));
     }, theme);
     holds(marked, 'a value on a marked line in ' + theme, TEXT);
     await type(page, '');
@@ -135,7 +137,7 @@ test('the suggestion list', async ({ page }) => {
   await settle(page);
 
   for (const theme of THEMES) {
-    const wanted = [
+    const wanted: Measurement[] = [
       ['a query on the suggestion list in ' + theme, '#suggest .sgt', TEXT],
       ['the count beside it in ' + theme, '#suggest .sg:not(.on) .sgn', TEXT],
       ['the count on the picked row in ' + theme, '#suggest .sg.on .sgn', TEXT],

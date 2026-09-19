@@ -6,7 +6,7 @@
    It is also the only page driven at the size of a real document -- 700KB of
    kubectl output -- which is where anything that costs per line shows up. */
 
-import { test, expect, settle, type, clickAway } from '../fixtures.js';
+import { test, expect, settle, type, clickAway } from '../fixtures.ts';
 
 /* The one page here with a real document behind it: 122,706 elements, against
    about 1,500 on the fixture. A trace snapshots the DOM on every action, which
@@ -25,7 +25,7 @@ test('the committed example page is the page people are pointed at', async ({ pa
     /* Built the default way, so the engine is in it: the page people are
        pointed at is the one they would get. */
     engine: typeof window.jqjs,
-    wired: __t.$('#q').placeholder.includes('jq'),
+    wired: __t.get('#q', HTMLInputElement).placeholder.includes('jq'),
     modeVisible: __t.visible(__t.$('#mode')),
     nodes: __t.$$('#tree .node').length,
     copies: __t.$$('#tree .node > .line > .cp').length,
@@ -35,7 +35,7 @@ test('the committed example page is the page people are pointed at', async ({ pa
     externalScripts: __t.$$('script[src]').length,
     styles: __t.$$('style').length > 0,
     marks: __t.$$('header svg').length,
-    markPaths: __t.$$('path', __t.$('header svg')).length
+    markPaths: __t.$$('path', __t.get('header svg', SVGSVGElement)).length
   }));
 
   expect.soft(got.title, 'the page is built from the example document').toContain('k8s.json');
@@ -55,9 +55,9 @@ test('the committed example page is the page people are pointed at', async ({ pa
 test('the example page still works at that size', async ({ page }) => {
   await type(page, '.items | length');
   const one = await page.evaluate(() => ({
-    resultsHidden: __t.$('#results').hidden,
+    resultsHidden: __t.get('#results', HTMLElement).hidden,
     stats: __t.text('#stats'),
-    count: +__t.text(__t.$('#results .v'))
+    count: +__t.get('#results .v', HTMLElement).textContent
   }));
   expect.soft(one.resultsHidden, 'a query runs against it').toBe(false);
   expect.soft(one.stats, 'and returns something').toBe('1 result');
@@ -65,14 +65,14 @@ test('the example page still works at that size', async ({ page }) => {
 
   await type(page, '.items[] | .kind');
   const many = await page.evaluate((count) => {
-    const stats = __t.text('#stats');
+    const stats = __t.get('#stats', HTMLElement).textContent;
     return stats === count + ' results' || stats.startsWith('first 500 of');
   }, one.count);
   expect.soft(many, 'a query with many outputs is capped, or counted').toBe(true);
 
   await type(page, '.items[0].kind');
   const path = await page.evaluate(() => ({
-    treeHidden: __t.$('#tree').hidden,
+    treeHidden: __t.get('#tree', HTMLElement).hidden,
     stats: __t.text('#stats')
   }));
   expect.soft(path.treeHidden, 'a path is shown where it sits').toBe(false);
@@ -82,12 +82,12 @@ test('the example page still works at that size', async ({ page }) => {
   await page.locator('at=.items[0].kind').locator('> .line > .fq').click();
   await settle(page);
   const list = await page.evaluate(() => ({
-    hidden: __t.$('#suggest').hidden,
+    hidden: __t.get('#suggest', HTMLElement).hidden,
     rows: __t.$$('#suggest .sg').length,
     /* Counting every reading against a document this size is what the budget
        in query/ui.ts exists for: a row it ran out of time on is offered
        without a count rather than not offered. */
-    counted: __t.$$('#suggest .sgn').map((n) => __t.text(n))
+    counted: __t.$$('#suggest .sgn').map((n) => n.textContent)
       .every((l) => l === '' || /^\d+ (result|key)s?$/.test(l))
   }));
   expect.soft(list.hidden, 'the suggestion list opens on it').toBe(false);
@@ -100,7 +100,7 @@ test('the example page still works at that size', async ({ page }) => {
   await settle(page);
   const folded = await page.evaluate(() => ({
     label: __t.text('#fold'),
-    rootCollapsed: __t.$('#tree > .node').classList.contains('collapsed')
+    rootCollapsed: __t.get('#tree > .node', HTMLElement).classList.contains('collapsed')
   }));
   expect.soft(folded.label, 'collapsing the lot works at this size').toBe('Expand all');
   expect.soft(folded.rootCollapsed, 'and leaves the root open').toBe(false);

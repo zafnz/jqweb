@@ -2,15 +2,15 @@
    page reads it the way it reads anything typed, and .items[3] is a path to
    look up. */
 
-import { test, expect } from '../fixtures.js';
+import { test, expect } from '../fixtures.ts';
 
 test.use({ variant: 'simplequery' });
 
 test('a simple page opens on the path it was given', async ({ page }) => {
   const got = await page.evaluate(() => ({
-    box: __t.$('#q').value,
+    box: __t.get('#q', HTMLInputElement).value,
     stats: __t.text('#stats'),
-    marked: __t.$('#tree .node.hit') === __t.at('.items[3]'),
+    marked: __t.get('#tree .node.hit', HTMLElement) === __t.at('.items[3]'),
     outsideHidden: __t.at('.items[0]').classList.contains('hidden')
   }));
 

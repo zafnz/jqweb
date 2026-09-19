@@ -1,17 +1,17 @@
 /* A page built with a query on the command line opens on that query, run as
    though it had been typed into the box. */
 
-import { test, expect, type } from '../fixtures.js';
+import { test, expect, type } from '../fixtures.ts';
 
 test.use({ variant: 'query' });
 
 test('the page opens on the query it was built with', async ({ page }) => {
   const got = await page.evaluate(() => ({
-    box: __t.$('#q').value,
-    mode: __t.$('#mode').value,
-    bad: __t.$('#q').classList.contains('bad'),
-    resultsHidden: __t.$('#results').hidden,
-    treeHidden: __t.$('#tree').hidden,
+    box: __t.get('#q', HTMLInputElement).value,
+    mode: __t.get('#mode', HTMLSelectElement).value,
+    bad: __t.get('#q', HTMLInputElement).classList.contains('bad'),
+    resultsHidden: __t.get('#results', HTMLElement).hidden,
+    treeHidden: __t.get('#tree', HTMLElement).hidden,
     results: __t.$$('#results .result').length,
     stats: __t.text('#stats'),
     first: __t.text(__t.$('#results .result'))
@@ -29,8 +29,8 @@ test('the page opens on the query it was built with', async ({ page }) => {
   /* From there it is the search box it always was. */
   await type(page, '');
   const cleared = await page.evaluate(() => ({
-    treeHidden: __t.$('#tree').hidden,
-    resultsHidden: __t.$('#results').hidden,
+    treeHidden: __t.get('#tree', HTMLElement).hidden,
+    resultsHidden: __t.get('#results', HTMLElement).hidden,
     hidden: __t.$$('#tree .node.hidden').length
   }));
 

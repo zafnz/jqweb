@@ -2,7 +2,7 @@
    select, a search box that takes what is left, a count and two buttons, and
    the failure it is prone to is one of them taking room from another. */
 
-import { test, expect, settle, type, near } from '../fixtures.js';
+import { test, expect, settle, type, near } from '../fixtures.ts';
 
 test.use({ variant: 'default' });
 
@@ -19,14 +19,14 @@ const ITEMS = [
 
 test('the toolbar lays out in one row', async ({ page }) => {
   const got = await page.evaluate((items) => ({
-    rows: __t.rows(items.map(([, sel]) => __t.$(sel))),
-    bar: __t.box(__t.$('header')),
-    boxes: items.map(([, sel]) => __t.box(__t.$(sel))),
+    rows: __t.rows(items.map(([, sel]) => __t.get(sel, HTMLElement))),
+    bar: __t.box(__t.get('header', HTMLElement)),
+    boxes: items.map(([, sel]) => __t.box(__t.get(sel, HTMLElement))),
     noSideways: document.documentElement.scrollWidth <= window.innerWidth,
-    q: __t.box(__t.$('#q')),
-    fold: __t.box(__t.$('#fold')),
-    stats: __t.box(__t.$('#stats')),
-    theme: __t.box(__t.$('#theme'))
+    q: __t.box(__t.get('#q', HTMLInputElement)),
+    fold: __t.box(__t.get('#fold', HTMLElement)),
+    stats: __t.box(__t.get('#stats', HTMLElement)),
+    theme: __t.box(__t.get('#theme', HTMLElement))
   }), ITEMS);
 
   expect.soft(got.rows, 'the toolbar has room for one row').toBe(1);
@@ -58,9 +58,9 @@ test('a long count does not crowd anything out', async ({ page }) => {
      nothing: a long path put there must not push the buttons off the end. */
   await type(page, '.items[9].metadata.labels.namespace-that-is-long-enough-to-crowd');
   const got = await page.evaluate(() => ({
-    bar: __t.box(__t.$('header')),
-    theme: __t.box(__t.$('#theme')),
-    q: __t.box(__t.$('#q'))
+    bar: __t.box(__t.get('header', HTMLElement)),
+    theme: __t.box(__t.get('#theme', HTMLElement)),
+    q: __t.box(__t.get('#q', HTMLInputElement))
   }));
 
   expect.soft(Math.round(got.theme.right), 'a long count leaves the theme button where it was')
@@ -70,15 +70,15 @@ test('a long count does not crowd anything out', async ({ page }) => {
 
 test('the toolbar stays at the top', async ({ page }) => {
   /* Which is what makes the box reachable from the bottom of a long file. */
-  expect.soft(await page.evaluate(() => getComputedStyle(__t.$('header')).position),
+  expect.soft(await page.evaluate(() => getComputedStyle(__t.get('header', HTMLElement)).position),
     'the toolbar is stuck to the top').toBe('sticky');
 
   await page.evaluate(() => window.scrollTo(0, 1200));
   await settle(page, 150);
   const scrolled = await page.evaluate(() => ({
     scrollY: window.scrollY,
-    top: Math.round(__t.box(__t.$('header')).top),
-    zIndex: +getComputedStyle(__t.$('header')).zIndex
+    top: Math.round(__t.box(__t.get('header', HTMLElement)).top),
+    zIndex: +getComputedStyle(__t.get('header', HTMLElement)).zIndex
   }));
 
   expect.soft(scrolled.scrollY, 'the page really scrolled').toBeGreaterThanOrEqual(1000);
@@ -90,8 +90,8 @@ test('the toolbar stays at the top', async ({ page }) => {
   await page.evaluate(() => window.scrollTo(0, 0));
   await settle(page, 150);
   const rested = await page.evaluate(() => ({
-    tree: Math.round(__t.box(__t.$('#tree')).top),
-    header: Math.round(__t.box(__t.$('header')).bottom)
+    tree: Math.round(__t.box(__t.get('#tree', HTMLElement)).top),
+    header: Math.round(__t.box(__t.get('header', HTMLElement)).bottom)
   }));
   expect.soft(rested.tree, 'the document starts below the toolbar')
     .toBeGreaterThanOrEqual(rested.header);

@@ -4,13 +4,14 @@
    the reader halfway down the file; and a path typed one character at a time
    dragged the page around on every keystroke. */
 
-import { test, expect, settle, type, near } from '../fixtures.js';
+import { test, expect, settle, type, near } from '../fixtures.ts';
+import type { Page } from '@playwright/test';
 
 test.use({ variant: 'default' });
 
 /* Scrolling is instant -- the page asks for block: 'center' and no behaviour --
    so this only has to put the page somewhere and let the handlers run. */
-async function scrollTo(page, y) {
+async function scrollTo(page: Page, y: number | 'bottom') {
   await page.evaluate((to) => window.scrollTo(0, to === 'bottom'
     ? document.documentElement.scrollHeight : to), y);
   await settle(page, 150);
@@ -31,8 +32,8 @@ test('a revealed line comes out from under the toolbar', async ({ page }) => {
   await type(page, '.');
   const root = await page.evaluate(() => ({
     scrollY: window.scrollY,
-    top: __t.$('#tree > .node').getBoundingClientRect().top,
-    below: __t.$('header').getBoundingClientRect().bottom
+    top: __t.get('#tree > .node', HTMLElement).getBoundingClientRect().top,
+    below: __t.get('header', HTMLElement).getBoundingClientRect().bottom
   }));
   expect.soft(root.scrollY, '. goes to the top of the document, not the middle of it')
     .toBeLessThanOrEqual(50);
@@ -45,8 +46,8 @@ test('a revealed line comes out from under the toolbar', async ({ page }) => {
   await type(page, '.items[9].status');
   const far = await page.evaluate(() => ({
     stats: __t.text('#stats'),
-    top: __t.$('#tree .node.hit').getBoundingClientRect().top,
-    below: __t.$('header').getBoundingClientRect().bottom,
+    top: __t.get('#tree .node.hit', HTMLElement).getBoundingClientRect().top,
+    below: __t.get('header', HTMLElement).getBoundingClientRect().bottom,
     inner: window.innerHeight,
     scrollY: window.scrollY
   }));
@@ -74,8 +75,8 @@ test('every revealed line clears the toolbar', async ({ page }) => {
     await scrollTo(page, 'bottom');
     await type(page, path);
     const got = await page.evaluate(() => ({
-      top: __t.$('#tree .node.hit').getBoundingClientRect().top,
-      below: __t.$('header').getBoundingClientRect().bottom,
+      top: __t.get('#tree .node.hit', HTMLElement).getBoundingClientRect().top,
+      below: __t.get('header', HTMLElement).getBoundingClientRect().bottom,
       inner: window.innerHeight
     }));
     expect.soft(Math.round(got.top), path + ' comes out from under the toolbar')

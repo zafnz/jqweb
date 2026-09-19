@@ -1,6 +1,6 @@
 /* The pages the specs run against, and where they are built.
 
-   Each variant is rendered once per run, by global-setup.js, and shared by
+   Each variant is rendered once per run, by global-setup.ts, and shared by
    every spec naming it. "docs" is not rendered: it is the copy committed for
    GitHub Pages, and driving the committed bytes is the only way anything here
    says whether the page people are pointed at works. "query" and "simplequery"
@@ -33,7 +33,9 @@ const PAGES = {
    to pivot on, and long enough that the page scrolls. */
 const doc = path.join(here, 'testdata', 'doc.json');
 
-function pageFile(name) {
+export type Variant = keyof typeof PAGES;
+
+function pageFile(name: Variant) {
   if (!(name in PAGES)) throw new Error('unknown page "' + name + '"');
   return name === 'docs'
     ? path.join(repo, 'docs', 'k8s.html')
@@ -42,7 +44,7 @@ function pageFile(name) {
 
 /* Whatever follows the file name is added to the address, so a spec can check
    what the page reads out of its own URL. */
-function pageURL(name, address) {
+function pageURL(name: Variant, address = '') {
   return pathToFileURL(pageFile(name)).href + (address || '');
 }
 
@@ -56,7 +58,8 @@ function renderAll() {
   const binary = path.join(built, 'jqweb');
   execFileSync('go', ['build', '-o', binary, '.'], { cwd: repo, stdio: 'inherit' });
 
-  for (const [name, args] of Object.entries(PAGES)) {
+  for (const name of Object.keys(PAGES) as Variant[]) {
+    const args = PAGES[name];
     if (!args) continue;
     execFileSync(binary, args.map((a) =>
       a === '$out' ? pageFile(name) : a === '$doc' ? doc : a), { cwd: repo, stdio: 'inherit' });

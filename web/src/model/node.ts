@@ -45,10 +45,14 @@ export function leafOf(v: Scalar): LeafNode {
   if (v === null) return { t: 'l', r: null, h: span('null', 'null') };
   if (v === true || v === false) return { t: 'l', r: v, h: span('bool', String(v)) };
   if (typeof v === 'number') {
-    /* JSON has no way to write a NaN or an infinity, so they become null,
-       which is what JSON.stringify does with them too. */
-    if (!isFinite(v)) return { t: 'l', r: null, h: span('null', 'null') };
-    return { t: 'l', r: v, n: String(v), h: span('num', String(v)) };
+    /* JSON has no way to write a NaN or an infinity. The value is kept as
+       it is, so that what is computed from it next comes out as jq's would,
+       and only its text is jq's: null for a NaN, and the largest double for
+       an infinity, so 1000 | exp shows as 1.7976931348623157e+308 and
+       (1000 | exp) / 2 shows the same. */
+    if (v !== v) return { t: 'l', r: v, n: 'null', h: span('null', 'null') };
+    const text = String(v === Infinity ? Number.MAX_VALUE : v === -Infinity ? -Number.MAX_VALUE : v);
+    return { t: 'l', r: v, n: text, h: span('num', text) };
   }
   return { t: 'l', r: v, h: span('str', esc(quote(v))) };
 }

@@ -1,33 +1,30 @@
 /* The builtins, by name and argument count: map/1 is map with one argument.
 
-   Each takes the input value and the argument expressions, still unrun,
-   and returns a stream. An argument is a filter, so a builtin that wants a
-   value out of one runs it against the same input. */
+   Each takes the input value, the argument expressions still unrun, and the
+   sink to send each output to. An argument is a filter, so a builtin that
+   wants a value out of one runs it against the same input. */
 
 import { leafOf, stringify } from '../../model/node.ts';
 import type { ArrayNode, Node, ObjectNode } from '../../model/node.ts';
 import { NestingError } from '../../model/nesting.ts';
 import { parseJSON } from '../../model/parse.ts';
 import { runErr } from './errors.ts';
-import { ev, push, tick } from './evaluate.ts';
-import type { Builtin, Stream } from './evaluate.ts';
+import { collect, ev, evUntil, firstOf, one, scalar, some, stopping, tick } from './evaluate.ts';
+import type { Builtin, Emit } from './evaluate.ts';
 import { FORMATS } from './formats.ts';
 import type { Ast } from './parser.ts';
-import { captureOne, matchOne, one, scanOne, splitOn, substitute, testOne,
+import { captureOne, matchOne, scanOne, splitOn, substitute, testOne,
   withRe } from './regex.ts';
-import { broken, parseDate, seconds, strftime } from './time.ts';
-import { FALSE, NULL, TRUE, add2, arrayOf, chars, cmp, descend, distinct, elem,
-  equal, field, is, iterate, lookup, members, num, objectOf, truthy, typeOf,
-  wantType } from './values.ts';
+import { broken, fields, mktime, parseDate, parts, strftime } from './time.ts';
+import { FALSE, NULL, TRUE, add2, arrayOf, chars, cmp, cmpStr, descend, distinct,
+  elem, equal, field, is, iterate, lookup, members, num, objectOf, splitStr,
+  truthy, typeOf, wantType } from './values.ts';
 import type { JqType } from './values.ts';
 
-/* Runs f once for every output of an argument expression, because jq treats
-   a value argument as a stream: has("a","b") answers twice. */
-function overArg(arg: Ast, x: Node, f: (v: Node) => Node): Stream {
-  const vals = ev(arg, x);
-  const out: Stream = [];
-  for (let i = 0; i < vals.length; i++) out.push(f(vals[i]));
-  return out;
+/* Emits f of every output of an argument expression, because jq treats a
+   value argument as a stream: has("a","b") answers twice. */
+function overArg(arg: Ast, x: Node, emit: Emit, f: (v: Node) => Node): void {
+  ev(arg, x, function (v) { emit(f(v)); });
 }
 
 function keysOf(n: Node, sorted: boolean): ArrayNode {
@@ -38,7 +35,7 @@ function keysOf(n: Node, sorted: boolean): ArrayNode {
   }
   if (n.t === 'o') {
     const k = members(n).k.slice();
-    if (sorted) k.sort();
+    if (sorted) k.sort(cmpStr);
     return arrayOf(k.map(leafOf));
   }
   throw runErr(typeOf(n) + ' has no keys');
@@ -65,7 +62,7 @@ interface Keyed {
    keys are worked out once up front rather than on every comparison, and
    the sort is stable, so equal elements keep their order. */
 function keyed(list: Node[], arg: Ast): Keyed[] {
-  const pairs = list.map(function (n) { return { n: n, k: arrayOf(ev(arg, n)) }; });
+  const pairs = list.map(function (n) { return { n: n, k: arrayOf(collect(arg, n)) }; });
   pairs.sort(function (p, q) { return cmp(p.k, q.k); });
   return pairs;
 }
@@ -89,43 +86,51 @@ function flattenInto(list: Node[], depth: number, out: Node[]): void {
   }
 }
 
-/* range over every combination of its arguments, as jq does. A zero step
-   would never reach the end, so it produces nothing rather than hanging. */
-function rangeOf(froms: Node[], tos: Node[], bys: Node[]): Stream {
-  const out: Stream = [];
-  for (let i = 0; i < froms.length; i++) {
-    for (let j = 0; j < tos.length; j++) {
-      for (let k = 0; k < bys.length; k++) {
-        const from = num(froms[i], 'range');
-        const to = num(tos[j], 'range');
-        const by = num(bys[k], 'range');
-        if (by === 0) continue;
-        for (let v = from; by > 0 ? v < to : v > to; v += by) {
+/* range over every combination of its arguments, the first on the outside,
+   as jq does. A zero step would never reach the end, so it produces nothing
+   rather than hanging. */
+function rangeOf(from: Ast | null, to: Ast, by: Ast | null, x: Node, emit: Emit): void {
+  argOrOne(from, x, 0, function (lo) {
+    ev(to, x, function (hi) {
+      argOrOne(by, x, 1, function (step) {
+        const f = num(lo, 'range');
+        const t = num(hi, 'range');
+        const b = num(step, 'range');
+        if (b === 0) return;
+        for (let v = f; b > 0 ? v < t : v > t; v += b) {
           tick();
-          out.push(leafOf(v));
+          emit(leafOf(v));
         }
-      }
-    }
-  }
-  return out;
+      });
+    });
+  });
+}
+
+/* An argument that a shorter form of a builtin leaves out, standing for the
+   one value dflt. */
+function argOrOne(a: Ast | null, x: Node, dflt: number, f: (n: Node) => void): void {
+  if (a) ev(a, x, f);
+  else f(leafOf(dflt));
 }
 
 /* jq's containment: a string contains a substring, an array contains
    another when every element of the second is contained in some element of
    the first, and an object when every member of the second is contained in
-   the member of the first with that key. */
-function containsIn(a: Node, b: Node): boolean {
+   the member of the first with that key. Two values of different kinds --
+   jq counts true and false as different kinds here -- are an error at the
+   top and a non-match anywhere inside, so [1] | contains(["1"]) is false. */
+function containsIn(a: Node, b: Node, top: boolean): boolean {
   if (a.t === 'o' && b.t === 'o') {
     const mb = members(b);
     for (let i = 0; i < mb.k.length; i++) {
-      if (!containsIn(field(a, mb.k[i]), mb.v[i])) return false;
+      if (!containsIn(field(a, mb.k[i]), mb.v[i], false)) return false;
     }
     return true;
   }
   if (a.t === 'a' && b.t === 'a') {
     for (let i = 0; i < b.v.length; i++) {
       let ok = false;
-      for (let j = 0; j < a.v.length && !ok; j++) ok = containsIn(a.v[j], b.v[i]);
+      for (let j = 0; j < a.v.length && !ok; j++) ok = containsIn(a.v[j], b.v[i], false);
       if (!ok) return false;
     }
     return true;
@@ -133,7 +138,10 @@ function containsIn(a: Node, b: Node): boolean {
   if (is(a, 'string') && is(b, 'string')) return a.r.indexOf(b.r) >= 0;
   const ta = typeOf(a);
   const tb = typeOf(b);
-  if (ta !== tb) throw runErr(ta + ' and ' + tb + ' cannot be checked for containment');
+  if (ta !== tb || (ta === 'boolean' && a.t === 'l' && b.t === 'l' && a.r !== b.r)) {
+    if (top) throw runErr(ta + ' and ' + tb + ' cannot be checked for containment');
+    return false;
+  }
   return equal(a, b);
 }
 
@@ -182,26 +190,27 @@ function endIndex(found: Node, last: boolean): Node {
   return last ? found.v[found.v.length - 1] : found.v[0];
 }
 
-/* The names from_entries accepts for the key and the value of an entry. A
-   key falls through to the next spelling when it is null or false; a value
-   does not, so an entry may hold a null on purpose. */
-const ENTRY_KEYS = ['name', 'Name', 'key', 'Key'];
-const ENTRY_VALUES = ['value', 'Value'];
+/* The names from_entries accepts for the key and the value of an entry,
+   from jq's own definition:
 
-function entryKey(e: ObjectNode): Node {
-  for (let i = 0; i < ENTRY_KEYS.length; i++) {
-    const at = e.k.lastIndexOf(ENTRY_KEYS[i]);
-    if (at >= 0 && truthy(e.v[at])) return e.v[at];
-  }
-  return NULL;
+       map({(.key // .Key // .name // .Name): (if has("value") then .value else .Value end)}) | add | .//={}
+
+   A key falls through to the next spelling when it is null or false, and
+   has to end up a string; a value does not fall through, so an entry may
+   hold a null on purpose. An entry that is not an object fails the way
+   .key on it would. */
+const ENTRY_KEYS = ['key', 'Key', 'name', 'Name'];
+
+function entryKey(e: Node): string {
+  let k: Node = NULL;
+  for (let i = 0; i < ENTRY_KEYS.length && !truthy(k); i++) k = field(e, ENTRY_KEYS[i]);
+  if (!is(k, 'string')) throw runErr('an object key must be a string, not ' + typeOf(k));
+  return k.r;
 }
 
-function entryValue(e: ObjectNode): Node {
-  for (let i = 0; i < ENTRY_VALUES.length; i++) {
-    const at = e.k.lastIndexOf(ENTRY_VALUES[i]);
-    if (at >= 0) return e.v[at];
-  }
-  return NULL;
+function entryValue(e: Node): Node {
+  if (e.t === 'o' && e.k.indexOf('value') >= 0) return field(e, 'value');
+  return field(e, 'Value');
 }
 
 function toEntries(x: Node): ArrayNode {
@@ -218,29 +227,29 @@ function fromEntries(x: Node): ObjectNode {
   const keys: string[] = [];
   const vals: Node[] = [];
   for (let i = 0; i < list.length; i++) {
-    const e = list[i];
-    const k = e.t === 'o' ? entryKey(e) : e;
-    vals.push(e.t === 'o' ? entryValue(e) : NULL);
-    keys.push(is(k, 'string') ? k.r : stringify(k));
+    keys.push(entryKey(list[i]));
+    vals.push(entryValue(list[i]));
   }
   return distinct(objectOf(keys, vals));
 }
 
 /* Every path to a value inside a node, deepest last, as jq's paths gives
-   them: arrays of keys and indices, and never the empty path for the root. */
-function pathsOf(n: Node, at: Node[], out: ArrayNode[], keep: (v: Node) => boolean): void {
+   them: arrays of keys and indices, and never the empty path for the root.
+   keep is asked about each value with its path, and says whether to emit
+   it. */
+function pathsOf(n: Node, at: Node[], keep: (v: Node, path: ArrayNode) => void): void {
   if (n.t === 'a') {
     for (let i = 0; i < n.v.length; i++) {
       const here = at.concat([leafOf(i)]);
-      if (keep(n.v[i])) out.push(arrayOf(here));
-      pathsOf(n.v[i], here, out, keep);
+      keep(n.v[i], arrayOf(here));
+      pathsOf(n.v[i], here, keep);
     }
   } else if (n.t === 'o') {
     const m = members(n);
     for (let i = 0; i < m.k.length; i++) {
       const here = at.concat([leafOf(m.k[i])]);
-      if (keep(m.v[i])) out.push(arrayOf(here));
-      pathsOf(m.v[i], here, out, keep);
+      keep(m.v[i], arrayOf(here));
+      pathsOf(m.v[i], here, keep);
     }
   }
 }
@@ -264,7 +273,7 @@ function pick(list: Node[], arg: Ast | null, want: number): Node {
   let best: Node | null = null;
   let bestKey: Node | null = null;
   for (let i = 0; i < list.length; i++) {
-    const key = arg ? arrayOf(ev(arg, list[i])) : list[i];
+    const key = arg ? arrayOf(collect(arg, list[i])) : list[i];
     if (best === null || bestKey === null) {
       best = list[i];
       bestKey = key;
@@ -279,220 +288,329 @@ function pick(list: Node[], arg: Ast | null, want: number): Node {
   return best === null ? NULL : best;
 }
 
+/* Whether any member of a value satisfies f. */
+function anyMember(x: Node, f: (n: Node) => boolean): boolean {
+  const vals = iterate(x);
+  for (let i = 0; i < vals.length; i++) if (f(vals[i])) return true;
+  return false;
+}
+
+function falsy(n: Node): boolean { return !truthy(n); }
+
+/* The loops: while, until and recurse, which jq defines as
+
+       def while(cond; update): def _while: if cond then ., (update | _while) else empty end; _while;
+       def until(cond; update): def _until: if cond then . else (update | _until) end; _until;
+       def recurse(f): def r: ., (f | r); r;
+       def recurse(f; cond): def r: ., (f | select(cond) | r); r;
+
+   Every output of cond is a branch and every output of update is followed,
+   and each is followed before the next is asked for, so that
+   first(while(true; error)) is the input and never reaches the error.
+
+   That laziness is recursion on the JavaScript stack. A loop whose steps
+   are scalar -- until(. >= 3; . + 1) -- has no later output to wait for and
+   runs as a plain loop for any number of steps. A branching loop is
+   followed LAZY_DEPTH levels down, and past that each further step's
+   outputs are collected before the first is followed, over an explicit
+   stack, so the depth of a branch is bounded by memory rather than the
+   stack; only a sibling that would fail or never end, that deep, tells
+   the difference from jq. */
+const LAZY_DEPTH = 256;
+let lazyDepth = 0;
+
+interface LoopTask {
+  v: Node;
+  done: boolean;
+}
+
+/* What one step of a loop does with its value: emit it, and follow it or
+   not. For while the value is emitted when cond holds and then followed;
+   for until it is emitted when cond holds and followed when it does not. */
+function loop(x: Node, a: Ast[], emit: Emit, isWhile: boolean): void {
+  if (scalar(a[0]) && scalar(a[1])) {
+    let v = x;
+    for (;;) {
+      tick();
+      const go = truthy(one(a[0], v));
+      if (go) emit(v);
+      if (go !== isWhile) return;
+      v = one(a[1], v);
+    }
+  }
+  follow(x);
+
+  function follow(v: Node): void {
+    tick();
+    if (lazyDepth >= LAZY_DEPTH) {
+      collected(v);
+      return;
+    }
+    lazyDepth++;
+    try {
+      ev(a[0], v, function (c) {
+        const go = truthy(c);
+        if (go) emit(v);
+        if (go === isWhile) ev(a[1], v, follow);
+      });
+    } finally {
+      lazyDepth--;
+    }
+  }
+
+  function collected(v: Node): void {
+    const stack: LoopTask[] = [{ v: v, done: false }];
+    let t: LoopTask | undefined;
+    while ((t = stack.pop()) !== undefined) {
+      tick();
+      if (t.done) {
+        emit(t.v);
+        continue;
+      }
+      const here = t.v;
+      const next: LoopTask[] = [];
+      ev(a[0], here, function (c) {
+        const go = truthy(c);
+        if (go) next.push({ v: here, done: true });
+        if (go === isWhile) ev(a[1], here, function (u) { next.push({ v: u, done: false }); });
+      });
+      /* Reversed, so that the first is the next one taken. */
+      for (let i = next.length - 1; i >= 0; i--) stack.push(next[i]);
+    }
+  }
+}
+
+function recurseWith(x: Node, f: Ast, cond: Ast | null, emit: Emit): void {
+  if (scalar(f) && (!cond || scalar(cond))) {
+    let v = x;
+    for (;;) {
+      tick();
+      emit(v);
+      v = one(f, v);
+      if (cond && !truthy(one(cond, v))) return;
+    }
+  }
+  follow(x);
+
+  function follow(v: Node): void {
+    tick();
+    if (lazyDepth >= LAZY_DEPTH) {
+      collected(v);
+      return;
+    }
+    lazyDepth++;
+    try {
+      emit(v);
+      ev(f, v, function (n) {
+        if (!cond) follow(n);
+        /* select emits its input once for every truthy output of cond. */
+        else ev(cond, n, function (c) { if (truthy(c)) follow(n); });
+      });
+    } finally {
+      lazyDepth--;
+    }
+  }
+
+  function collected(v: Node): void {
+    const stack: Node[] = [v];
+    let top: Node | undefined;
+    while ((top = stack.pop()) !== undefined) {
+      tick();
+      emit(top);
+      const next: Node[] = [];
+      ev(f, top, function (n) {
+        if (!cond) next.push(n);
+        else ev(cond, n, function (c) { if (truthy(c)) next.push(n); });
+      });
+      /* Reversed, so that the first output is the next one taken. */
+      for (let i = next.length - 1; i >= 0; i--) stack.push(next[i]);
+    }
+  }
+}
+
+/* What strftime and todate format: a number is broken out first, and an
+   array is taken as a broken-out time already. */
+function timeOf(x: Node, name: string): number[] {
+  return is(x, 'number') ? parts(x.r) : fields(x, name);
+}
+
+const DECIMAL = /^\s*[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?\s*$/;
+const NOT_FINITE = /^\s*[+-]?inf(?:inity)?\s*$/i;
+const NOT_A_NUMBER = /^\s*[+-]?nan\s*$/i;
+
 /* A builtin that maps one number to another; name is for its error message. */
 function mathOf(f: (n: number) => number, name: string): Builtin {
-  return function (x) { return [leafOf(f(num(x, name)))]; };
+  return function (x, _a, emit) { emit(leafOf(f(num(x, name)))); };
 }
 
 /* select(type == "...") under the shorter name jq gives it. */
 function typeFilter(t: JqType): Builtin {
-  return function (x) { return typeOf(x) === t ? [x] : []; };
+  return function (x, _a, emit) { if (typeOf(x) === t) emit(x); };
 }
 
 export const builtins: Record<string, Builtin> = {
-  'empty/0': function () { return []; },
-  'not/0': function (x) { return [truthy(x) ? FALSE : TRUE]; },
-  'type/0': function (x) { return [leafOf(typeOf(x))]; },
+  'empty/0': function () { /* nothing */ },
+  'not/0': function (x, _a, emit) { emit(truthy(x) ? FALSE : TRUE); },
+  'type/0': function (x, _a, emit) { emit(leafOf(typeOf(x))); },
 
-  'select/1': function (x, args) {
-    const vals = ev(args[0], x);
-    const out: Stream = [];
-    for (let i = 0; i < vals.length; i++) if (truthy(vals[i])) out.push(x);
-    return out;
+  /* The input, once for every truthy output of the condition. */
+  'select/1': function (x, a, emit) {
+    ev(a[0], x, function (c) { if (truthy(c)) emit(x); });
   },
 
-  'recurse/0': function (x) {
-    const out: Stream = [];
-    descend(x, out);
-    return out;
-  },
-  /* Depth first over an explicit stack rather than the JavaScript one,
-     because a filter with no end -- recurse(. + 1) -- would overflow that
-     long before the step limit could report it. */
-  'recurse/1': function (x, args) {
-    const out: Stream = [];
-    const stack: Node[] = [x];
-    let top: Node | undefined;
-    while ((top = stack.pop()) !== undefined) {
-      tick();
-      out.push(top);
-      const next = ev(args[0], top);
-      /* Reversed, so that the first output is the next one taken. */
-      for (let i = next.length - 1; i >= 0; i--) stack.push(next[i]);
-    }
-    return out;
-  },
+  'recurse/0': function (x, _a, emit) { descend(x, emit); },
+  'recurse/1': function (x, a, emit) { recurseWith(x, a[0], null, emit); },
+  'recurse/2': function (x, a, emit) { recurseWith(x, a[0], a[1], emit); },
 
-  'map/1': function (x, args) {
+  'map/1': function (x, a, emit) {
     const vals = iterate(x);
-    const out: Stream = [];
-    for (let i = 0; i < vals.length; i++) push(out, ev(args[0], vals[i]));
-    return [arrayOf(out)];
+    const out: Node[] = [];
+    for (let i = 0; i < vals.length; i++) {
+      ev(a[0], vals[i], function (v) { out.push(v); });
+    }
+    emit(arrayOf(out));
   },
 
-  /* A member whose filter produces nothing is dropped, which is how
-     map_values(empty) deletes every one of them. */
-  'map_values/1': function (x, args) {
+  /* A member takes the first output of its filter, and one whose filter
+     produces nothing is dropped, which is how map_values(empty) deletes
+     every one of them. */
+  'map_values/1': function (x, a, emit) {
     const keys: string[] = [];
     const vals: Node[] = [];
     if (x.t === 'a') {
       for (let i = 0; i < x.v.length; i++) {
-        const r = ev(args[0], x.v[i]);
-        if (r.length) vals.push(r[0]);
+        const r = firstOf(a[0], x.v[i]);
+        if (r !== undefined) vals.push(r);
       }
-      return [arrayOf(vals)];
+      emit(arrayOf(vals));
+      return;
     }
     const m = members(wantType(x, 'object', 'map_values'));
     for (let i = 0; i < m.k.length; i++) {
-      const r = ev(args[0], m.v[i]);
-      if (r.length) {
+      const r = firstOf(a[0], m.v[i]);
+      if (r !== undefined) {
         keys.push(m.k[i]);
-        vals.push(r[0]);
+        vals.push(r);
       }
     }
-    return [objectOf(keys, vals)];
+    emit(objectOf(keys, vals));
   },
 
-  'length/0': function (x) {
-    if (x.t === 'o') return [leafOf(members(x).k.length)];
-    if (x.t === 'a') return [leafOf(x.v.length)];
-    if (is(x, 'number')) return [leafOf(Math.abs(x.r))];
-    if (is(x, 'string')) return [leafOf(chars(x.r).length)];
-    if (is(x, 'boolean')) throw runErr('boolean has no length');
-    return [leafOf(0)];
+  'length/0': function (x, _a, emit) {
+    if (x.t === 'o') emit(leafOf(members(x).k.length));
+    else if (x.t === 'a') emit(leafOf(x.v.length));
+    else if (is(x, 'number')) emit(leafOf(Math.abs(x.r)));
+    else if (is(x, 'string')) emit(leafOf(chars(x.r).length));
+    else if (is(x, 'boolean')) throw runErr('boolean has no length');
+    else emit(leafOf(0));
   },
 
-  'keys/0': function (x) { return [keysOf(x, true)]; },
-  'keys_unsorted/0': function (x) { return [keysOf(x, false)]; },
+  'keys/0': function (x, _a, emit) { emit(keysOf(x, true)); },
+  'keys_unsorted/0': function (x, _a, emit) { emit(keysOf(x, false)); },
 
-  'has/1': function (x, args) {
-    return overArg(args[0], x, function (k) { return hasKey(x, k) ? TRUE : FALSE; });
+  'has/1': function (x, a, emit) {
+    overArg(a[0], x, emit, function (k) { return hasKey(x, k) ? TRUE : FALSE; });
   },
-  'in/1': function (x, args) {
-    return overArg(args[0], x, function (c) { return hasKey(c, x) ? TRUE : FALSE; });
+  'in/1': function (x, a, emit) {
+    overArg(a[0], x, emit, function (c) { return hasKey(c, x) ? TRUE : FALSE; });
   },
-  'indices/1': function (x, args) {
-    return overArg(args[0], x, function (w) { return indicesOf(x, w); });
+  'indices/1': function (x, a, emit) {
+    overArg(a[0], x, emit, function (w) { return indicesOf(x, w); });
   },
-  'index/1': function (x, args) {
-    return overArg(args[0], x, function (w) { return endIndex(indicesOf(x, w), false); });
+  'index/1': function (x, a, emit) {
+    overArg(a[0], x, emit, function (w) { return endIndex(indicesOf(x, w), false); });
   },
-  'rindex/1': function (x, args) {
-    return overArg(args[0], x, function (w) { return endIndex(indicesOf(x, w), true); });
+  'rindex/1': function (x, a, emit) {
+    overArg(a[0], x, emit, function (w) { return endIndex(indicesOf(x, w), true); });
   },
-  'contains/1': function (x, args) {
-    return overArg(args[0], x, function (b) { return containsIn(x, b) ? TRUE : FALSE; });
+  'contains/1': function (x, a, emit) {
+    overArg(a[0], x, emit, function (b) { return containsIn(x, b, true) ? TRUE : FALSE; });
   },
-  'inside/1': function (x, args) {
-    return overArg(args[0], x, function (b) { return containsIn(b, x) ? TRUE : FALSE; });
+  'inside/1': function (x, a, emit) {
+    overArg(a[0], x, emit, function (b) { return containsIn(b, x, true) ? TRUE : FALSE; });
   },
 
-  'to_entries/0': function (x) { return [toEntries(x)]; },
-  'from_entries/0': function (x) { return [fromEntries(x)]; },
-  'with_entries/1': function (x, args) {
+  'to_entries/0': function (x, _a, emit) { emit(toEntries(x)); },
+  'from_entries/0': function (x, _a, emit) { emit(fromEntries(x)); },
+  'with_entries/1': function (x, a, emit) {
     const entries = toEntries(x);
-    const out: Stream = [];
-    for (let i = 0; i < entries.v.length; i++) push(out, ev(args[0], entries.v[i]));
-    return [fromEntries(arrayOf(out))];
+    const out: Node[] = [];
+    for (let i = 0; i < entries.v.length; i++) {
+      ev(a[0], entries.v[i], function (e) { out.push(e); });
+    }
+    emit(fromEntries(arrayOf(out)));
   },
 
-  'add/0': function (x) {
+  'add/0': function (x, _a, emit) {
     const vals = iterate(x);
     let acc: Node = NULL;
     for (let i = 0; i < vals.length; i++) acc = add2(acc, vals[i]);
-    return [acc];
+    emit(acc);
   },
 
-  'any/0': function (x) {
-    const vals = iterate(x);
-    for (let i = 0; i < vals.length; i++) if (truthy(vals[i])) return [TRUE];
-    return [FALSE];
+  /* Each of these stops at the first value that settles the answer, so a
+     later one that would fail is never reached. An empty stream is
+     vacuously all and not any, as in jq. */
+  'any/0': function (x, _a, emit) { emit(anyMember(x, truthy) ? TRUE : FALSE); },
+  'all/0': function (x, _a, emit) { emit(anyMember(x, falsy) ? FALSE : TRUE); },
+  'any/1': function (x, a, emit) {
+    emit(anyMember(x, function (v) { return some(a[0], v, truthy); }) ? TRUE : FALSE);
   },
-  'all/0': function (x) {
-    const vals = iterate(x);
-    for (let i = 0; i < vals.length; i++) if (!truthy(vals[i])) return [FALSE];
-    return [TRUE];
+  'all/1': function (x, a, emit) {
+    emit(anyMember(x, function (v) { return some(a[0], v, falsy); }) ? FALSE : TRUE);
   },
-  'any/1': function (x, args) {
-    const vals = iterate(x);
-    for (let i = 0; i < vals.length; i++) {
-      const r = ev(args[0], vals[i]);
-      for (let j = 0; j < r.length; j++) if (truthy(r[j])) return [TRUE];
-    }
-    return [FALSE];
-  },
-  'all/1': function (x, args) {
-    const vals = iterate(x);
-    for (let i = 0; i < vals.length; i++) {
-      const r = ev(args[0], vals[i]);
-      for (let j = 0; j < r.length; j++) if (!truthy(r[j])) return [FALSE];
-    }
-    return [TRUE];
-  },
-
   /* The two-argument forms take a stream rather than the input's own
      members, which is what lets a test reach anywhere in a subtree:
-     any(.. | objects; .containerPort? == 80). An empty stream is vacuously
-     all and not any, as in jq. */
-  'any/2': function (x, args) {
-    const vals = ev(args[0], x);
-    for (let i = 0; i < vals.length; i++) {
-      const r = ev(args[1], vals[i]);
-      for (let j = 0; j < r.length; j++) if (truthy(r[j])) return [TRUE];
-    }
-    return [FALSE];
+     any(.. | objects; .containerPort? == 80). */
+  'any/2': function (x, a, emit) {
+    emit(some(a[0], x, function (v) { return some(a[1], v, truthy); }) ? TRUE : FALSE);
   },
-  'all/2': function (x, args) {
-    const vals = ev(args[0], x);
-    for (let i = 0; i < vals.length; i++) {
-      const r = ev(args[1], vals[i]);
-      for (let j = 0; j < r.length; j++) if (!truthy(r[j])) return [FALSE];
-    }
-    return [TRUE];
+  'all/2': function (x, a, emit) {
+    emit(some(a[0], x, function (v) { return some(a[1], v, falsy); }) ? FALSE : TRUE);
   },
 
-  'min/0': function (x) { return [pick(wantType(x, 'array', 'min').v, null, -1)]; },
-  'max/0': function (x) { return [pick(wantType(x, 'array', 'max').v, null, 1)]; },
-  'min_by/1': function (x, args) { return [pick(wantType(x, 'array', 'min_by').v, args[0], -1)]; },
-  'max_by/1': function (x, args) { return [pick(wantType(x, 'array', 'max_by').v, args[0], 1)]; },
+  'min/0': function (x, _a, emit) { emit(pick(wantType(x, 'array', 'min').v, null, -1)); },
+  'max/0': function (x, _a, emit) { emit(pick(wantType(x, 'array', 'max').v, null, 1)); },
+  'min_by/1': function (x, a, emit) { emit(pick(wantType(x, 'array', 'min_by').v, a[0], -1)); },
+  'max_by/1': function (x, a, emit) { emit(pick(wantType(x, 'array', 'max_by').v, a[0], 1)); },
 
-  'sort/0': function (x) {
-    return [arrayOf(wantType(x, 'array', 'sort').v.slice().sort(cmp))];
+  'sort/0': function (x, _a, emit) {
+    emit(arrayOf(wantType(x, 'array', 'sort').v.slice().sort(cmp)));
   },
-  'sort_by/1': function (x, args) {
-    const pairs = keyed(wantType(x, 'array', 'sort_by').v, args[0]);
-    return [arrayOf(pairs.map(function (p) { return p.n; }))];
+  'sort_by/1': function (x, a, emit) {
+    const pairs = keyed(wantType(x, 'array', 'sort_by').v, a[0]);
+    emit(arrayOf(pairs.map(function (p) { return p.n; })));
   },
-  'group_by/1': function (x, args) {
-    const runs = runsOf(keyed(wantType(x, 'array', 'group_by').v, args[0]));
-    return [arrayOf(runs.map(arrayOf))];
+  'group_by/1': function (x, a, emit) {
+    const runs = runsOf(keyed(wantType(x, 'array', 'group_by').v, a[0]));
+    emit(arrayOf(runs.map(arrayOf)));
   },
-  'unique/0': function (x) {
+  'unique/0': function (x, _a, emit) {
     const sorted = wantType(x, 'array', 'unique').v.slice().sort(cmp);
     const out: Node[] = [];
     for (let i = 0; i < sorted.length; i++) {
       if (!i || cmp(sorted[i - 1], sorted[i]) !== 0) out.push(sorted[i]);
     }
-    return [arrayOf(out)];
+    emit(arrayOf(out));
   },
-  'unique_by/1': function (x, args) {
-    const runs = runsOf(keyed(wantType(x, 'array', 'unique_by').v, args[0]));
-    return [arrayOf(runs.map(function (r) { return r[0]; }))];
-  },
-
-  'reverse/0': function (x) {
-    if (is(x, 'string')) return [leafOf(chars(x.r).reverse().join(''))];
-    if (is(x, 'null')) return [arrayOf([])];
-    return [arrayOf(wantType(x, 'array', 'reverse').v.slice().reverse())];
+  'unique_by/1': function (x, a, emit) {
+    const runs = runsOf(keyed(wantType(x, 'array', 'unique_by').v, a[0]));
+    emit(arrayOf(runs.map(function (r) { return r[0]; })));
   },
 
-  'flatten/0': function (x) {
+  'reverse/0': function (x, _a, emit) {
+    if (is(x, 'string')) emit(leafOf(chars(x.r).reverse().join('')));
+    else if (is(x, 'null')) emit(arrayOf([]));
+    else emit(arrayOf(wantType(x, 'array', 'reverse').v.slice().reverse()));
+  },
+
+  'flatten/0': function (x, _a, emit) {
     const out: Node[] = [];
     flattenInto(wantType(x, 'array', 'flatten').v, Infinity, out);
-    return [arrayOf(out)];
+    emit(arrayOf(out));
   },
-  'flatten/1': function (x, args) {
-    return overArg(args[0], x, function (d) {
+  'flatten/1': function (x, a, emit) {
+    overArg(a[0], x, emit, function (d) {
       const depth = num(d, 'flatten');
       const out: Node[] = [];
       if (depth < 0) throw runErr('flatten needs a depth of 0 or more');
@@ -501,104 +619,121 @@ export const builtins: Record<string, Builtin> = {
     });
   },
 
-  'first/0': function (x) { return [elem(wantType(x, 'array', 'first'), 0)]; },
-  'last/0': function (x) { return [elem(wantType(x, 'array', 'last'), -1)]; },
-  'first/1': function (x, args) {
-    const vals = ev(args[0], x);
-    return vals.length ? [vals[0]] : [];
+  'first/0': function (x, _a, emit) { emit(elem(wantType(x, 'array', 'first'), 0)); },
+  'last/0': function (x, _a, emit) { emit(elem(wantType(x, 'array', 'last'), -1)); },
+  /* The stream is stopped after its first output, so first(1, error) is 1. */
+  'first/1': function (x, a, emit) {
+    evUntil(a[0], x, function (v) { emit(v); return true; });
   },
-  'last/1': function (x, args) {
-    const vals = ev(args[0], x);
-    return vals.length ? [vals[vals.length - 1]] : [];
+  /* jq 1.7 defines last(f) as a reduce from null, so last(empty) is null. */
+  'last/1': function (x, a, emit) {
+    let last: Node = NULL;
+    ev(a[0], x, function (v) { last = v; });
+    emit(last);
   },
-  /* Nothing here produces an endless stream, so taking the first n of a
-     stream already built is the same answer jq's lazy limit gives. */
-  'limit/2': function (x, args) {
-    const out: Stream = [];
-    const counts = ev(args[0], x);
-    for (let i = 0; i < counts.length; i++) {
-      const n = Math.floor(num(counts[i], 'limit'));
-      if (n <= 0) continue;
-      const vals = ev(args[1], x);
-      push(out, vals.slice(0, n));
-    }
-    return out;
+  /* jq 1.7 takes the whole stream for a negative count and stops once the
+     count is reached, so a count of 1.8 gives two. */
+  'limit/2': function (x, a, emit) {
+    ev(a[0], x, function (count) {
+      const n = num(count, 'limit');
+      if (n < 0) {
+        ev(a[1], x, emit);
+        return;
+      }
+      if (n === 0) return;
+      let seen = 0;
+      evUntil(a[1], x, function (v) { emit(v); return ++seen >= n; });
+    });
   },
 
-  'range/1': function (x, args) { return rangeOf([leafOf(0)], ev(args[0], x), [leafOf(1)]); },
-  'range/2': function (x, args) { return rangeOf(ev(args[0], x), ev(args[1], x), [leafOf(1)]); },
-  'range/3': function (x, args) { return rangeOf(ev(args[0], x), ev(args[1], x), ev(args[2], x)); },
+  'range/1': function (x, a, emit) { rangeOf(null, a[0], null, x, emit); },
+  'range/2': function (x, a, emit) { rangeOf(a[0], a[1], null, x, emit); },
+  'range/3': function (x, a, emit) { rangeOf(a[0], a[1], a[2], x, emit); },
 
-  'join/1': function (x, args) {
-    const list = wantType(x, 'array', 'join').v;
-    return overArg(args[0], x, function (sep) {
-      const parts: string[] = [];
+  /* jq's definition, which is a reduce over "+": a null separator adds
+     nothing, a number or boolean element is written out, a null one is
+     empty text, and anything else is added as it is, so a separator or an
+     element that cannot be added to a string is the error "+" gives. The
+     argument is run before the input is checked, as jq binds a value
+     argument first: 0 | join(empty) produces nothing rather than failing.
+     split, startswith, endswith and strftime are the same. */
+  'join/1': function (x, a, emit) {
+    overArg(a[0], x, emit, function (sep) {
+      const list = iterate(x);
+      let acc: Node = leafOf('');
       for (let i = 0; i < list.length; i++) {
+        if (i) acc = add2(acc, sep);
         const v = list[i];
         const t = typeOf(v);
-        if (t === 'null') parts.push('');
-        else if (is(v, 'string')) parts.push(v.r);
-        else if (t === 'number' || t === 'boolean') parts.push(stringify(v));
-        else throw runErr('cannot join ' + t + ' elements');
+        acc = add2(acc, t === 'number' || t === 'boolean' ? leafOf(stringify(v))
+          : t === 'null' ? leafOf('') : v);
       }
-      return leafOf(parts.join(is(sep, 'string') ? sep.r : stringify(sep)));
+      return acc;
     });
   },
-  'split/1': function (x, args) {
-    const s = wantType(x, 'string', 'split').r;
-    return overArg(args[0], x, function (sep) {
-      return arrayOf(s.split(wantType(sep, 'string', 'split').r).map(leafOf));
+  'split/1': function (x, a, emit) {
+    overArg(a[0], x, emit, function (sep) {
+      const s = wantType(x, 'string', 'split').r;
+      return arrayOf(splitStr(s, wantType(sep, 'string', 'split').r).map(leafOf));
     });
   },
 
-  'startswith/1': function (x, args) {
-    const s = wantType(x, 'string', 'startswith').r;
-    return overArg(args[0], x, function (p) {
+  'startswith/1': function (x, a, emit) {
+    overArg(a[0], x, emit, function (p) {
+      const s = wantType(x, 'string', 'startswith').r;
       return s.lastIndexOf(wantType(p, 'string', 'startswith').r, 0) === 0 ? TRUE : FALSE;
     });
   },
-  'endswith/1': function (x, args) {
-    const s = wantType(x, 'string', 'endswith').r;
-    return overArg(args[0], x, function (p) {
+  'endswith/1': function (x, a, emit) {
+    overArg(a[0], x, emit, function (p) {
+      const s = wantType(x, 'string', 'endswith').r;
       const t = wantType(p, 'string', 'endswith').r;
       return s.length >= t.length && s.indexOf(t, s.length - t.length) >= 0 ? TRUE : FALSE;
     });
   },
-  'ltrimstr/1': function (x, args) {
-    return overArg(args[0], x, function (p) {
+  'ltrimstr/1': function (x, a, emit) {
+    overArg(a[0], x, emit, function (p) {
       if (!is(x, 'string') || !is(p, 'string')) return x;
       return x.r.lastIndexOf(p.r, 0) === 0 ? leafOf(x.r.slice(p.r.length)) : x;
     });
   },
-  'rtrimstr/1': function (x, args) {
-    return overArg(args[0], x, function (p) {
+  'rtrimstr/1': function (x, a, emit) {
+    overArg(a[0], x, emit, function (p) {
       if (!is(x, 'string') || !is(p, 'string')) return x;
       const at = x.r.length - p.r.length;
       return at >= 0 && x.r.indexOf(p.r, at) === at ? leafOf(x.r.slice(0, at)) : x;
     });
   },
-  'ascii_downcase/0': function (x) {
-    return [leafOf(wantType(x, 'string', 'ascii_downcase').r.replace(/[A-Z]/g, lower))];
+  'ascii_downcase/0': function (x, _a, emit) {
+    emit(leafOf(wantType(x, 'string', 'ascii_downcase').r.replace(/[A-Z]/g, lower)));
   },
-  'ascii_upcase/0': function (x) {
-    return [leafOf(wantType(x, 'string', 'ascii_upcase').r.replace(/[a-z]/g, upper))];
+  'ascii_upcase/0': function (x, _a, emit) {
+    emit(leafOf(wantType(x, 'string', 'ascii_upcase').r.replace(/[a-z]/g, upper)));
   },
 
-  'tostring/0': function (x) {
-    return [is(x, 'string') ? x : leafOf(stringify(x))];
+  'tostring/0': function (x, _a, emit) {
+    emit(is(x, 'string') ? x : leafOf(stringify(x)));
   },
-  'tonumber/0': function (x) {
-    if (is(x, 'number')) return [x];
+  /* What jq's number reader takes: a decimal with an optional sign,
+     fraction and exponent, or a spelling of infinity or NaN, with blank
+     space around it. JavaScript's own conversion also takes hex, binary
+     and octal, which jq refuses. */
+  'tonumber/0': function (x, _a, emit) {
+    if (is(x, 'number')) {
+      emit(x);
+      return;
+    }
     const s = wantType(x, 'string', 'tonumber').r;
-    const n = +s;
-    if (s.trim() === '' || isNaN(n)) throw runErr('cannot parse "' + s + '" as a number');
-    return [leafOf(n)];
+    if (DECIMAL.test(s)) emit(leafOf(+s));
+    else if (NOT_FINITE.test(s)) emit(leafOf(s.trim().charAt(0) === '-' ? -Infinity : Infinity));
+    else if (NOT_A_NUMBER.test(s)) emit(leafOf(NaN));
+    else throw runErr('cannot parse "' + s + '" as a number');
   },
-  'tojson/0': function (x) { return [leafOf(stringify(x))]; },
+  'tojson/0': function (x, _a, emit) { emit(leafOf(stringify(x))); },
   /* JSON.parse is the syntax check and parseJSON the parse. parseJSON keeps
      key order and number text, and its string scanner never ends
      on text with no closing quote, so it only sees what JSON.parse accepted. */
-  'fromjson/0': function (x) {
+  'fromjson/0': function (x, _a, emit) {
     const s = wantType(x, 'string', 'fromjson').r;
     try {
       JSON.parse(s);
@@ -606,7 +741,7 @@ export const builtins: Record<string, Builtin> = {
       throw runErr('cannot parse "' + s + '" as JSON');
     }
     try {
-      return [parseJSON(s)];
+      emit(parseJSON(s));
     } catch (e) {
       if (e instanceof NestingError) throw runErr(e.message);
       throw e;
@@ -615,7 +750,9 @@ export const builtins: Record<string, Builtin> = {
 
   'floor/0': mathOf(Math.floor, 'floor'),
   'ceil/0': mathOf(Math.ceil, 'ceil'),
-  'round/0': mathOf(Math.round, 'round'),
+  /* Halves go away from zero, as C's round does: -1.5 is -2. Math.round
+     would take it to -1. */
+  'round/0': mathOf(function (n) { return Math.sign(n) * Math.round(Math.abs(n)); }, 'round'),
   'fabs/0': mathOf(Math.abs, 'fabs'),
   'sqrt/0': mathOf(Math.sqrt, 'sqrt'),
 
@@ -625,159 +762,149 @@ export const builtins: Record<string, Builtin> = {
   'numbers/0': typeFilter('number'),
   'strings/0': typeFilter('string'),
   'nulls/0': typeFilter('null'),
-  'iterables/0': function (x) { return x.t === 'a' || x.t === 'o' ? [x] : []; },
-  'scalars/0': function (x) { return x.t === 'l' ? [x] : []; },
-  'values/0': function (x) { return x.t === 'l' && x.r === null ? [] : [x]; },
+  'iterables/0': function (x, _a, emit) { if (x.t === 'a' || x.t === 'o') emit(x); },
+  'scalars/0': function (x, _a, emit) { if (x.t === 'l') emit(x); },
+  'values/0': function (x, _a, emit) { if (!(x.t === 'l' && x.r === null)) emit(x); },
 
-  'match/1': function (x, a) { return withRe(x, a, 1, matchOne); },
-  'match/2': function (x, a) { return withRe(x, a, 2, matchOne); },
-  'capture/1': function (x, a) { return withRe(x, a, 1, captureOne); },
-  'capture/2': function (x, a) { return withRe(x, a, 2, captureOne); },
-  'scan/1': function (x, a) { return withRe(x, a, 1, scanOne); },
-  'scan/2': function (x, a) { return withRe(x, a, 2, scanOne); },
-  'splits/1': function (x, a) { return withRe(x, a, 1, splitOn); },
-  'splits/2': function (x, a) { return withRe(x, a, 2, splitOn); },
-  'split/2': function (x, a) { return [arrayOf(withRe(x, a, 2, splitOn))]; },
-  'test/1': function (x, a) { return withRe(x, a, 1, testOne); },
-  'test/2': function (x, a) { return withRe(x, a, 2, testOne); },
-  'sub/2': function (x, a) { return substitute(x, one(a[0], x, 'sub'), a[1], '', false); },
-  'sub/3': function (x, a) {
-    return substitute(x, one(a[0], x, 'sub'), a[1], one(a[2], x, 'sub'), false);
+  'match/1': function (x, a, emit) { withRe(x, a, 1, matchOne, emit); },
+  'match/2': function (x, a, emit) { withRe(x, a, 2, matchOne, emit); },
+  'capture/1': function (x, a, emit) { withRe(x, a, 1, captureOne, emit); },
+  'capture/2': function (x, a, emit) { withRe(x, a, 2, captureOne, emit); },
+  'scan/1': function (x, a, emit) { withRe(x, a, 1, scanOne, emit); },
+  'scan/2': function (x, a, emit) { withRe(x, a, 2, scanOne, emit); },
+  'splits/1': function (x, a, emit) { withRe(x, a, 1, splitOn, emit); },
+  'splits/2': function (x, a, emit) { withRe(x, a, 2, splitOn, emit); },
+  'split/2': function (x, a, emit) {
+    withRe(x, a, 2, function (s, pattern, mode, out) {
+      const parts: Node[] = [];
+      splitOn(s, pattern, mode, function (p) { parts.push(p); });
+      out(arrayOf(parts));
+    }, emit);
   },
-  'gsub/2': function (x, a) { return substitute(x, one(a[0], x, 'gsub'), a[1], '', true); },
-  'gsub/3': function (x, a) {
-    return substitute(x, one(a[0], x, 'gsub'), a[1], one(a[2], x, 'gsub'), true);
+  'test/1': function (x, a, emit) { withRe(x, a, 1, testOne, emit); },
+  'test/2': function (x, a, emit) { withRe(x, a, 2, testOne, emit); },
+  /* The pattern is on the outside and the flags inside, as jq's own
+     definition binds them: sub($re; str; $flags). */
+  'sub/2': function (x, a, emit) {
+    ev(a[0], x, function (re) { substitute(x, re, a[1], leafOf(''), false, emit); });
+  },
+  'sub/3': function (x, a, emit) {
+    ev(a[0], x, function (re) {
+      ev(a[2], x, function (flags) { substitute(x, re, a[1], flags, false, emit); });
+    });
+  },
+  'gsub/2': function (x, a, emit) {
+    ev(a[0], x, function (re) { substitute(x, re, a[1], leafOf(''), true, emit); });
+  },
+  'gsub/3': function (x, a, emit) {
+    ev(a[0], x, function (re) {
+      ev(a[2], x, function (flags) { substitute(x, re, a[1], flags, true, emit); });
+    });
   },
 
-  'paths/0': function (x) {
-    const out: ArrayNode[] = [];
-    pathsOf(x, [], out, function () { return true; });
-    return out;
+  'paths/0': function (x, _a, emit) {
+    pathsOf(x, [], function (_v, path) { emit(path); });
   },
-  'paths/1': function (x, a) {
-    const out: ArrayNode[] = [];
-    const kept: Stream = [];
-    pathsOf(x, [], out, function () { return true; });
-    for (let i = 0; i < out.length; i++) {
-      const v = atPath(x, out[i].v);
-      const r = ev(a[0], v);
-      for (let j = 0; j < r.length; j++) {
-        if (truthy(r[j])) { kept.push(out[i]); break; }
-      }
-    }
-    return kept;
+  /* A path once for every truthy output of the filter on its value, which
+     is what select does. */
+  'paths/1': function (x, a, emit) {
+    pathsOf(x, [], function (v, path) {
+      ev(a[0], v, function (r) { if (truthy(r)) emit(path); });
+    });
   },
-  'getpath/1': function (x, a) {
-    return overArg(a[0], x, function (p) {
+  'getpath/1': function (x, a, emit) {
+    overArg(a[0], x, emit, function (p) {
       return atPath(x, wantType(p, 'array', 'getpath').v);
     });
   },
 
-  'walk/1': function (x, a) {
-    return [step(x)];
+  /* jq's definition, in which map takes every output of the filter and
+     map_values the first:
 
-    function step(n: Node): Node {
+         def walk(f): def w: if type == "object" then map_values(w)
+           elif type == "array" then map(w) else . end | f; w; */
+  'walk/1': function (x, a, emit) {
+    step(x, emit);
+
+    function step(n: Node, out: Emit): void {
       tick();
       if (n.t === 'a') {
-        n = arrayOf(n.v.map(step));
+        const list: Node[] = [];
+        for (let i = 0; i < n.v.length; i++) step(n.v[i], function (v) { list.push(v); });
+        n = arrayOf(list);
       } else if (n.t === 'o') {
         const m = members(n);
+        const keys: string[] = [];
         const vals: Node[] = [];
-        for (let i = 0; i < m.v.length; i++) vals.push(step(m.v[i]));
-        n = objectOf(m.k, vals);
+        for (let i = 0; i < m.v.length; i++) {
+          let first: Node | undefined;
+          stopping(function (e) { step(m.v[i], e); }, function (v) { first = v; return true; });
+          if (first !== undefined) {
+            keys.push(m.k[i]);
+            vals.push(first);
+          }
+        }
+        n = objectOf(keys, vals);
       }
-      const r = ev(a[0], n);
-      return r.length ? r[0] : NULL;
+      ev(a[0], n, out);
     }
   },
 
-  'while/2': function (x, a) {
-    const out: Stream = [];
-    let at = x;
-    for (;;) {
-      tick();
-      let r = ev(a[0], at);
-      if (!r.length || !truthy(r[0])) return out;
-      out.push(at);
-      r = ev(a[1], at);
-      if (!r.length) return out;
-      at = r[0];
-    }
+  'while/2': function (x, a, emit) { loop(x, a, emit, true); },
+  'until/2': function (x, a, emit) { loop(x, a, emit, false); },
+  'isempty/1': function (x, a, emit) {
+    emit(some(a[0], x, function () { return true; }) ? FALSE : TRUE);
   },
-  'until/2': function (x, a) {
-    let at = x;
-    for (;;) {
-      tick();
-      let r = ev(a[0], at);
-      if (r.length && truthy(r[0])) return [at];
-      r = ev(a[1], at);
-      if (!r.length) return [at];
-      at = r[0];
-    }
-  },
-  'isempty/1': function (x, a) { return [ev(a[0], x).length ? FALSE : TRUE]; },
   'error/0': function (x) {
     throw runErr(is(x, 'string') ? x.r : stringify(x));
   },
+  /* error(f) is f | error: it raises the first output, and raises nothing
+     when there is none. */
   'error/1': function (x, a) {
-    const m = ev(a[0], x);
-    const first = m[0];
-    throw runErr(!m.length ? 'error' : is(first, 'string') ? first.r : stringify(first));
-  },
-  'recurse/2': function (x, a) {
-    const out: Stream = [];
-    const stack: Node[] = [x];
-    let top: Node | undefined;
-    while ((top = stack.pop()) !== undefined) {
-      tick();
-      out.push(top);
-      const keep: Node[] = [];
-      const next = ev(a[0], top);
-      for (let i = 0; i < next.length; i++) {
-        const c = ev(a[1], next[i]);
-        for (let j = 0; j < c.length; j++) {
-          if (truthy(c[j])) { keep.push(next[i]); break; }
-        }
-      }
-      for (let i = keep.length - 1; i >= 0; i--) stack.push(keep[i]);
-    }
-    return out;
-  },
-
-  'explode/0': function (x) {
-    return [arrayOf(chars(wantType(x, 'string', 'explode').r)
-      .map(function (c) { return leafOf(c.codePointAt(0)!); }))];
-  },
-  'implode/0': function (x) {
-    return [leafOf(wantType(x, 'array', 'implode').v
-      .map(function (n) { return String.fromCodePoint(num(n, 'implode')); }).join(''))];
-  },
-
-  'now/0': function () { return [leafOf(Date.now() / 1000)]; },
-  'gmtime/0': function (x) { return [broken(num(x, 'gmtime'))]; },
-  'mktime/0': function (x) { return [leafOf(seconds(x, 'mktime'))]; },
-  'todate/0': function (x) { return [leafOf(strftime(num(x, 'todate'), '%Y-%m-%dT%H:%M:%SZ'))]; },
-  'todateiso8601/0': function (x) {
-    return [leafOf(strftime(num(x, 'todateiso8601'), '%Y-%m-%dT%H:%M:%SZ'))];
-  },
-  'fromdate/0': function (x) { return [leafOf(parseDate(x, 'fromdate'))]; },
-  'fromdateiso8601/0': function (x) { return [leafOf(parseDate(x, 'fromdateiso8601'))]; },
-  'strftime/1': function (x, a) {
-    const secs = seconds(x, 'strftime');
-    return overArg(a[0], x, function (f) {
-      return leafOf(strftime(secs, wantType(f, 'string', 'strftime').r));
+    ev(a[0], x, function (m) {
+      throw runErr(is(m, 'string') ? m.r : stringify(m));
     });
   },
-  'pow/2': function (x, a) {
-    const b = ev(a[0], x);
-    const e = ev(a[1], x);
-    const out: Stream = [];
-    for (let i = 0; i < b.length; i++) {
-      for (let j = 0; j < e.length; j++) {
-        out.push(leafOf(Math.pow(num(b[i], 'pow'), num(e[j], 'pow'))));
-      }
-    }
-    return out;
+
+  'explode/0': function (x, _a, emit) {
+    emit(arrayOf(chars(wantType(x, 'string', 'explode').r)
+      .map(function (c) { return leafOf(c.codePointAt(0)!); })));
+  },
+  /* A code point that is not one -- past U+10FFFF, negative, or a surrogate
+     -- becomes the replacement character, as in jq; a NaN is refused. */
+  'implode/0': function (x, _a, emit) {
+    emit(leafOf(wantType(x, 'array', 'implode').v.map(function (n) {
+      const c = Math.trunc(num(n, 'implode'));
+      if (c !== c) throw runErr('implode needs a number, not null');
+      const ok = c >= 0 && c <= 0x10FFFF && !(c >= 0xD800 && c <= 0xDFFF);
+      return String.fromCodePoint(ok ? c : 0xFFFD);
+    }).join('')));
+  },
+
+  'now/0': function (_x, _a, emit) { emit(leafOf(Date.now() / 1000)); },
+  'gmtime/0': function (x, _a, emit) { emit(broken(num(x, 'gmtime'))); },
+  'mktime/0': function (x, _a, emit) { emit(leafOf(mktime(fields(x, 'mktime')))); },
+  'todate/0': function (x, _a, emit) {
+    emit(leafOf(strftime(timeOf(x, 'todate'), '%Y-%m-%dT%H:%M:%SZ')));
+  },
+  'todateiso8601/0': function (x, _a, emit) {
+    emit(leafOf(strftime(timeOf(x, 'todateiso8601'), '%Y-%m-%dT%H:%M:%SZ')));
+  },
+  'fromdate/0': function (x, _a, emit) { emit(leafOf(parseDate(x, 'fromdate'))); },
+  'fromdateiso8601/0': function (x, _a, emit) { emit(leafOf(parseDate(x, 'fromdateiso8601'))); },
+  'strftime/1': function (x, a, emit) {
+    overArg(a[0], x, emit, function (f) {
+      return leafOf(strftime(timeOf(x, 'strftime'), wantType(f, 'string', 'strftime').r));
+    });
+  },
+  /* The exponent is on the outside, so pow((2,3); (4,5)) gives 16, 81, 32,
+     243 as jq does. */
+  'pow/2': function (x, a, emit) {
+    ev(a[1], x, function (e) {
+      ev(a[0], x, function (b) {
+        emit(leafOf(Math.pow(num(b, 'pow'), num(e, 'pow'))));
+      });
+    });
   },
   'log/0': mathOf(Math.log, 'log'),
   'log2/0': mathOf(Math.log2, 'log2'),
@@ -791,5 +918,5 @@ export const builtins: Record<string, Builtin> = {
 /* The format strings go in under their own names, since @base64 is a filter
    like any other once the parser has read the "@". */
 Object.keys(FORMATS).forEach(function (name) {
-  builtins[name + '/0'] = function (x) { return [leafOf(FORMATS[name](x))]; };
+  builtins[name + '/0'] = function (x, _a, emit) { emit(leafOf(FORMATS[name](x))); };
 });

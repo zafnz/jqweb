@@ -187,13 +187,11 @@ nothing.
 
 ## Rules that bite
 
-**The phone breakpoint is written twice.** `@media (max-width: 600px)` in
-`page.css` hides the search box and the line buttons, and `page/search.ts`
-runs `matchMedia` on the same query to clear a search when the window crosses
-it. Change one and change the other. `phone.spec.ts` runs at 500px and
-`narrow.spec.ts` at 640px, so a breakpoint moved outside that range fails one of
-them. The viewport is set exactly now rather than being whatever headless Chrome
-would open, so a spec at a real phone width is available if one is wanted.
+**The phone breakpoint keeps search and hides its secondary controls.** At
+`@media (max-width: 600px)`, `page.css` puts the title and buttons above a
+full-width search box, and hides the mode select, count and line buttons.
+`phone.spec.ts` runs at 390px and `narrow.spec.ts` at 640px, so a breakpoint
+moved outside that range fails one of them.
 
 **Offline, always.** A rendered page is one file that has to work with no
 network: no CDN, no web fonts, no remote images. The GitHub mark in the toolbar
@@ -313,6 +311,13 @@ nine seconds, against the Chrome already installed rather than a downloaded one.
 before adding one. `--headed` watches a run and `--debug` steps through it, and
 the trace of a failure is `npx playwright show-trace` over what it left in
 `.out`.
+
+**Never launch Chrome inside the Codex workspace sandbox on macOS.** Its denial
+of the `com.apple.coreservices.launchservicesd` Mach service makes Chrome abort
+in `TransformProcessType`, producing a macOS crash notification for every
+Playwright worker. Run browser tests and screenshot captures outside the
+sandbox through Codex's escalated execution path; do not retry a sandboxed
+launch, and do not treat `--no-sandbox` as a fix for this outer seatbelt denial.
 
 **Wind the clock after anything that comes back on a timer.** The suite installs
 Playwright's clock, so the 120ms search debounce and the 900ms copy tick cost

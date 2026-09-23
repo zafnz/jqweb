@@ -124,6 +124,14 @@ of a fixture and fails if any of them will not compile or will not run: a
 suggestion that errors is worse than no suggestion, and the shapes that cause
 one are easy to miss by hand.
 
+A row of the suggestion list shows a query on the left and a count on the
+right, and the query wraps while the count does not. A function hint is the
+other way round: its left column is the signature, which is short, and its
+right column is a description, which is not, so `.sg.hint` in `query.css`
+lets the description wrap and holds the signature column to a minimum width
+instead. The width is 18ch because all but a handful of signatures fit in it,
+which is what makes the descriptions line up down the list.
+
 The engine works on the nodes `web/src/model/parse.ts` builds for rendering, so
 a result goes straight back to `renderTree` with key order and number text
 intact and the document is parsed once; scalars come from the `r` field on a

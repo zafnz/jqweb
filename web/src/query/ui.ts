@@ -16,16 +16,21 @@ import type { EntryWrite, QueryHost, QueryUI } from '../page/search.ts';
 import { segsOf } from '../page/tree.ts';
 import { compile, isJqError } from './engine/index.ts';
 import type { Query } from './engine/index.ts';
-import { completions, countOf, splitPartial, suggest } from './suggest.ts';
+import { completions, countOf, functionCompletions, splitCall, splitPartial, suggest } from './suggest.ts';
 import type { Candidate, Shape } from './suggest.ts';
 
 /* A row of the suggestion list: a reading of the clicked line, with count
-   saying how much it returned, or a completion of a half-typed name, with a
-   label of its own. count is null for a row nothing was counted for. */
+   saying how much it returned, or a completion of a half-typed key or
+   function name, with a label of its own. count is null for a row nothing
+   was counted for. A row shows its query unless it has a text of its own: a
+   function hint shows the signature, since the query on every row of that
+   list is the same text with a different name on the end. */
 interface Row {
   q: string;
   count: number | null;
   label?: string;
+  text?: string;
+  hint?: boolean;
   shape?: Shape;
   plain?: boolean;
 }
@@ -95,9 +100,9 @@ export function jqui(page: QueryHost): QueryUI {
      the view.
 
      A query still being typed is not run at all: while its trailing name is
-     a prefix of keys that are really there, complete() offers those instead
-     and the view stays as it was, and run returns false. force is Enter
-     saying run it anyway. */
+     a prefix of keys that are really there, or of builtin names, complete()
+     offers those instead and the view stays as it was, and run returns
+     false. force is Enter saying run it anyway. */
   function run(raw: string, force?: boolean): boolean {
     clearFault();
     completing = !force && complete(raw);
@@ -266,11 +271,23 @@ export function jqui(page: QueryHost): QueryUI {
      keys its output really has, those go on the list and nothing else moves:
      the view keeps showing whatever last ran. A name that matches a whole key
      runs -- ".items[].kind" behaves as it always did -- and one that no key
-     starts with runs too, nulls and all. */
+     starts with runs too, nulls and all.
+
+     A function name is completed the same way: ".[] | joi" would be an error
+     until the "n" arrives, so while the name is a prefix of builtin names
+     those go on the list instead, each with what it takes and does beside
+     it. A whole name that needs an argument, such as join, stays on the list
+     too, since run as written it could only fail; one that runs without an
+     argument runs. Enter runs the text as written either way. */
 
   /* Offers completions for raw instead of running it, when there are any.
      True means it did and the caller has nothing to run. */
   function complete(raw: string): boolean {
+    return completeKey(raw) || completeCall(raw);
+  }
+
+  /* The keys that could finish a trailing field name. */
+  function completeKey(raw: string): boolean {
     const split = splitPartial(raw);
     if (!split) return false;
     let out: ValueNode[];
@@ -296,12 +313,27 @@ export function jqui(page: QueryHost): QueryUI {
     return true;
   }
 
+  /* The builtins that could finish a trailing function name. */
+  function completeCall(raw: string): boolean {
+    const call = splitCall(raw);
+    if (!call) return false;
+    const found = functionCompletions(call.partial);
+    if (found.exact || !found.hints.length) return false;
+    rows = found.hints.map(function (h): Row {
+      return { q: call.lead + h.q, text: h.sig, label: h.doc, hint: true, count: null };
+    });
+    draw();
+    show();
+    return true;
+  }
+
   function draw(): void {
     const parts: string[] = [];
     for (let i = 0; i < rows.length; i++) {
-      parts.push('<div class="sg"><button class="sgq" type="button">' +
-        '<span class="sgt">' + esc(rows[i].q) + '</span>' +
-        '<span class="sgn">' + esc(label(rows[i])) + '</span></button>' +
+      const row = rows[i];
+      parts.push('<div class="sg' + (row.hint ? ' hint' : '') + '"><button class="sgq" type="button">' +
+        '<span class="sgt">' + esc(row.text === undefined ? row.q : row.text) + '</span>' +
+        '<span class="sgn">' + esc(label(row)) + '</span></button>' +
         '<button class="sgc" type="button" title="Copy this query">' + COPY_GLYPH + '</button></div>');
     }
     suggestions.innerHTML = parts.join('');
@@ -337,6 +369,10 @@ export function jqui(page: QueryHost): QueryUI {
   function pick(i: number, how?: EntryWrite): void {
     input.value = rows[i].q;
     mark(i);
+    /* A function still waiting for its argument is left in the box: run as
+       written it could only fail, and the next keystroke runs the box as
+       usual. */
+    if (rows[i].q.slice(-1) === '(') return;
     if (run(rows[i].q)) page.record(how);
   }
 

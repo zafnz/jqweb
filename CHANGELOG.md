@@ -16,6 +16,13 @@ run in the search box, and the address shows the current one as `?q=`. A `?q=`
 is read the way typing it would be, so `?q=keys` searches for the word where it
 used to run `keys` as a jq query.
 
+### Function names complete as they are typed
+
+A half-typed builtin name drops down the names that start with it, each with
+what it takes and does beside it, and a whole name that still needs an
+argument, such as `join`, stays on the list instead of failing. Enter runs the
+text as written.
+
 **Changed:** `install.sh` checks the downloaded archive against the release's
 `checksums.txt` and stops without installing if the checksum does not match or
 cannot be checked.

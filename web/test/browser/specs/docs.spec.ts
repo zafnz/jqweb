@@ -1,7 +1,6 @@
-/* docs/k8s.html, the copy committed for GitHub Pages. It is generated and
-   does not regenerate itself, so it is the one page here that nothing else
-   would ever load: a change to web/ that breaks it goes unnoticed until someone
-   follows the link in the README.
+/* docs/k8s.json rendered as the example page on jqweb.io is, from the current
+   source rather than the release the site uses, so a change that breaks the
+   example page fails here before it is released.
 
    It is also the only page driven at the size of a real document -- 700KB of
    kubectl output -- which is where anything that costs per line shows up. */
@@ -18,7 +17,7 @@ test.use({
   trace: { mode: 'retain-on-failure', snapshots: false }
 });
 
-test('the committed example page is the page people are pointed at', async ({ page }) => {
+test('the example page is the page people are pointed at', async ({ page }) => {
   const got = await page.evaluate(() => ({
     title: document.title,
     name: __t.text('header .name'),

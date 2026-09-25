@@ -1,0 +1,59 @@
+name: pages
+
+# jqweb.io is docs/ from main plus k8s.html, which is rendered here by the
+# binary from the latest release. Rendering it from main would put features on
+# the example page before anyone can install them.
+#
+# A release is published by the release workflow's GITHUB_TOKEN, and events
+# caused by that token start no workflows, so "release: published" would never
+# fire. workflow_run does, and it runs on main, which is the only ref the
+# github-pages environment accepts a deployment from.
+on:
+  workflow_run:
+    workflows: [release]
+    types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - docs/**
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Deployments queue rather than cancel, so the last one to start is the one
+# left live.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # The page is rendered from the path it is served beside, because the
+      # input file name becomes the page title.
+      - name: Render the example page with the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download --pattern 'jqweb_*_linux_amd64.tar.gz' --dir "$RUNNER_TEMP"
+          tar -xzf "$RUNNER_TEMP"/jqweb_*_linux_amd64.tar.gz -C "$RUNNER_TEMP" jqweb
+          "$RUNNER_TEMP/jqweb" --version
+          "$RUNNER_TEMP/jqweb" -o docs/k8s.html docs/k8s.json
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs
+
+      - uses: actions/deploy-pages@v5
+        id: deployment

@@ -223,15 +223,12 @@ as written, so a comment in `page.css` or `query.css` ships in every page.
 colour anywhere means one theme gets it wrong. Check the contrast ratio rather
 than the look on one screen: dimming a grey with `opacity` once gave 1.6:1.
 
-**`docs/k8s.html` is generated and committed.** It is `docs/k8s.json`
-rendered, so rebuild `web/dist` and then regenerate it after any change under
-`web/`, with the commands in `CONTRIBUTING.md`. `docs/index.html` is written by
-hand and is not rendered from anything.
-
-**`docs/CNAME` sets the custom domain.** Pages deploys from `/docs` on `main`,
-and GitHub reads the domain from that file, so a build without it drops
-jqweb.io. The `main` ruleset stops GitHub committing the file itself, so a
-domain change is a pull request that edits it.
+**jqweb.io shows the latest release, not `main`.** `.github/workflows/pages.yml`
+deploys `docs/` from `main` together with a `k8s.html` that the latest release's
+binary renders from `docs/k8s.json`. Do not commit `docs/k8s.html`.
+`docs/index.html` is written by hand and goes live on merge, so a change to it
+that describes an unreleased feature waits for the release. The custom domain
+is set in the repository's Pages settings, not in a `CNAME` file.
 
 **The packages' install path is written twice.** `bindir` in the `nfpms`
 section of `.goreleaser.yaml` and `packagedPath` in `internal/update` both
@@ -250,8 +247,8 @@ their upgrade hint.
 and the `curl` in `README.md` fetches it from there. Examples that need a
 document use this one.
 
-**`demo.png` is generated and committed.** Regenerate it for every new release,
-after the example page is current, with `node web/test/browser/capture-demo.ts`.
+**`docs/demo.png` is generated and committed.** Regenerate it for every new
+release with `node web/test/browser/capture-demo.ts`.
 The script drives `docs/k8s.json` into the screenshot query and draws the browser
 frame; do not replace it with a hand capture.
 

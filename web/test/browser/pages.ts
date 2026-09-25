@@ -1,11 +1,9 @@
 /* The pages the specs run against, and where they are built.
 
    Each variant is rendered once per run, by global-setup.ts, and shared by
-   every spec naming it. "docs" is not rendered: it is the copy committed for
-   GitHub Pages, and driving the committed bytes is the only way anything here
-   says whether the page people are pointed at works. "query" and "simplequery"
-   are built with a query on the command line, for the specs checking the query
-   a page opens on. */
+   every spec naming it. "docs" is docs/k8s.json rendered the way the Pages
+   workflow renders the example page. "query" and "simplequery" are built with a
+   query on the command line, for the specs checking the query a page opens on. */
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -26,7 +24,7 @@ const PAGES = {
   light: ['--theme', 'light', '-o', '$out', '$doc'],
   query: ['-o', '$out', '.items[] | .metadata.name', '$doc'],
   simplequery: ['--simple', '-o', '$out', '.items[3]', '$doc'],
-  docs: null
+  docs: ['-o', '$out', 'docs/k8s.json']
 };
 
 /* The fixture: ten records with repeated fields, so a suggestion has something
@@ -37,9 +35,7 @@ export type Variant = keyof typeof PAGES;
 
 function pageFile(name: Variant) {
   if (!(name in PAGES)) throw new Error('unknown page "' + name + '"');
-  return name === 'docs'
-    ? path.join(repo, 'docs', 'k8s.html')
-    : path.join(built, name + '.html');
+  return path.join(built, name + '.html');
 }
 
 /* Whatever follows the file name is added to the address, so a spec can check
@@ -59,14 +55,9 @@ function renderAll() {
   execFileSync('go', ['build', '-o', binary, '.'], { cwd: repo, stdio: 'inherit' });
 
   for (const name of Object.keys(PAGES) as Variant[]) {
-    const args = PAGES[name];
-    if (!args) continue;
-    execFileSync(binary, args.map((a) =>
+    execFileSync(binary, PAGES[name].map((a) =>
       a === '$out' ? pageFile(name) : a === '$doc' ? doc : a), { cwd: repo, stdio: 'inherit' });
   }
-
-  const committed = pageFile('docs');
-  if (!fs.existsSync(committed)) throw new Error('docs/k8s.html is missing');
 }
 
 export { PAGES, pageFile, pageURL, renderAll, built, repo };

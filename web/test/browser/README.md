@@ -40,8 +40,8 @@ which page it wants and how big a window to open it in:
 The variants are `default` (the fixture built the default way), `simple`
 (`--simple`), `light` (`--theme light`), `query` (opening on the query
 `.items[] | .metadata.name`), `simplequery` (`--simple`, opening on
-`.items[3]`) and `docs` (`docs/k8s.html` as committed). A spec naming none of
-them gets `default`, and a window of 1200x800.
+`.items[3]`) and `docs` (`docs/k8s.json`, the example page on jqweb.io). A
+spec naming none of them gets `default`, and a window of 1200x800.
 
 `address` is the third option. Whatever it holds is added after the page's file
 name in the address, so `test.use({ address: '?q=keys' })` is how a spec checks

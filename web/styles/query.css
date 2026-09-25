@@ -28,6 +28,9 @@
 .sgt { white-space: pre-wrap; word-break: break-all; }
 .sgn { color: var(--muted); white-space: nowrap; }
 .sg.on .sgn { color: var(--fg); }
+.sg.hint .sgq { justify-content: flex-start; }
+.sg.hint .sgt { flex: 0 0 auto; min-width: 18ch; }
+.sg.hint .sgn { white-space: normal; }
 .sgc {
   font: inherit; color: var(--icon); background: none; border: none;
   border-radius: 3px; cursor: pointer; padding: 3px 6px;

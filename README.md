@@ -162,6 +162,11 @@ runs. A bare trailing dot lists every key. Click a completion or arrow down to
 it to run it, keep typing, or press Enter to run the half-typed text as
 written; a name that no key starts with runs as written too.
 
+A function name is completed the same way: `.[] | joi` drops down `join(sep)`
+with what it does beside it, and on `jq` a bare `len` drops down `length`. A
+whole name that still needs an argument, such as `join`, stays on the list
+until the argument is typed. Enter runs the text as written.
+
 This is a subset of jq, not all of it. Paths, `[]`, slices, `|`, `,`, `//`,
 `?`, comparisons, arithmetic, `if/then/elif/else/end`, array and object
 construction, and around 100 builtins:

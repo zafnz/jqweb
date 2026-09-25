@@ -92,9 +92,10 @@ function orList(ns: number[]): string {
 
 /* Which argument counts each builtin name accepts, worked out once from the
    builtin table so that a wrong count can say so rather than claim the name
-   does not exist. */
+   does not exist. suggest.ts reads it too, for the names a half-typed one
+   could finish and whether a whole one runs without an argument. */
 let arityCache: Record<string, number[]> | null = null;
-function arities(): Record<string, number[]> {
+export function arities(): Record<string, number[]> {
   if (!arityCache) {
     const found: Record<string, number[]> = Object.create(null);
     for (const key in builtins) {

@@ -1,6 +1,6 @@
 name: pages
 
-# jqweb.io is docs/ from main plus k8s.html, which is rendered here by the
+# jqweb.io is website/ from main plus k8s.html, which is rendered here by the
 # binary from the latest release. Rendering it from main would put features on
 # the example page before anyone can install them.
 #
@@ -15,7 +15,7 @@ on:
   push:
     branches: [main]
     paths:
-      - docs/**
+      - website/**
       - .github/workflows/pages.yml
   workflow_dispatch:
 
@@ -49,11 +49,25 @@ jobs:
           gh release download --pattern 'jqweb_*_linux_amd64.tar.gz' --dir "$RUNNER_TEMP"
           tar -xzf "$RUNNER_TEMP"/jqweb_*_linux_amd64.tar.gz -C "$RUNNER_TEMP" jqweb
           "$RUNNER_TEMP/jqweb" --version
-          "$RUNNER_TEMP/jqweb" -o docs/k8s.html docs/k8s.json
+          "$RUNNER_TEMP/jqweb" -o website/k8s.html website/k8s.json
+
+      # The front page's demo drives this page's search box through the hook
+      # in website/demo-hook.js, so it goes into the deployed copy inline and
+      # is not served on its own. A release without the box it drives only
+      # costs the demo its typed query, so that is a warning and never a
+      # failed deploy.
+      - name: Add the demo hook to the example page
+        continue-on-error: true
+        run: |
+          if ! grep -q 'id="q"' website/k8s.html; then
+            echo '::warning file=website/demo-hook.js::The example page has no id="q" search box, so the front page demo will not type its query.'
+          fi
+          { echo '<script>'; cat website/demo-hook.js; echo '</script>'; } >> website/k8s.html
+          rm website/demo-hook.js
 
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: docs
+          path: website
 
       - uses: actions/deploy-pages@v5
         id: deployment

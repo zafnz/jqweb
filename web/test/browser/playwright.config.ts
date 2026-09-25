@@ -24,7 +24,7 @@ export default defineConfig({
   fullyParallel: true,
   workers: 4,
 
-  /* A page this size takes a second or two to build its tree, and the docs
+  /* A page this size takes a second or two to build its tree, and the website
      page is 700KB of it. */
   timeout: 60000,
 

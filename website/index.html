@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>jqweb — turn JSON into an interactive webpage</title>
+<meta name="description" content="jqweb turns JSON into an interactive webpage with one pipe. Pipe any JSON in and browse it locally as a navigable tree with instant search and jq-style queries. No upload, no server to configure.">
+<link rel="canonical" href="https://jqweb.io/">
+<meta name="theme-color" content="#20001f">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="jqweb">
+<meta property="og:url" content="https://jqweb.io/">
+<meta property="og:title" content="jqweb — turn JSON into an interactive webpage">
+<meta property="og:description" content="Pipe any JSON into jqweb and browse it locally as a navigable tree with instant search and jq-style queries.">
+<meta property="og:image" content="https://repository-images.githubusercontent.com/1353822044/a6667efe-dcd0-4877-9728-494ab3dac782">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="jqweb — turn JSON into an interactive webpage">
+<meta name="twitter:description" content="Pipe any JSON into jqweb and browse it locally as a navigable tree with instant search and jq-style queries.">
+<meta name="twitter:image" content="https://repository-images.githubusercontent.com/1353822044/a6667efe-dcd0-4877-9728-494ab3dac782">
+<link rel="stylesheet" href="style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=PT+Mono&amp;display=swap">
+<script>document.documentElement.classList.add('js');</script>
+<style>
+  :root { --font-heading: "PT Mono", ui-monospace, Menlo, monospace; --font-body: "Helvetica Neue", Helvetica, Arial, sans-serif; --font-mono: "PT Mono", ui-monospace, Menlo, monospace; --font-heading-weight: 400; --color-bg: #20001f; --color-surface: #2b0a2a; --color-text: #f9f6f8; --color-divider: rgba(174,149,247,.18); --color-accent: #ae95f7; --color-accent-400: #ae95f7; --color-accent-700: #ae95f7; --color-accent-800: #cbbcfa; color-scheme: dark; }
+  body { margin: 0; text-wrap: pretty; }
+  a { color: var(--color-accent-700); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  a:hover { color: var(--color-accent-800); }
+  @keyframes jqw-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+  .cursor { display: inline-block; width: 0.6em; height: 1.1em; margin-left: 1px; vertical-align: -0.2em; background: var(--color-neutral-300); animation: jqw-blink 1.05s infinite; }
+  #stage.typing .cursor { animation: none; }
+  #stage.served .cursor, html:not(.js) .cursor, html:not(.js) .replay, html:not(.js) #install-seg { display: none; }
+  html.js #stage:not(.started) .typed { visibility: hidden; }
+  html.js #stage:not(.served) .served-line { display: none; }
+  html.js #stage:not(.open) .demo-win { opacity: 0; transform: translateY(28px) scale(0.975); pointer-events: none; }
+  #install-code .prompt { color: var(--color-accent-700); }
+</style>
+</head>
+<body>
+<div style="background: #20001f; color: #f9f6f8; position: relative; overflow: hidden;">
+<nav class="nav" style="position: relative; z-index: 3; border-bottom: 1px solid rgba(174,149,247,.14); padding-inline: max(clamp(20px, 5vw, 72px), calc((100% - 1200px) / 2 + clamp(20px, 5vw, 72px)));">
+  <span class="nav-brand" style="font-family: var(--font-heading); font-size: 22px; color: #ae95f7;">jqweb</span>
+  <a href="#install" style="color: #f9f6f8; text-decoration: none; white-space: nowrap;">Install</a>
+  <a href="#usage" style="color: #f9f6f8; text-decoration: none; white-space: nowrap;">Usage</a>
+  <a href="https://github.com/zafnz/jqweb" style="color: #f9f6f8; text-decoration: none; white-space: nowrap;">GitHub</a>
+  <a class="btn btn-primary" href="https://jqweb.io/k8s.html" style="color: #ae95f7; border-color: #ae95f7;">Live demo</a>
+</nav>
+<div style="max-width: 1200px; margin: 0 auto; padding: 0 clamp(20px, 5vw, 72px); position: relative;">
+  <section style="position: relative; padding: 88px 0 80px;">
+    <img src="braces.svg" alt="" aria-hidden="true" style="position: absolute; left: -12px; top: 56px; width: clamp(150px, 17vw, 230px); pointer-events: none; user-select: none;">
+    <div style="position: relative; padding-left: min(250px, max(0px, calc((100vw - 640px) * 0.4)));">
+      <h1 style="font-family: var(--font-heading); font-weight: 400; font-size: clamp(56px, 7.5vw, 104px); line-height: 1; letter-spacing: -0.02em; margin: 0; color: #ae95f7;">jqweb</h1>
+      <p style="font-family: var(--font-mono); font-size: clamp(18px, 2vw, 24px); line-height: 1.3; margin: 32px 0 0; color: #f9f6f8;">cat data.json | jqweb -O</p>
+      <p style="font-size: clamp(19px, 1.8vw, 23px); line-height: 1.4; max-width: 30ch; margin: 22px 0 0; color: #f9f6f8;">Turn JSON into an interactive webpage with one pipe.</p>
+      <p style="font-size: 16px; line-height: 26px; max-width: 54ch; margin: 16px 0 0; color: rgba(249,246,248,.72);">It opens locally in your browser as a navigable tree with instant text search and jq-style queries—no upload and no server to configure.</p>
+      <div style="display: flex; gap: var(--space-3); flex-wrap: wrap; margin-top: 32px;">
+        <a class="btn btn-primary" href="#install" style="color: #ae95f7; border-color: #ae95f7;">Install jqweb</a>
+        <a class="btn btn-ghost" href="https://github.com/zafnz/jqweb" style="color: #f9f6f8;">View on GitHub</a>
+      </div>
+    </div>
+  </section>
+  <section id="demo" aria-label="Demo: piping kubectl output into jqweb" style="padding: 0 0 96px;">
+    <div id="stage" style="display: grid; grid-template-columns: minmax(0, 1fr);">
+
+      <div style="grid-area: 1 / 1; align-self: start; justify-self: start; width: min(600px, 100%); position: relative; z-index: 1; background: #120012; border: 1px solid rgba(174,149,247,.18); border-radius: var(--radius-lg); box-shadow: 0 12px 40px rgba(0,0,0,.35); overflow: hidden;">
+        <div style="display: flex; align-items: center; gap: 7px; padding: 11px 14px; border-bottom: 1px solid rgba(174,149,247,.14);">
+          <span style="width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--color-neutral-600);"></span>
+          <span style="width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--color-neutral-600);"></span>
+          <span style="width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--color-neutral-600);"></span>
+          <span style="margin-left: auto; font-size: 12px; letter-spacing: 0.06em; color: var(--color-neutral-400);">zsh — 80×24</span>
+        </div>
+        <div style="padding: 18px 20px 22px; min-height: 112px; font-family: var(--font-mono); font-size: 14.5px; line-height: 24px; color: var(--color-neutral-100); word-break: break-all;">
+          <div><span style="color: var(--color-accent-400); white-space: pre;">$ </span><span class="typed" style="white-space: pre-wrap;">kubectl get pods -o json | jqweb -O</span><span class="cursor"></span></div>
+          <div class="served-line" style="color: var(--color-neutral-400);">jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)</div>
+        </div>
+      </div>
+
+      <div class="demo-win" aria-hidden="true" style="grid-area: 1 / 1; margin: 148px 0 0 clamp(0px, 16%, 200px); position: relative; z-index: 0; border-radius: var(--radius-lg); box-shadow: 0 0 90px 12px rgba(133,0,133,.6); pointer-events: none; transition: opacity 520ms ease, transform 620ms cubic-bezier(.2,.8,.2,1);"></div>
+      <div class="demo-win" style="grid-area: 1 / 1; margin: 148px 0 0 clamp(0px, 16%, 200px); position: relative; z-index: 2; border: 1px solid rgba(188,188,188,.5); border-radius: var(--radius-lg); background: var(--color-bg); box-shadow: 0 12px 40px rgba(0,0,0,.35); overflow: hidden; transition: opacity 520ms ease, transform 620ms cubic-bezier(.2,.8,.2,1);">
+        <div style="display: flex; align-items: center; gap: var(--space-3); padding: 9px 14px 9px 0; border-bottom: 1px solid var(--color-divider);">
+          <button type="button" class="replay" aria-label="Replay demo" title="Replay demo" style="display: flex; gap: 7px; align-self: stretch; align-items: center; margin: -9px 0; padding: 9px 14px; background: none; border: 0; cursor: pointer;">
+            <span style="width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--color-neutral-400);"></span>
+            <span style="width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--color-neutral-400);"></span>
+            <span style="width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--color-neutral-400);"></span>
+          </button>
+          <div style="flex: 1; min-width: 0; text-align: center; font-size: 13px; font-feature-settings: 'tnum' 1; color: color-mix(in srgb, var(--color-text) 70%, transparent); border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: 3px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">127.0.0.1:52748</div>
+          <a href="https://jqweb.io/k8s.html" target="_blank" rel="noopener" style="font-size: 13px; white-space: nowrap;">Open ↗</a>
+        </div>
+        <iframe id="demo-frame" src="https://jqweb.io/k8s.html" title="jqweb page generated from kubectl get pods" style="color-scheme: dark; display: block; width: 100%; height: clamp(380px, 62vh, 600px); border: 0; background: var(--color-bg);"></iframe>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin-top: 20px;">
+      <p style="margin: 0; font-size: 14px; line-height: 24px; color: rgba(249,246,248,.72);">This is the page that command opens, running live. Try typing <code style="font-family: var(--font-mono); font-size: 13px; color: #f9f6f8;">.items[].spec</code> in its search box.</p>
+      <button type="button" class="btn btn-ghost replay" style="color: #ae95f7;">Replay</button>
+    </div>
+  </section>
+</div>
+</div>
+
+<main style="max-width: 1200px; margin: 0 auto; padding: 0 clamp(20px, 5vw, 72px);">
+
+
+  <section style="padding: 84px 0;">
+    <span style="display: block; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-accent-700); margin: 0 0 28px;">Features</span>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 42px 56px;">
+      <div style="border-top: 1px solid var(--color-divider); padding-top: 24px;">
+        <h2 style="font-family: var(--font-heading); font-weight: 400; font-size: 28px; line-height: 1.1; margin: 0;">Search</h2>
+        <p style="font-size: 15.5px; line-height: 28px; margin: 14px 0 0; color: color-mix(in srgb, var(--color-text) 78%, transparent); text-align: left;">The search box filters keys and values as you type, and also accepts a jq-style path. The copy button on each line puts that line’s path on the clipboard, so a copied path can be pasted straight back into the box.</p>
+      </div>
+      <div style="border-top: 1px solid var(--color-divider); padding-top: 24px;">
+        <h2 style="font-family: var(--font-heading); font-weight: 400; font-size: 28px; line-height: 1.1; margin: 0;">jq queries</h2>
+        <p style="font-size: 15.5px; line-height: 28px; margin: 14px 0 0; color: color-mix(in srgb, var(--color-text) 78%, transparent); text-align: left;">The search box also runs jq queries. It supports a subset of jq: paths, slices, pipes, comparisons, <code style="font-family: var(--font-mono); font-size: 13.5px;">if/then/else</code>, array and object construction, and around 100 builtins. Key names are suggested as you type.</p>
+      </div>
+      <div style="border-top: 1px solid var(--color-divider); padding-top: 24px;">
+        <h2 style="font-family: var(--font-heading); font-weight: 400; font-size: 28px; line-height: 1.1; margin: 0;">Filtering on a value</h2>
+        <p style="font-size: 15.5px; line-height: 28px; margin: 14px 0 0; color: color-mix(in srgb, var(--color-text) 78%, transparent); text-align: left;">Each line has a button that fills the search box with a query built from that line. It also lists other queries the line could match, with the number of results each returns.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr style="height: 1px; border: 0; margin: 0; background: var(--color-divider);">
+
+  <section id="install" style="padding: 84px 0; display: flex; flex-direction: column; gap: 32px;">
+    <div>
+      <h2 style="font-family: var(--font-heading); font-weight: 400; font-size: clamp(32px, 3.6vw, 44px); line-height: 1.08; margin: 0;">Install</h2>
+      <p style="font-size: 15.5px; line-height: 28px; margin: 18px 0 0; max-width: 64ch; color: color-mix(in srgb, var(--color-text) 78%, transparent);">The macOS builds are signed and notarized. For prebuilt binaries, see the <a href="https://github.com/zafnz/jqweb#install">README</a>.</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 14px; min-width: 0;">
+      <div class="seg" id="install-seg" role="radiogroup" aria-label="Install method" style="align-self: start; flex-wrap: wrap;"></div>
+      <div style="display: flex; align-items: flex-start; gap: var(--space-3); border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: 12px 12px 12px 16px;">
+        <code style="flex: 1; min-width: 0; display: flex; flex-direction: column; padding-top: 5px; font-family: var(--font-mono); font-size: 14px; line-height: 22px; overflow-x: auto; white-space: pre;" id="install-code"><span><span class="prompt">$ </span>brew install zafnz/tap/jqweb</span></code>
+        <button type="button" class="btn btn-secondary" id="install-copy" style="flex: none;">Copy</button>
+      </div>
+      <p style="margin: 0; font-size: 14px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 70%, transparent);" id="install-note">macOS and Linux.</p>
+    </div>
+  </section>
+
+  <hr style="height: 1px; border: 0; margin: 0; background: var(--color-divider);">
+
+  <section id="usage" style="padding: 84px 0;">
+    <h2 style="font-family: var(--font-heading); font-weight: 400; font-size: clamp(32px, 3.6vw, 44px); line-height: 1.08; margin: 0 0 32px;">Usage</h2>
+    <div style="overflow-x: auto;">
+      <table class="table" style="width: 100%; min-width: 560px;">
+        <tbody>
+          <tr>
+            <td style="padding: 16px 24px 16px 0; white-space: nowrap; vertical-align: top;"><code style="font-family: var(--font-mono); font-size: 14px;">kubectl get pods -o json | jqweb -O</code></td>
+            <td style="padding: 16px 0; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 78%, transparent);">Open the page in your default browser.</td>
+          </tr>
+          <tr>
+            <td style="padding: 16px 24px 16px 0; white-space: nowrap; vertical-align: top;"><code style="font-family: var(--font-mono); font-size: 14px;">jqweb -OC myfile.json</code></td>
+            <td style="padding: 16px 0; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 78%, transparent);">Return to the prompt and serve in the background until the last tab showing the page is closed.</td>
+          </tr>
+          <tr>
+            <td style="padding: 16px 24px 16px 0; white-space: nowrap; vertical-align: top;"><code style="font-family: var(--font-mono); font-size: 14px;">kubectl get pods -o json | jqweb -o k8s.html</code></td>
+            <td style="padding: 16px 0; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 78%, transparent);">Write a self-contained HTML file for offline viewing.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin: 28px 0 0; font-size: 15px; line-height: 28px;"><a href="https://github.com/zafnz/jqweb#usage">Full usage in the README</a></p>
+  </section>
+
+  <footer style="border-top: 1px solid var(--color-divider); padding: 40px 0 56px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-size: 13px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 70%, transparent);">
+    <span>Written by <a href="https://nickclifford.com/">Nick Clifford</a>, Copyright 2026 MIT License</span>
+    <a href="https://github.com/zafnz/jqweb">github.com/zafnz/jqweb</a>
+  </footer>
+</main>
+<script>
+(() => {
+  const COMMAND = 'kubectl get pods -o json | jqweb -O';
+  const DEMO_ORIGIN = 'https://jqweb.io';
+  const DEMO_QUERY = '.items[].spec';
+  const TYPE_SPEED = 55;
+  const OPEN_DELAY = 900;
+  const INSTALLS = [
+    { label: 'Brew', lines: ['brew install zafnz/tap/jqweb'], note: 'macOS and Linux.' },
+    { label: 'Curl', lines: ['curl -fsSL https://raw.githubusercontent.com/zafnz/jqweb/main/install.sh | sh'], note: 'Linux or macOS without Homebrew. Puts the latest release in ~/.local/bin.' },
+    { label: 'Go', lines: ['go install github.com/zafnz/jqweb@latest'], note: 'With Go installed.' },
+    { label: 'Debian', lines: ["echo 'deb [trusted=yes] https://apt.fury.io/zafnz/ /' | sudo tee /etc/apt/sources.list.d/jqweb.list", 'sudo apt update && sudo apt install jqweb'], note: 'Debian and Ubuntu.' },
+    { label: 'Fedora', lines: ["printf '[jqweb]\\nname=jqweb\\nbaseurl=https://yum.fury.io/zafnz/\\nenabled=1\\ngpgcheck=0\\n' | sudo tee /etc/yum.repos.d/jqweb.repo", 'sudo dnf install jqweb'], note: 'Fedora and RHEL.' },
+    { label: 'Scoop', lines: ['scoop bucket add zafnz https://github.com/zafnz/scoop-bucket', 'scoop install jqweb'], note: 'Windows.' },
+    { label: 'Winget', lines: ['winget install zafnz.jqweb'], note: 'Windows.' },
+    { label: 'Dev Container', lines: ['"features": { "ghcr.io/zafnz/devcontainer-features/jqweb:1": {} }'], note: 'Add to devcontainer.json. The latest release is installed when the container is built.', noPrompt: true },
+  ];
+
+  /* The demo: the command is typed into the terminal, the served line appears,
+     and the browser window opens on the live example page. The page in the
+     frame answers jqweb-demo:hello with jqweb-demo:ready, after which the
+     query is typed into its search box with jqweb-demo:set. */
+  const stage = document.getElementById('stage');
+  const typed = stage.querySelector('.typed');
+  const frame = document.getElementById('demo-frame');
+  let timers = [];
+  let demoReady = false;
+
+  const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+  const post = (msg) => { if (frame.contentWindow) frame.contentWindow.postMessage(msg, DEMO_ORIGIN); };
+
+  window.addEventListener('message', (e) => {
+    if (e.origin !== DEMO_ORIGIN || e.source !== frame.contentWindow) return;
+    if (e.data && e.data.type === 'jqweb-demo:ready') demoReady = true;
+  });
+  frame.addEventListener('load', () => { demoReady = false; post({ type: 'jqweb-demo:hello' }); });
+
+  function typeQuery() {
+    if (!demoReady) return;
+    const step = (i) => {
+      post({ type: 'jqweb-demo:set', value: DEMO_QUERY.slice(0, i) });
+      if (i < DEMO_QUERY.length) later(() => step(i + 1), 110 + Math.random() * 70);
+    };
+    step(1);
+  }
+
+  function play() {
+    timers.forEach(clearTimeout);
+    timers = [];
+    if (demoReady) post({ type: 'jqweb-demo:set', value: '' });
+    typed.textContent = '';
+    stage.classList.remove('served', 'open');
+    stage.classList.add('started', 'typing');
+    const step = (i) => {
+      if (i > COMMAND.length) {
+        later(() => { stage.classList.remove('typing'); stage.classList.add('served'); }, 420);
+        later(() => stage.classList.add('open'), 420 + OPEN_DELAY);
+        later(typeQuery, 420 + OPEN_DELAY + 1400);
+        return;
+      }
+      typed.textContent = COMMAND.slice(0, i);
+      const ch = COMMAND[i - 1];
+      const pause = ch === ' ' ? TYPE_SPEED * 1.6 : ch === '|' ? TYPE_SPEED * 4 : TYPE_SPEED * (0.6 + Math.random() * 0.8);
+      later(() => step(i + 1), pause);
+    };
+    later(() => step(1), 600);
+  }
+
+  for (const b of document.querySelectorAll('.replay')) b.addEventListener('click', play);
+
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    stage.classList.add('started', 'served', 'open');
+  } else if (!('IntersectionObserver' in window)) {
+    play();
+  } else {
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { io.disconnect(); play(); }
+    }, { threshold: 0.35 });
+    io.observe(stage);
+  }
+
+  /* The install picker. */
+  const seg = document.getElementById('install-seg');
+  const code = document.getElementById('install-code');
+  const note = document.getElementById('install-note');
+  const copy = document.getElementById('install-copy');
+  let current = INSTALLS[0];
+  let copyTimer;
+
+  function select(o) {
+    current = o;
+    code.replaceChildren(...o.lines.map((text) => {
+      const line = document.createElement('span');
+      const prompt = document.createElement('span');
+      prompt.className = 'prompt';
+      prompt.textContent = o.noPrompt ? '' : '$ ';
+      line.append(prompt, text);
+      return line;
+    }));
+    note.textContent = o.note;
+    clearTimeout(copyTimer);
+    copy.textContent = 'Copy';
+  }
+
+  INSTALLS.forEach((o, i) => {
+    const label = document.createElement('label');
+    label.className = 'seg-opt';
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'jqw-install';
+    input.checked = i === 0;
+    input.addEventListener('change', () => select(o));
+    label.append(input, o.label);
+    seg.append(label);
+  });
+
+  copy.addEventListener('click', () => {
+    if (navigator.clipboard) navigator.clipboard.writeText(current.lines.join('\n')).catch(() => {});
+    copy.textContent = 'Copied';
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => { copy.textContent = 'Copy'; }, 1600);
+  });
+})();
+</script>
+</body>
+</html>

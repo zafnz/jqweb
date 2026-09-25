@@ -161,17 +161,17 @@ a terminal.
 
 https://jqweb.io/k8s.html is not in the repository. `.github/workflows/pages.yml`
 renders it with the latest release's binary and deploys it with the rest of
-`docs/` from `main`, so the example page never shows a feature that cannot be
-installed yet. The workflow runs when the release workflow succeeds, when a
-push to `main` changes `docs/`, and by hand from the Actions tab. The `docs`
-variant of the browser suite renders the same document from the current source.
-To look at it locally:
+`website/` from `main`, so the example page never shows a feature that cannot
+be installed yet. The workflow runs when the release workflow succeeds, when a
+push to `main` changes `website/`, and by hand from the Actions tab. The
+`website` variant of the browser suite renders the same document from the
+current source. To look at it locally:
 
-    go build -o jqweb . && ./jqweb -o docs/k8s.html docs/k8s.json
+    go build -o jqweb . && ./jqweb -o website/k8s.html website/k8s.json
 
 `k8s.html` is gitignored.
 
-`docs/k8s.json` is the document that page shows: a `kubectl get all -o json`
+`website/k8s.json` is the document that page shows: a `kubectl get all -o json`
 listing, generated rather than taken from a real cluster. GitHub Pages serves
 it at https://jqweb.io/k8s.json, which is what the `curl` in
 `README.md` fetches, so changing the file changes both the example page and
@@ -179,7 +179,7 @@ the first command a reader runs.
 
 Regenerate the README screenshot for every new release. The script uses the
 same document, runs the example query, draws a browser frame around the page,
-and writes `docs/demo.png`. It drives the page with
+and writes `website/demo.png`. It drives the page with
 Playwright, so it needs `npm --prefix web ci` first; two runs of it produce the
 same bytes.
 

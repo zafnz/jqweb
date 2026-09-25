@@ -1,4 +1,4 @@
-/* docs/k8s.json rendered as the example page on jqweb.io is, from the current
+/* website/k8s.json rendered as the example page on jqweb.io is, from the current
    source rather than the release the site uses, so a change that breaks the
    example page fails here before it is released.
 
@@ -13,7 +13,7 @@ import { test, expect, settle, type, clickAway } from '../fixtures.ts';
    log, the console and the screenshots and gives up the DOM timeline. Every
    other spec keeps the lot. */
 test.use({
-  variant: 'docs',
+  variant: 'website',
   trace: { mode: 'retain-on-failure', snapshots: false }
 });
 

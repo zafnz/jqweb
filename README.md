@@ -1,4 +1,4 @@
-[![jqweb — turn JSON into an interactive webpage](docs/banner.png)](https://jqweb.io/k8s.html)
+[![jqweb — turn JSON into an interactive webpage](website/banner.png)](https://jqweb.io/k8s.html)
 <br/>
 ![Release](https://github.com/zafnz/jqweb/workflows/release/badge.svg)
 [![GitHub Release](https://img.shields.io/github/v/release/zafnz/jqweb)](https://github.com/zafnz/jqweb/releases)
@@ -62,7 +62,7 @@ $ curl -s https://jqweb.io/k8s.json | jqweb -O
 jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)
 ```
 
-[<img src="docs/demo.png" alt="jqweb filtering running pods in a Kubernetes resource list" width="580">](https://jqweb.io/k8s.html)
+[<img src="website/demo.png" alt="jqweb filtering running pods in a Kubernetes resource list" width="580">](https://jqweb.io/k8s.html)
 
 *Filtering running Kubernetes pods with a jq-style query.*
 
@@ -235,21 +235,6 @@ into the box brings it back.
 A value the size of a whole subtree is asked about by presence instead --
 `select(.value.get? != null)`, "which paths have a get at all" -- because
 pasting the subtree into the query would give a row nobody can read.
-
-## On a phone
-
-At 600px wide and below the page is the tree and the buttons to fold it:
-`Collapse all`, the arrow on each branch, and the theme button. The search box,
-the mode dropdown, the match count and the two buttons on each line are left
-off, since a phone has no room to write a query and the browser's own find in
-page covers text search. A wider window, or a phone turned on its side, gets
-the whole page back.
-
-## Update check
-
-When stderr is a terminal, jqweb asks github.com at most once a day whether a
-newer release is out, and prints one line naming the command to upgrade with.
-Set `JQWEB_NO_UPDATE_CHECK=1` to turn it off.
 
 ## License
 

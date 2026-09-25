@@ -1,4 +1,4 @@
-/* Builds a deterministic README screenshot from the committed example.
+/* Builds a deterministic README screenshot from the example document.
 
      node web/test/browser/capture-demo.ts
      node web/test/browser/capture-demo.ts /tmp/demo.png
@@ -15,7 +15,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const repo = path.resolve(import.meta.dirname, '..', '..', '..');
-const output = path.resolve(process.argv[2] || path.join(repo, 'demo.png'));
+const output = path.resolve(process.argv[2] || path.join(repo, 'docs', 'demo.png'));
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'jqweb-demo-'));
 
 const frame = `

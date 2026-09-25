@@ -62,7 +62,7 @@ $ curl -s https://jqweb.io/k8s.json | jqweb -O
 jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)
 ```
 
-[<img src="demo.png" alt="jqweb filtering running pods in a Kubernetes resource list" width="580">](https://jqweb.io/k8s.html)
+[<img src="docs/demo.png" alt="jqweb filtering running pods in a Kubernetes resource list" width="580">](https://jqweb.io/k8s.html)
 
 *Filtering running Kubernetes pods with a jq-style query.*
 

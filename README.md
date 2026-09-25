@@ -1,4 +1,4 @@
-[![jqweb — turn JSON into an interactive webpage](website/banner.png)](https://jqweb.io/k8s.html)
+[![jqweb — turn JSON into an interactive webpage](website/banner.png)](https://jqweb.io/)
 <br/>
 ![Release](https://github.com/zafnz/jqweb/workflows/release/badge.svg)
 [![GitHub Release](https://img.shields.io/github/v/release/zafnz/jqweb)](https://github.com/zafnz/jqweb/releases)

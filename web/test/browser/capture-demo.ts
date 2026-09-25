@@ -15,7 +15,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const repo = path.resolve(import.meta.dirname, '..', '..', '..');
-const output = path.resolve(process.argv[2] || path.join(repo, 'docs', 'demo.png'));
+const output = path.resolve(process.argv[2] || path.join(repo, 'website', 'demo.png'));
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'jqweb-demo-'));
 
 const frame = `
@@ -85,7 +85,7 @@ async function main() {
     const binary = path.join(work, 'jqweb');
     const page = path.join(work, 'demo.html');
     execFileSync('go', ['build', '-o', binary, '.'], { cwd: repo, stdio: 'inherit' });
-    execFileSync(binary, ['--theme', 'dark', '-o', page, path.join(repo, 'docs', 'k8s.json')],
+    execFileSync(binary, ['--theme', 'dark', '-o', page, path.join(repo, 'website', 'k8s.json')],
       { cwd: repo, stdio: 'inherit' });
 
     let html = fs.readFileSync(page, 'utf8');

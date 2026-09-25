@@ -1,4 +1,4 @@
-[![jqweb — turn JSON into an interactive webpage](docs/banner.png)](https://jqweb.io/k8s.html)
+[![jqweb — turn JSON into an interactive webpage](website/banner.png)](https://jqweb.io/k8s.html)
 <br/>
 ![Release](https://github.com/zafnz/jqweb/workflows/release/badge.svg)
 [![GitHub Release](https://img.shields.io/github/v/release/zafnz/jqweb)](https://github.com/zafnz/jqweb/releases)
@@ -62,7 +62,7 @@ $ curl -s https://jqweb.io/k8s.json | jqweb -O
 jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)
 ```
 
-[<img src="docs/demo.png" alt="jqweb filtering running pods in a Kubernetes resource list" width="580">](https://jqweb.io/k8s.html)
+[<img src="website/demo.png" alt="jqweb filtering running pods in a Kubernetes resource list" width="580">](https://jqweb.io/k8s.html)
 
 *Filtering running Kubernetes pods with a jq-style query.*
 

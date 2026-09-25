@@ -1,9 +1,10 @@
 /* The pages the specs run against, and where they are built.
 
    Each variant is rendered once per run, by global-setup.ts, and shared by
-   every spec naming it. "docs" is docs/k8s.json rendered the way the Pages
-   workflow renders the example page. "query" and "simplequery" are built with a
-   query on the command line, for the specs checking the query a page opens on. */
+   every spec naming it. "website" is website/k8s.json rendered the way the
+   Pages workflow renders the example page. "query" and "simplequery" are built
+   with a query on the command line, for the specs checking the query a page
+   opens on. */
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -24,7 +25,7 @@ const PAGES = {
   light: ['--theme', 'light', '-o', '$out', '$doc'],
   query: ['-o', '$out', '.items[] | .metadata.name', '$doc'],
   simplequery: ['--simple', '-o', '$out', '.items[3]', '$doc'],
-  docs: ['-o', '$out', 'docs/k8s.json']
+  website: ['-o', '$out', 'website/k8s.json']
 };
 
 /* The fixture: ten records with repeated fields, so a suggestion has something

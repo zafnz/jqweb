@@ -224,11 +224,23 @@ colour anywhere means one theme gets it wrong. Check the contrast ratio rather
 than the look on one screen: dimming a grey with `opacity` once gave 1.6:1.
 
 **jqweb.io shows the latest release, not `main`.** `.github/workflows/pages.yml`
-deploys `docs/` from `main` together with a `k8s.html` that the latest release's
-binary renders from `docs/k8s.json`. Do not commit `docs/k8s.html`.
-`docs/index.html` is written by hand and goes live on merge, so a change to it
-that describes an unreleased feature waits for the release. The custom domain
-is set in the repository's Pages settings, not in a `CNAME` file.
+deploys `website/` from `main` together with a `k8s.html` that the latest
+release's binary renders from `website/k8s.json`. Do not commit
+`website/k8s.html`. `website/index.html` is not rendered from anything and goes
+live on merge, so a change to it that describes an unreleased feature waits for
+the release. The custom domain is set in the repository's Pages settings, not
+in a `CNAME` file.
+
+**`website/index.html` works without its script.** The HTML is the finished
+state of the demo and the Brew install line; the script at the foot of the page
+hides and replays the demo and builds the install picker. `website/style.css`
+holds the only classes the page uses.
+
+**The demo hook is in the deployed `k8s.html` only.** The pages workflow
+appends `website/demo-hook.js` to the page it renders, so the front page demo
+can type into the search box. Keep it out of `web/src` and the page template.
+It drives `#q`; a release without that id costs the demo its typed query and
+the deploy a warning, and must never fail the deploy.
 
 **The packages' install path is written twice.** `bindir` in the `nfpms`
 section of `.goreleaser.yaml` and `packagedPath` in `internal/update` both
@@ -242,15 +254,15 @@ winget install by the `WinGet\Packages\zafnz.jqweb_` directory, which comes from
 name. Renaming either package leaves Windows users with the releases page as
 their upgrade hint.
 
-**`docs/k8s.json` is the example document.** It is a generated `kubectl get all
--o json` listing, committed and served at https://jqweb.io/k8s.json,
+**`website/k8s.json` is the example document.** It is a generated `kubectl get
+all -o json` listing, committed and served at https://jqweb.io/k8s.json,
 and the `curl` in `README.md` fetches it from there. Examples that need a
 document use this one.
 
-**`docs/demo.png` is generated and committed.** Regenerate it for every new
+**`website/demo.png` is generated and committed.** Regenerate it for every new
 release with `node web/test/browser/capture-demo.ts`.
-The script drives `docs/k8s.json` into the screenshot query and draws the browser
-frame; do not replace it with a hand capture.
+The script drives `website/k8s.json` into the screenshot query and draws the
+browser frame; do not replace it with a hand capture.
 
 **Other sample documents are gitignored** — `simple.json`, `large.json`,
 `wiki-rest.json`. They are scratch fixtures. A wide `git add` has swept one in

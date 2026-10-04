@@ -33,6 +33,7 @@ interface Row {
   hint?: boolean;
   shape?: Shape;
   plain?: boolean;
+  name?: string;
 }
 
 export function jqui(page: QueryHost): QueryUI {
@@ -54,10 +55,16 @@ export function jqui(page: QueryHost): QueryUI {
      it, and whether the last run was held back to offer completions. */
   let rows: Row[] = [];
   let completing = false;
+  let completionLead: string | null = null;
+  let drawn = new Map<string, { node: HTMLElement; html: string }>();
 
   /* Building the markup for a query's whole output is what would stall the
      page, so only this many are rendered; the count still reports them all. */
   const RESULT_CAP = 500;
+
+  /* Only the values on screen are retained, for comparing the next output.
+     This does not save evaluation: a new query still runs in full. */
+  let displayed: ValueNode[] | null = null;
 
   /* Running every candidate against a large document could take longer than
      anyone will wait for a menu, so counting stops after this and the rest of
@@ -102,30 +109,34 @@ export function jqui(page: QueryHost): QueryUI {
      A query still being typed is not run at all: while its trailing name is
      a prefix of keys that are really there, or of builtin names, complete()
      offers those instead and the view stays as it was, and run returns
-     false. force is Enter saying run it anyway. */
+     false. Errors and unchanged results also return false; only a change to
+     the displayed values belongs in history. force is Enter saying run it anyway. */
   function run(raw: string, force?: boolean): boolean {
     clearFault();
     completing = !force && complete(raw);
     if (completing) return false;
-    showDocument();
+    if (completionLead !== null) forget();
     let query: Query;
     try {
       query = compile(raw);
     } catch (e) {
       if (!(e instanceof Error)) throw e;
       fault(e.message, isJqError(e) ? e.pos : undefined);
-      return true;
+      return false;
     }
-    if (query.path) { page.showFound(page.resolve(query.path), query.path.length); return true; }
+    if (query.path) {
+      const restored = showDocument();
+      const changed = page.showFound(page.resolve(query.path), query.path.length);
+      return restored || changed;
+    }
     try {
       const out = query.run(page.value);
-      showResults(out);
+      return showResults(out);
     } catch (e) {
       if (!(e instanceof Error)) throw e;
       fault(e.message);
-      return true;
+      return false;
     }
-    return true;
   }
 
   /* Reports a query that would not compile or would not run. The message goes
@@ -154,19 +165,38 @@ export function jqui(page: QueryHost): QueryUI {
      unnumbered. The document tree is hidden rather than thrown away, so it
      comes back with its collapsed state intact and without being rendered
      again. */
-  function showResults(out: ValueNode[]): void {
+  function showResults(out: ValueNode[]): boolean {
     const shown = Math.min(out.length, RESULT_CAP);
-    const parts: string[] = [];
-    for (let i = 0; i < shown; i++) {
-      parts.push('<div class="result" data-n="' + i + '">' + renderTree(out[i]) + '</div>');
+    const unchanged = displayed !== null && displayed.length === shown &&
+      displayed.every(function (n, i) { return sameView(n, out[i]); });
+    if (!unchanged) {
+      const parts: string[] = [];
+      for (let i = 0; i < shown; i++) {
+        parts.push('<div class="result" data-n="' + i + '">' + renderTree(out[i]) + '</div>');
+      }
+      results.innerHTML = parts.join('');
+      displayed = out.slice(0, shown);
+      results.classList.toggle('one', out.length === 1);
     }
-    results.innerHTML = parts.join('');
-    results.classList.toggle('one', out.length === 1);
-    results.hidden = false;
-    tree.hidden = true;
+    if (results.hidden) results.hidden = false;
+    if (!tree.hidden) tree.hidden = true;
     stats.textContent = shown < out.length
       ? 'first ' + shown + ' of ' + plural(out.length, 'result')
       : describe(out);
+    return !unchanged;
+  }
+
+  /* Compare what renderTree shows, including key order and number spelling.
+     jq's value equality ignores both. Shared document nodes need no walk. */
+  function sameView(a: ValueNode, b: ValueNode): boolean {
+    if (a === b) return true;
+    if (a.t === 'l') return b.t === 'l' && a.h === b.h;
+    if (b.t === 'l' || a.t !== b.t || a.v.length !== b.v.length) return false;
+    for (let i = 0; i < a.v.length; i++) {
+      if (a.t === 'o' && b.t === 'o' && a.k[i] !== b.k[i]) return false;
+      if (!sameView(a.v[i], b.v[i])) return false;
+    }
+    return true;
   }
 
   /* What a query returned. A single object or array is one result, but how
@@ -185,11 +215,13 @@ export function jqui(page: QueryHost): QueryUI {
 
   /* Puts the document back. Without the engine nothing ever replaces it, so
      the page only has this to call when there is a jqui at all. */
-  function showDocument(): void {
-    if (results.hidden) return;
+  function showDocument(): boolean {
+    if (results.hidden) return false;
     results.hidden = true;
     results.innerHTML = '';
+    displayed = null;
     tree.hidden = false;
+    return true;
   }
 
   /* ---- the suggestion list ----
@@ -208,6 +240,8 @@ export function jqui(page: QueryHost): QueryUI {
   /* Builds the list for one line of the document, puts the widest reading in
      the box, and runs it. */
   function filter(node: HTMLElement): void {
+    completionLead = null;
+    completing = false;
     const segs = segsOf(node);
     const deadline = Date.now() + COUNT_BUDGET_MS;
     const counted = suggest(page.value, segs).map(function (c) {
@@ -304,10 +338,12 @@ export function jqui(page: QueryHost): QueryUI {
       const seg = pathText([{ key: k.key }]);
       return {
         q: split.lead ? split.lead + seg.replace(/^\.\[/, '[') : seg,
+        name: k.key,
         label: k.n === comp.objects ? '' : 'on ' + k.n + ' of ' + comp.objects,
         count: null
       };
     });
+    completionLead = split.lead;
     draw();
     show();
     return true;
@@ -320,23 +356,41 @@ export function jqui(page: QueryHost): QueryUI {
     const found = functionCompletions(call.partial);
     if (found.exact || !found.hints.length) return false;
     rows = found.hints.map(function (h): Row {
-      return { q: call.lead + h.q, text: h.sig, label: h.doc, hint: true, count: null };
+      return { q: call.lead + h.q, name: h.q.replace(/\($/, ''), text: h.sig, label: h.doc, hint: true, count: null };
     });
+    completionLead = call.lead;
     draw();
     show();
     return true;
   }
 
   function draw(): void {
-    const parts: string[] = [];
+    const next = new Map<string, { node: HTMLElement; html: string }>();
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
-      parts.push('<div class="sg' + (row.hint ? ' hint' : '') + '"><button class="sgq" type="button">' +
+      const html = '<button class="sgq" type="button">' +
         '<span class="sgt">' + esc(row.text === undefined ? row.q : row.text) + '</span>' +
         '<span class="sgn">' + esc(label(row)) + '</span></button>' +
-        '<button class="sgc" type="button" title="Copy this query">' + COPY_GLYPH + '</button></div>');
+        '<button class="sgc" type="button" title="Copy this query">' + COPY_GLYPH + '</button>';
+      let entry = drawn.get(row.q);
+      if (!entry) {
+        entry = { node: document.createElement('div'), html: '' };
+        entry.node.className = 'sg';
+      }
+      if (entry.html !== html) {
+        entry.node.innerHTML = html;
+        entry.html = html;
+      }
+      entry.node.classList.toggle('hint', !!row.hint);
+      if (suggestions.children[i] !== entry.node) {
+        suggestions.insertBefore(entry.node, suggestions.children[i] || null);
+      }
+      next.set(row.q, entry);
     }
-    suggestions.innerHTML = parts.join('');
+    for (const [q, entry] of drawn) {
+      if (!next.has(q)) entry.node.remove();
+    }
+    drawn = next;
   }
 
   /* Highlights the row the box is holding. Nothing else can put text there
@@ -348,14 +402,17 @@ export function jqui(page: QueryHost): QueryUI {
   }
 
   function show(): void {
-    if (rows.length && faultBox.hidden) suggestions.hidden = false;
+    if (rows.length && faultBox.hidden && suggestions.hidden) suggestions.hidden = false;
   }
-  function hide(): void { suggestions.hidden = true; }
+  function hide(): void { if (!suggestions.hidden) suggestions.hidden = true; }
 
   /* Put the list away and drop what was in it. */
   function forget(): void {
     rows = [];
-    suggestions.innerHTML = '';
+    completionLead = null;
+    completing = false;
+    drawn.clear();
+    if (suggestions.childElementCount) suggestions.replaceChildren();
     hide();
   }
 
@@ -389,15 +446,22 @@ export function jqui(page: QueryHost): QueryUI {
 
   input.addEventListener('focus', show);
 
-  /* Typing anything is done with the list. It offered readings of one line of
-     the document, and the moment the text stops being one of them it is
-     answering a question that is no longer being asked -- so the rows go, and
-     focusing the box brings nothing back.
-
-     Only a person typing gets here: filling the box from a row sets the value
-     directly, which fires nothing. Escape is the one way to put the list away
-     and still get it back. */
+  /* Matching completions stay visible during the debounce, with only the
+     names that still fit. A different context or a list of filter readings
+     is discarded immediately, so stale rows cannot be picked. */
   input.addEventListener('input', function () {
+    const raw = input.value.trim();
+    if (completing && completionLead !== null && wants(raw)) {
+      const split = rows[0]?.hint ? splitCall(raw) : splitPartial(raw);
+      if (split && split.lead === completionLead) {
+        rows = rows.filter(function (row) { return row.name?.startsWith(split.partial); });
+        if (rows.length) {
+          mark(-1);
+          draw();
+          return;
+        }
+      }
+    }
     forget();
   });
 
@@ -415,8 +479,7 @@ export function jqui(page: QueryHost): QueryUI {
     }
     if (e.key === 'Enter' && completing) {
       hide();
-      run(input.value.trim(), true);
-      page.record();
+      if (run(input.value.trim(), true)) page.record();
       return;
     }
     if (suggestions.hidden || !rows.length) return;

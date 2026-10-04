@@ -9,6 +9,13 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+### Faster query editing
+
+Query editing keeps unchanged results and their folds intact, retains the last
+successful view during incomplete or failing queries, and keeps key and function
+hints in place as their names are typed. The URL follows changes to the displayed
+results after a half-second pause.
+
 ## [0.10.0] - 2026-10-04
 
 ### Search stays available on phones

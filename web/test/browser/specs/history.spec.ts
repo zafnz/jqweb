@@ -49,16 +49,16 @@ test.describe('the default page', () => {
     expect.soft(got.stats, 'and says where it led').toBe('.items[0]');
   });
 
-  test('the address follows the box', async ({ page }) => {
+  test('the address follows changes to the view', async ({ page }) => {
     expect.soft(await addressQ(page), 'the page opens with no ?q=').toBe(null);
 
-    await page.locator('#q').fill('blah');
-    await settle(page, 300);
-    expect.soft(await addressQ(page), 'typing puts the box in the address').toBe('blah');
+    await page.locator('#q').fill('Running');
+    await settle(page, 700);
+    expect.soft(await addressQ(page), 'typing puts the box in the address').toBe('Running');
 
-    await page.locator('#q').fill('blahblah');
-    await settle(page, 300);
-    expect.soft(await addressQ(page), 'and typing on rewrites it').toBe('blahblah');
+    await page.locator('#q').fill('Pending');
+    await settle(page, 700);
+    expect.soft(await addressQ(page), 'and typing on rewrites it').toBe('Pending');
 
     await page.goBack();
     expect.soft(await addressQ(page), 'back takes it out again').toBe(null);
@@ -66,6 +66,104 @@ test.describe('the default page', () => {
     await page.goForward();
     await type(page, '');
     expect.soft(await addressQ(page), 'as does emptying the box').toBe(null);
+  });
+
+  test('only changed results update the address', async ({ page }) => {
+    await type(page, '.');
+    expect.soft(await addressQ(page), 'the whole document is already shown').toBe(null);
+    await type(page, '.items[]');
+    expect.soft(await addressQ(page)).toBe('.items[]');
+    for (const q of ['.items[] |', '.items[] | select(', '.items[] | sel']) {
+      await type(page, q);
+      expect.soft(await addressQ(page), 'errors and hints retain the successful query').toBe('.items[]');
+    }
+    const pods = '.items[] | select(.kind == "Pod")';
+    await type(page, pods);
+    expect.soft(await addressQ(page)).toBe(pods);
+    await type(page, '.items[] | select( .kind == "Pod" )');
+    expect.soft(await addressQ(page), 'equivalent results leave the address alone').toBe(pods);
+    await type(page, '.items[] | error("failed")');
+    expect.soft(await addressQ(page), 'runtime errors leave the address alone').toBe(pods);
+  });
+
+  test('history debounces changed views for half a second', async ({ page }) => {
+    await page.locator('#q').fill('.items[]');
+    await settle(page, 400);
+    expect.soft((await view(page)).results, 'results render before the URL changes').toBe(true);
+    expect.soft(await addressQ(page)).toBe(null);
+    await page.locator('#q').fill('.items[] | .kind');
+    await settle(page, 600);
+    expect.soft(await addressQ(page), 'another changed view restarts the debounce').toBe(null);
+    await settle(page, 50);
+    expect.soft(await addressQ(page)).toBe('.items[] | .kind');
+    await page.goBack();
+    expect.soft((await view(page)).box, 'coalesced changes make one entry').toBe('');
+  });
+
+  test('history writes stay at least half a second apart', async ({ page }) => {
+    const writes = await page.evaluateHandle(() => {
+      const writes: { method: string; at: number }[] = [];
+      for (const method of ['pushState', 'replaceState'] as const) {
+        const original = history[method].bind(history);
+        history[method] = function (...args: Parameters<History[typeof method]>) {
+          writes.push({ method, at: Date.now() });
+          original(args[0], args[1], args[2]);
+        };
+      }
+      return writes;
+    });
+    for (const q of ['.items[]', '.items[] | .kind']) {
+      await page.locator('#q').fill(q);
+      await settle(page, 650);
+    }
+    await page.locator('#q').press('Escape');
+    await settle(page, 550);
+    const got = await writes.jsonValue();
+    expect.soft(got.map(w => w.method), 'typing groups edits; Escape starts an entry')
+      .toEqual(['pushState', 'replaceState', 'pushState']);
+    for (let i = 1; i < got.length; i++) {
+      expect.soft(got[i].at - got[i - 1].at, 'all writes obey the interval').toBeGreaterThanOrEqual(500);
+    }
+  });
+
+  test('a pending write remembers the successful query', async ({ page }) => {
+    await page.locator('#q').fill('.items[]');
+    await settle(page, 150);
+    await type(page, '.items[] |');
+    expect.soft(await addressQ(page)).toBe('.items[]');
+    await page.reload();
+    await settle(page);
+    expect.soft((await view(page)).box, 'reload restores the rendered query').toBe('.items[]');
+    expect.soft((await view(page)).results).toBe(true);
+  });
+
+  test('going back cancels a pending history write', async ({ page }) => {
+    await typeAlone(page, '.items[]');
+    await page.locator('#q').fill('.items[] | .kind');
+    await settle(page, 150);
+    await page.goBack();
+    await settle(page);
+    expect.soft((await view(page)).box).toBe('');
+    expect.soft(await addressQ(page)).toBe(null);
+    await page.goForward();
+    expect.soft((await view(page)).box).toBe('.items[]');
+  });
+
+  test('unchanged paths and text matches leave the address alone', async ({ page }) => {
+    await typeAlone(page, '.items[0]');
+    await type(page, '.items[ 0 ]');
+    expect.soft(await addressQ(page)).toBe('.items[0]');
+    await typeAlone(page, 'blablabla');
+    await type(page, 'blablablab');
+    expect.soft(await addressQ(page)).toBe('blablabla');
+  });
+
+  test('forcing an invalid function hint does not record an error', async ({ page }) => {
+    await typeAlone(page, '.items[]');
+    await type(page, '.items[] | sel');
+    await page.locator('#q').press('Enter');
+    await settle(page);
+    expect.soft(await addressQ(page)).toBe('.items[]');
   });
 
   test('an address the page wrote opens on the same view', async ({ page }) => {
@@ -86,6 +184,7 @@ test.describe('the default page', () => {
       await page.locator('#q').fill(q);
       await settle(page, 300);
     }
+    await settle(page, 500);
     await page.goBack();
     expect.soft((await view(page)).box, 'one back returns to before the typing').toBe('');
   });

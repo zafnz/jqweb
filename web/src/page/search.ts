@@ -18,19 +18,19 @@ import { each, pathOf, resolvePath, showPath } from './tree.ts';
 export interface QueryHost {
   value: ValueNode;
   resolve(segs: Segment[]): Found;
-  showFound(found: Found, want: number): void;
+  showFound(found: Found, want: number): boolean;
   rerun(): void;
   record(how?: EntryWrite): void;
 }
 
-/* What the query UI hands back. run returns false when it held the query back
-   to offer completions. */
+/* What the query UI hands back. run reports whether the displayed values
+   changed, and showDocument reports whether it restored the original tree. */
 export interface QueryUI {
   wants(raw: string): boolean;
   run(raw: string, force?: boolean): boolean;
   filter(node: HTMLElement): void;
   clearFault(): void;
-  showDocument(): void;
+  showDocument(): boolean;
   forget(): void;
 }
 
@@ -59,6 +59,8 @@ export function startSearch(jqui: StartQuery | null, value: ValueNode, root: HTM
   /* In the page with or without the engine; only query/ui.ts reads it, but
      every history entry records it. */
   const mode = find('#mode', HTMLSelectElement);
+
+  let documentTarget: HTMLElement | null = root;
 
   /* The query half, or null in a page built with --simple. */
   const query = jqui ? jqui({
@@ -100,37 +102,35 @@ export function startSearch(jqui: StartQuery | null, value: ValueNode, root: HTM
     if (e.key === 'Escape' && e.target === input) { input.value = ''; step('push'); }
   });
 
-  /* Back and Forward step through what the box has held. Going to an entry
-     puts the box and the mode select back and runs the box as written: an
-     entry is only recorded for a run that was not held back to offer
-     completions, so forcing it shows what was on screen when it was recorded.
-
-     Each write also puts the box in the address as ?q=, or takes ?q= out for
-     an empty box.
-
-     Typing makes one entry per query rather than one per pause: a write within
-     EDIT_MS of the last one replaces the entry, and a longer gap starts a new
-     one. */
+  /* Record only a changed view, after half a second without another change.
+     Capture the box now: it may contain an incomplete query by write time.
+     Writes close together replace one entry; a longer pause starts another. */
+  const HISTORY_MS = 500;
   const EDIT_MS = 1000;
   let written = 0;
+  let historyTimer: ReturnType<typeof setTimeout> | undefined;
 
   function record(how?: EntryWrite): void {
     const entry: Entry = { q: input.value, mode: mode.value };
-    const now = Date.now();
-    if (how === 'replace' || (!how && now - written < EDIT_MS)) {
-      history.replaceState(entry, '', addressOf(entry.q));
-    } else {
+    clearTimeout(historyTimer);
+    historyTimer = setTimeout(function () {
       const at = entryOf(history.state);
       if (at && at.q === entry.q && at.mode === entry.mode) return;
-      history.pushState(entry, '', addressOf(entry.q));
-    }
-    written = now;
+      const now = Date.now();
+      if (how === 'replace' || (!how && now - written < EDIT_MS)) {
+        history.replaceState(entry, '', addressOf(entry.q));
+      } else {
+        history.pushState(entry, '', addressOf(entry.q));
+      }
+      written = now;
+    }, HISTORY_MS);
   }
 
   window.addEventListener('popstate', function (e) {
     const entry = entryOf(e.state);
     if (!entry) return;
     clearTimeout(timer);
+    clearTimeout(historyTimer);
     input.value = entry.q;
     mode.value = entry.mode;
     if (query) query.forget();
@@ -140,7 +140,7 @@ export function startSearch(jqui: StartQuery | null, value: ValueNode, root: HTM
     written = 0;
   });
 
-  /* Runs the box and records it in the history. */
+  /* Runs the box and records it only when the view changes. */
   function step(how?: EntryWrite): void {
     if (run()) record(how);
   }
@@ -149,17 +149,16 @@ export function startSearch(jqui: StartQuery | null, value: ValueNode, root: HTM
      path, as it has always been; with it, the mode decides. force runs a
      half-typed name as written rather than completing it, which is what the
      query the page opened with is given, since nobody is part way through
-     typing it. Returns false when the query UI held the run back to offer
-     completions. */
+     typing it. Returns whether the displayed view changed. */
   function run(force?: boolean): boolean {
     const raw = input.value.trim();
     if (query) query.clearFault();
-    if (!raw) { reset(); return true; }
-    if (!query) { runPath(raw); return true; }
+    if (!raw) return reset();
+    if (!query) return runPath(raw);
     if (query.wants(raw)) return query.run(raw, force);
-    query.showDocument();
-    findText(raw);
-    return true;
+    const restored = query.showDocument();
+    const changed = findText(raw);
+    return restored || changed;
   }
 
   /* What a page built with --simple does, and what every page did before the
@@ -167,44 +166,51 @@ export function startSearch(jqui: StartQuery | null, value: ValueNode, root: HTM
      .a.b[3].c, so it is tried as one first, and a bare word is always a text
      filter. A path that does not resolve falls back to text filtering unless
      it was written with a leading dot, which takes it as a path regardless. */
-  function runPath(raw: string): void {
+  function runPath(raw: string): boolean {
     if (/[.[]/.test(raw)) {
       const segs = parsePath(raw);
       if (segs) {
         const found = resolvePath(root, segs);
         if (found.depth === segs.length || raw.charAt(0) === '.') {
-          showFound(found, segs.length);
-          return;
+          return showFound(found, segs.length);
         }
       }
     }
-    findText(raw);
+    return findText(raw);
   }
 
   /* Reveals the node a path led to, or says how far it got. A partial match is
      still worth showing, since it says where the path stopped resolving. */
-  function showFound(found: Found, want: number): void {
+  function showFound(found: Found, want: number): boolean {
+    const changed = documentTarget !== found.node;
+    documentTarget = found.node;
     if (found.depth === want) {
       showPath(header, found.node, true);
       stats.textContent = pathOf(found.node);
-      return;
+      return changed;
     }
     showPath(header, found.node, found.depth > 0);
     stats.textContent = found.depth ? 'no path past ' + pathOf(found.node) : 'no such path';
+    return changed;
   }
 
   /* Filters the tree on raw as text, ignoring case, and reports the count. */
-  function findText(raw: string): void {
-    const hits = textFilter(root, raw.toLowerCase());
+  function findText(raw: string): boolean {
+    const { hits, changed } = textFilter(root, raw.toLowerCase());
+    documentTarget = null;
     stats.textContent = hits === 1 ? '1 match' : hits + ' matches';
+    return changed;
   }
 
   /* Clears any filtering and shows the whole document again. Collapsed state
      is left alone: it is the reader's, not the search's. */
-  function reset(): void {
-    if (query) query.showDocument();
+  function reset(): boolean {
+    const restored = query?.showDocument() || false;
+    const changed = documentTarget !== root;
+    documentTarget = root;
     each('.node', function (n) { n.classList.remove('hidden', 'hit'); });
     stats.textContent = '';
+    return restored || changed;
   }
 
   /* Whatever the box started with runs as though it had been typed, except

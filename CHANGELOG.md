@@ -9,6 +9,12 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+### Faster query editing
+
+Typing a query is faster, and suggestions no longer flicker as you type. Results
+stay on screen while you finish typing, and the address bar updates only when
+the results change.
+
 ## [0.10.0] - 2026-10-04
 
 ### Search stays available on phones

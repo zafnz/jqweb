@@ -9,6 +9,11 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+### Search stays available on phones
+
+At phone widths, the search box is available in automatic mode; the mode
+selector, match count and per-line buttons remain hidden to save room.
+
 ### Back and Forward step through searches
 
 The browser's Back and Forward buttons step through the searches and queries

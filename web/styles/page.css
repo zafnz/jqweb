@@ -139,5 +139,13 @@ main { padding: 10px 14px 60px; }
 .node.hit > .line { background: var(--hit); }
 
 @media (max-width: 600px) {
-  #mode, .qwrap, #stats, .cp, .fq { display: none; }
+  header { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; }
+  header .name {
+    grid-column: 1; grid-row: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  #fold { grid-column: 2; grid-row: 1; margin-left: 0; }
+  #theme { grid-column: 3; grid-row: 1; }
+  .qwrap { grid-column: 1 / -1; grid-row: 2; min-width: 0; }
+  #mode, #stats, .cp, .fq { display: none; }
 }

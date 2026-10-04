@@ -11,10 +11,9 @@ above the commit list GoReleaser generates.
 
 ### Faster query editing
 
-Query editing keeps unchanged results and their folds intact, retains the last
-successful view during incomplete or failing queries, and keeps key and function
-hints in place as their names are typed. The URL follows changes to the displayed
-results after a half-second pause.
+Typing a query is faster, and suggestions no longer flicker as you type. Results
+stay on screen while you finish typing, and the address bar updates only when
+the results change.
 
 ## [0.10.0] - 2026-10-04
 

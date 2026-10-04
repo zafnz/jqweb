@@ -116,6 +116,14 @@ of a fixture and fails if any of them will not compile or will not run: a
 suggestion that errors is worse than no suggestion, and the shapes that cause
 one are easy to miss by hand.
 
+A row of the suggestion list shows a query on the left and a count on the
+right, and the query wraps while the count does not. A function hint is the
+other way round: its left column is the signature, which is short, and its
+right column is a description, which is not, so `.sg.hint` in `query.css`
+lets the description wrap and holds the signature column to a minimum width
+instead. The width is 18ch because all but a handful of signatures fit in it,
+which is what makes the descriptions line up down the list.
+
 The engine works on the nodes `web/src/model/parse.ts` builds for rendering, so
 a result goes straight back to `renderTree` with key order and number text
 intact and the document is parsed once; scalars come from the `r` field on a
@@ -143,25 +151,27 @@ a terminal.
 
 ## The example page
 
-`docs/k8s.html` is a rendered page committed for GitHub Pages, and it does
-not regenerate itself. After a change to the scripts or the styling it is
-stale until someone rebuilds the scripts and then the page. Build it the
-default way, so that the page people are pointed at is the one they will get.
-The input file name sets the page title, so build from `docs/k8s.json` where it
-sits:
+https://jqweb.io/k8s.html is not in the repository. `.github/workflows/pages.yml`
+renders it with the latest release's binary and deploys it with the rest of
+`website/` from `main`, so the example page never shows a feature that cannot
+be installed yet. The workflow runs when the release workflow succeeds, when a
+push to `main` changes `website/`, and by hand from the Actions tab. The
+`website` variant of the browser suite renders the same document from the
+current source. To look at it locally:
 
-    npm --prefix web run build
-    go build -o jqweb . && ./jqweb -o docs/k8s.html docs/k8s.json
+    go build -o jqweb . && ./jqweb -o website/k8s.html website/k8s.json
 
-`docs/k8s.json` is the document that page shows: a `kubectl get all -o json`
+`k8s.html` is gitignored.
+
+`website/k8s.json` is the document that page shows: a `kubectl get all -o json`
 listing, generated rather than taken from a real cluster. GitHub Pages serves
 it at https://jqweb.io/k8s.json, which is what the `curl` in
 `README.md` fetches, so changing the file changes both the example page and
 the first command a reader runs.
 
-Regenerate the README screenshot for every new release, after the example page
-is current. The script uses the same document, runs the example query, draws a
-browser frame around the page, and writes `demo.png`. It drives the page with
+Regenerate the README screenshot for every new release. The script uses the
+same document, runs the example query, draws a browser frame around the page,
+and writes `website/demo.png`. It drives the page with
 Playwright, so it needs `npm --prefix web ci` first; two runs of it produce the
 same bytes.
 

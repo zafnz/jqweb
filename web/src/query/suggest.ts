@@ -12,7 +12,9 @@
    reasoning about jq.
 
    splitPartial() and completions() are the other half: reading a query that
-   ends in a half-typed name, and the keys that could finish it.
+   ends in a half-typed key, and the keys that could finish it. splitCall()
+   and functionCompletions() do the same for a half-typed function name, with
+   the builtin names and what docs.ts says about each.
 
    Everything here is text in, text out, over the nodes in model/node.ts.
    Nothing touches the DOM and nothing runs a query. */
@@ -21,6 +23,9 @@ import type { Node } from '../model/node.ts';
 import { stringify } from '../model/node.ts';
 import type { Segment } from '../model/path.ts';
 import { pathText } from '../model/path.ts';
+import { DOCS } from './docs.ts';
+import { arities, lex } from './engine/index.ts';
+import type { Token } from './engine/index.ts';
 
 /* How to count what a query returns, which the output alone does not say:
    with_entries hands back one object and the answer is how many keys it kept,
@@ -280,4 +285,74 @@ export function completions(out: Node[], partial: string): Completions {
     objects: objects,
     keys: keys.map(function (key) { return { key: key, n: tally[key] }; })
   };
+}
+
+/* ---- completing a half-typed function name ---- */
+
+/* A query ending in a function name still being typed, as splitCall reads
+   it: lead is the text before the name, which the finished name goes onto
+   the end of. */
+export interface PartialCall {
+  lead: string;
+  partial: string;
+}
+
+/* One name that could finish a partial: q is what goes in the box, the name
+   with a "(" after it when every form of it takes an argument, and sig and
+   doc are its signature and what it does, from docs.ts. */
+export interface Hint {
+  q: string;
+  sig: string;
+  doc: string;
+}
+
+/* The names that could finish a partial function name, as
+   functionCompletions gathers them. exact says the partial is a whole name
+   that runs as written, so the text runs rather than being held. */
+export interface Hints {
+  exact: boolean;
+  hints: Hint[];
+}
+
+/* Splits a query that ends in a function name still being typed: ".[] | joi"
+   is {lead: ".[] | ", partial: "joi"}. The text is lexed rather than matched,
+   because the lexer already tells a function name from a field, a variable
+   and the inside of a string: ".items[].ki" ends in a field, which
+   splitPartial reads, and "test(\"ab" ends in an unterminated string, which
+   lex refuses. A format such as "@cs" is a name too.
+
+   Null for text that does not end in a name, which runs as written. */
+export function splitCall(raw: string): PartialCall | null {
+  let toks: Token[];
+  try {
+    toks = lex(raw);
+  } catch {
+    return null;
+  }
+  const last = toks[toks.length - 2];
+  if (!last || (last.k !== 'ident' && last.k !== 'format')) return null;
+  if (last.p + last.v.length !== raw.length) return null;
+  return { lead: raw.slice(0, last.p), partial: last.v };
+}
+
+/* The names a partial could finish: every builtin whose name starts with it,
+   the words of an if and the three literals included, alphabetical. exact is
+   whether running the partial as written is what was meant: a whole name
+   with a form that takes no argument. "join" is a whole name too, but every
+   join takes an argument, so run as written it can only fail; it stays on
+   the list, with what it takes beside it, until the argument is typed. */
+export function functionCompletions(partial: string): Hints {
+  const counts = arities();
+  const names = Object.keys(DOCS).sort();
+  const hints: Hint[] = [];
+  let exact = false;
+  for (let i = 0; i < names.length; i++) {
+    const name = names[i];
+    if (name.slice(0, partial.length) !== partial) continue;
+    const forms = counts[name];
+    const bare = !forms || forms.indexOf(0) >= 0;
+    if (name === partial && bare) exact = true;
+    hints.push({ q: bare ? name : name + '(', sig: DOCS[name][0], doc: DOCS[name][1] });
+  }
+  return { exact: exact, hints: hints };
 }

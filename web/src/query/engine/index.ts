@@ -26,6 +26,12 @@ import { parse, pathSegs } from './parser.ts';
 export { isJqError } from './errors.ts';
 export type { JqError } from './errors.ts';
 
+/* What completing a half-typed name needs from the engine: the tokens of the
+   text so far, and the names the parser knows. */
+export { lex } from './lexer.ts';
+export type { Token } from './lexer.ts';
+export { arities } from './parser.ts';
+
 /* A compiled query. path is the segments of a query that only walks down the
    document, in the form parsePath produces, and null for anything else. run
    returns the stream the query produces for one input. */

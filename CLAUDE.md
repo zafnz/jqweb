@@ -128,7 +128,8 @@ head before the body is parsed.
 | `src/page/alive.ts` | theme | runs in `<head>`, holds `/alive` open on a served page |
 | `styles/page.css` | both | the palette, both themes |
 | `src/query/engine/*.ts` | full only | the jq engine: lexer, parser, evaluator, builtins. No DOM. |
-| `src/query/suggest.ts` | full only | builds the queries a clicked line could mean, and the key completions of a half-typed one. No DOM. |
+| `src/query/suggest.ts` | full only | builds the queries a clicked line could mean, and the key and function-name completions of a half-typed one. No DOM. |
+| `src/query/docs.ts` | full only | one line per builtin, its signature and what it does, shown beside a function-name completion. A builtin without one fails `suggest.test.ts`. |
 | `src/query/ui.ts` | full only | search box as a query, results view, suggestion list |
 | `styles/query.css` | default only | mode select, suggestion list, error box, results |
 
@@ -220,15 +221,24 @@ as written, so a comment in `page.css` or `query.css` ships in every page.
 colour anywhere means one theme gets it wrong. Check the contrast ratio rather
 than the look on one screen: dimming a grey with `opacity` once gave 1.6:1.
 
-**`docs/k8s.html` is generated and committed.** It is `docs/k8s.json`
-rendered, so rebuild `web/dist` and then regenerate it after any change under
-`web/`, with the commands in `CONTRIBUTING.md`. `docs/index.html` is written by
-hand and is not rendered from anything.
+**jqweb.io shows the latest release, not `main`.** `.github/workflows/pages.yml`
+deploys `website/` from `main` together with a `k8s.html` that the latest
+release's binary renders from `website/k8s.json`. Do not commit
+`website/k8s.html`. `website/index.html` is not rendered from anything and goes
+live on merge, so a change to it that describes an unreleased feature waits for
+the release. The custom domain is set in the repository's Pages settings, not
+in a `CNAME` file.
 
-**`docs/CNAME` sets the custom domain.** Pages deploys from `/docs` on `main`,
-and GitHub reads the domain from that file, so a build without it drops
-jqweb.io. The `main` ruleset stops GitHub committing the file itself, so a
-domain change is a pull request that edits it.
+**`website/index.html` works without its script.** The HTML is the finished
+state of the demo and the Brew install line; the script at the foot of the page
+hides and replays the demo and builds the install picker. `website/style.css`
+holds the only classes the page uses.
+
+**The demo hook is in the deployed `k8s.html` only.** The pages workflow
+appends `website/demo-hook.js` to the page it renders, so the front page demo
+can type into the search box. Keep it out of `web/src` and the page template.
+It drives `#q`; a release without that id costs the demo its typed query and
+the deploy a warning, and must never fail the deploy.
 
 **The packages' install path is written twice.** `bindir` in the `nfpms`
 section of `.goreleaser.yaml` and `packagedPath` in `internal/update` both
@@ -242,15 +252,15 @@ winget install by the `WinGet\Packages\zafnz.jqweb_` directory, which comes from
 name. Renaming either package leaves Windows users with the releases page as
 their upgrade hint.
 
-**`docs/k8s.json` is the example document.** It is a generated `kubectl get all
--o json` listing, committed and served at https://jqweb.io/k8s.json,
+**`website/k8s.json` is the example document.** It is a generated `kubectl get
+all -o json` listing, committed and served at https://jqweb.io/k8s.json,
 and the `curl` in `README.md` fetches it from there. Examples that need a
 document use this one.
 
-**`demo.png` is generated and committed.** Regenerate it for every new release,
-after the example page is current, with `node web/test/browser/capture-demo.ts`.
-The script drives `docs/k8s.json` into the screenshot query and draws the browser
-frame; do not replace it with a hand capture.
+**`website/demo.png` is generated and committed.** Regenerate it for every new
+release with `node web/test/browser/capture-demo.ts`.
+The script drives `website/k8s.json` into the screenshot query and draws the
+browser frame; do not replace it with a hand capture.
 
 **Other sample documents are gitignored** — `simple.json`, `large.json`,
 `wiki-rest.json`. They are scratch fixtures. A wide `git add` has swept one in

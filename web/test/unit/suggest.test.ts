@@ -1,6 +1,6 @@
 /* Tests for query/suggest.ts: the queries offered when you click the filter
-   button on a line, and the completions of a key name still being typed.
-   Run with:  npm --prefix web test
+   button on a line, and the completions of a key or a function name still
+   being typed. Run with:  npm --prefix web test
 
    The property that matters most is near the bottom: every query offered for
    every line of a document has to compile and run against that document. A
@@ -13,8 +13,10 @@ import assert from 'node:assert';
 import type { Node } from '../../src/model/node.ts';
 import { parseJSON } from '../../src/model/parse.ts';
 import type { Segment } from '../../src/model/path.ts';
+import { DOCS } from '../../src/query/docs.ts';
+import { builtins } from '../../src/query/engine/builtins.ts';
 import { compile, isJqError } from '../../src/query/engine/index.ts';
-import { completions, countOf, splitPartial, suggest } from '../../src/query/suggest.ts';
+import { completions, countOf, functionCompletions, splitCall, splitPartial, suggest } from '../../src/query/suggest.ts';
 import type { Candidate } from '../../src/query/suggest.ts';
 
 /* A document with the shapes that have caught the generator out: an object
@@ -257,4 +259,79 @@ test('completions caps the list', () => {
   for (let i = 0; i < 250; i++) keys.push(`"k${String(i).padStart(3, '0')}":1`);
   const got = completions(stream('{' + keys.join(',') + '}'), 'k');
   assert.strictEqual(got.keys.length, 200);
+});
+
+/* ---- completing a half-typed function name ---- */
+
+test('splitCall reads a function name still being typed', () => {
+  assert.deepStrictEqual(splitCall('len'), { lead: '', partial: 'len' });
+  assert.deepStrictEqual(splitCall('.[] | joi'), { lead: '.[] | ', partial: 'joi' });
+  assert.deepStrictEqual(splitCall('.items[] | select(len'),
+    { lead: '.items[] | select(', partial: 'len' });
+  assert.deepStrictEqual(splitCall('.a | test("x") | le'),
+    { lead: '.a | test("x") | ', partial: 'le' });
+  /* A format is a name with an @ on the front. */
+  assert.deepStrictEqual(splitCall('.a | @cs'), { lead: '.a | ', partial: '@cs' });
+});
+
+test('splitCall leaves everything else alone', () => {
+  /* A field is splitPartial's, a variable and an operator are whole, a name
+     inside an unfinished string is text, a name in a comment is nothing, and
+     a name followed by anything is finished. */
+  for (const raw of ['', '.', '.items[].ki', '$x', '.a and', 'keys(1)', '.a | length ',
+    '.a | test("ab', '.a # len', 'length | .a']) {
+    assert.strictEqual(splitCall(raw), null, `split ${JSON.stringify(raw)}`);
+  }
+});
+
+const offered = (partial: string) => functionCompletions(partial).hints.map((h) => h.q);
+
+test('functionCompletions offers the names that continue a partial', () => {
+  const got = functionCompletions('ma');
+  assert.strictEqual(got.exact, false);
+  assert.deepStrictEqual(got.hints.map((h) => h.q), ['map(', 'map_values(', 'match(', 'max', 'max_by(']);
+  assert.deepStrictEqual(offered('len'), ['length']);
+  assert.deepStrictEqual(offered('@b'), ['@base64', '@base64d']);
+  assert.deepStrictEqual(offered('zz'), []);
+});
+
+test('a name that takes an argument in every form is offered with its paren', () => {
+  /* "join" is a whole name, but run as written it can only fail: it stays on
+     the list until the argument is typed. */
+  const join = functionCompletions('join');
+  assert.strictEqual(join.exact, false);
+  assert.deepStrictEqual(join.hints.map((h) => h.q), ['join(']);
+  /* "first" takes an argument or not, so the bare form is what runs, and so
+     does a name that takes none. */
+  assert.strictEqual(functionCompletions('first').exact, true);
+  assert.deepStrictEqual(offered('first'), ['first']);
+  assert.strictEqual(functionCompletions('length').exact, true);
+  assert.strictEqual(functionCompletions('true').exact, true);
+  /* A whole name that a longer one continues is still exact. */
+  assert.strictEqual(functionCompletions('keys').exact, true);
+  assert.deepStrictEqual(offered('keys'), ['keys', 'keys_unsorted']);
+});
+
+test('every hint carries its signature and what it does', () => {
+  const all = functionCompletions('').hints;
+  assert.ok(all.length > 100, `only ${all.length} hints`);
+  for (const h of all) {
+    assert.ok(h.sig.includes(h.q.replace(/\($/, '')), `${h.q}: signature ${h.sig}`);
+    assert.match(h.doc, /^\S/, h.q);
+  }
+});
+
+test('every builtin has a description, and every description is of a builtin or a word', () => {
+  const names = new Set(Object.keys(builtins).map((key) => key.slice(0, key.lastIndexOf('/'))));
+  const words = ['if', 'then', 'elif', 'else', 'end', 'and', 'or', 'true', 'false', 'null'];
+  const undocumented = [...names].filter((n) => !DOCS[n]).sort();
+  assert.deepStrictEqual(undocumented, [], 'builtins with no description');
+  const unknown = Object.keys(DOCS).filter((n) => !names.has(n) && !words.includes(n)).sort();
+  assert.deepStrictEqual(unknown, [], 'descriptions of nothing');
+  for (const name of Object.keys(DOCS)) {
+    const [sig, doc] = DOCS[name];
+    assert.ok(sig.includes(name), `${name}: the signature does not name it`);
+    assert.ok(sig.length <= 40, `${name}: the signature is too long for its column`);
+    assert.ok(doc.length <= 60, `${name}: too long to read on a row of the list`);
+  }
 });

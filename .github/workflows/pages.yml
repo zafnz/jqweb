@@ -1,0 +1,73 @@
+name: pages
+
+# jqweb.io is website/ from main plus k8s.html, which is rendered here by the
+# binary from the latest release. Rendering it from main would put features on
+# the example page before anyone can install them.
+#
+# A release is published by the release workflow's GITHUB_TOKEN, and events
+# caused by that token start no workflows, so "release: published" would never
+# fire. workflow_run does, and it runs on main, which is the only ref the
+# github-pages environment accepts a deployment from.
+on:
+  workflow_run:
+    workflows: [release]
+    types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - website/**
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Deployments queue rather than cancel, so the last one to start is the one
+# left live.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # The page is rendered from the path it is served beside, because the
+      # input file name becomes the page title.
+      - name: Render the example page with the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download --pattern 'jqweb_*_linux_amd64.tar.gz' --dir "$RUNNER_TEMP"
+          tar -xzf "$RUNNER_TEMP"/jqweb_*_linux_amd64.tar.gz -C "$RUNNER_TEMP" jqweb
+          "$RUNNER_TEMP/jqweb" --version
+          "$RUNNER_TEMP/jqweb" -o website/k8s.html website/k8s.json
+
+      # The front page's demo drives this page's search box through the hook
+      # in website/demo-hook.js, so it goes into the deployed copy inline and
+      # is not served on its own. A release without the box it drives only
+      # costs the demo its typed query, so that is a warning and never a
+      # failed deploy.
+      - name: Add the demo hook to the example page
+        continue-on-error: true
+        run: |
+          if ! grep -q 'id="q"' website/k8s.html; then
+            echo '::warning file=website/demo-hook.js::The example page has no id="q" search box, so the front page demo will not type its query.'
+          fi
+          { echo '<script>'; cat website/demo-hook.js; echo '</script>'; } >> website/k8s.html
+          rm website/demo-hook.js
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: website
+
+      - uses: actions/deploy-pages@v5
+        id: deployment

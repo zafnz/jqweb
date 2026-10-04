@@ -1,4 +1,4 @@
-[![jqweb — turn JSON into an interactive webpage](docs/banner.png)](https://jqweb.io/k8s.html)
+[![jqweb — turn JSON into an interactive webpage](website/banner.png)](https://jqweb.io/)
 <br/>
 ![Release](https://github.com/zafnz/jqweb/workflows/release/badge.svg)
 [![GitHub Release](https://img.shields.io/github/v/release/zafnz/jqweb)](https://github.com/zafnz/jqweb/releases)
@@ -62,7 +62,7 @@ $ curl -s https://jqweb.io/k8s.json | jqweb -O
 jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)
 ```
 
-[<img src="demo.png" alt="jqweb filtering running pods in a Kubernetes resource list" width="580">](https://jqweb.io/k8s.html)
+[<img src="website/demo.png" alt="jqweb filtering running pods in a Kubernetes resource list" width="580">](https://jqweb.io/k8s.html)
 
 *Filtering running Kubernetes pods with a jq-style query.*
 
@@ -162,6 +162,11 @@ runs. A bare trailing dot lists every key. Click a completion or arrow down to
 it to run it, keep typing, or press Enter to run the half-typed text as
 written; a name that no key starts with runs as written too.
 
+A function name is completed the same way: `.[] | joi` drops down `join(sep)`
+with what it does beside it, and on `jq` a bare `len` drops down `length`. A
+whole name that still needs an argument, such as `join`, stays on the list
+until the argument is typed. Enter runs the text as written.
+
 This is a subset of jq, not all of it. Paths, `[]`, slices, `|`, `,`, `//`,
 `?`, comparisons, arithmetic, `if/then/elif/else/end`, array and object
 construction, and around 100 builtins:
@@ -230,19 +235,6 @@ into the box brings it back.
 A value the size of a whole subtree is asked about by presence instead --
 `select(.value.get? != null)`, "which paths have a get at all" -- because
 pasting the subtree into the query would give a row nobody can read.
-
-## On a phone
-
-At 600px wide and below the search box stays available in automatic mode,
-alongside the tree, its folding controls and the theme button. The mode
-dropdown, match count and two buttons on each line are left off to save room.
-A wider window, or a phone turned on its side, gets those controls back.
-
-## Update check
-
-When stderr is a terminal, jqweb asks github.com at most once a day whether a
-newer release is out, and prints one line naming the command to upgrade with.
-Set `JQWEB_NO_UPDATE_CHECK=1` to turn it off.
 
 ## License
 

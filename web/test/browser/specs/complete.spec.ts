@@ -143,3 +143,55 @@ test('a completion can be picked', async ({ page }) => {
   expect.soft(entered.first, 'Enter runs it as written').toBe('null');
   expect.soft(entered.hidden, 'and puts the list away').toBe(true);
 });
+
+/* zafnz/jqweb#120. Tab takes a completion as clicking it would. Without
+   preventDefault the browser moves focus to the next control instead, and the
+   box keeps the half-typed name. */
+test('Tab takes a completion', async ({ page }) => {
+  const state = () => page.evaluate(() => ({
+    box: __t.get('#q', HTMLInputElement).value,
+    stats: __t.text('#stats'),
+    focused: document.activeElement === __t.get('#q', HTMLInputElement)
+  }));
+
+  await type(page, '.items[].kin');
+  await page.locator('#q').press('Tab');
+  await settle(page);
+  const key = await state();
+  expect.soft(key.box, 'Tab finishes the key').toBe('.items[].kind');
+  expect.soft(key.stats, 'and runs it').toBe('10 results');
+  expect.soft(key.focused, 'and the box keeps focus').toBe(true);
+
+  /* Of several, the first, which is the one Down would have picked. */
+  await type(page, '.items[].metadata.na');
+  await page.locator('#q').press('Tab');
+  await settle(page);
+  expect.soft((await state()).box, 'the first of several').toBe('.items[].metadata.name');
+
+  /* A function waiting for its argument is left in the box to be finished. */
+  await type(page, '.items[] | joi');
+  await page.locator('#q').press('Tab');
+  await settle(page);
+  const call = await state();
+  expect.soft(call.box, 'Tab finishes a function name').toBe('.items[] | join(');
+  expect.soft(call.focused, 'with the box still focused').toBe(true);
+
+  /* Inside the debounce the narrowed list is the one Tab reads. */
+  await type(page, '.items[].metadata.na');
+  await page.locator('#q').pressSequentially('mes');
+  await page.locator('#q').press('Tab');
+  await settle(page);
+  expect.soft((await state()).box, 'before the debounce fires').toBe('.items[].metadata.namespace');
+});
+
+test('Tab with nothing to complete moves on', async ({ page }) => {
+  await type(page, '.items[]');
+  await page.locator('#q').press('Tab');
+  await settle(page);
+  const got = await page.evaluate(() => ({
+    box: __t.get('#q', HTMLInputElement).value,
+    focused: document.activeElement === __t.get('#q', HTMLInputElement)
+  }));
+  expect.soft(got.box, 'the box is left alone').toBe('.items[]');
+  expect.soft(got.focused, 'and focus moves on as usual').toBe(false);
+});

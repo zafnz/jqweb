@@ -9,6 +9,8 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-04
+
 ### Search stays available on phones
 
 At phone widths, the search box is available in automatic mode; the mode
@@ -313,7 +315,8 @@ The first release: a JSON document rendered as one self-contained HTML page,
 served or written to a file, with a flag to open a browser on it and a flag to
 report the version.
 
-[Unreleased]: https://github.com/zafnz/jqweb/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/zafnz/jqweb/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/zafnz/jqweb/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/zafnz/jqweb/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/zafnz/jqweb/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/zafnz/jqweb/compare/v0.7.0...v0.7.1

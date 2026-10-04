@@ -74,9 +74,12 @@ const test = base.extend<{ variant: Variant; address: string }, { atSelector: vo
   page: async ({ page, variant, address }, use) => {
     /* Before the page loads, so the page's own timers are the fake ones and
        the helpers are there for the first evaluate. */
-    await page.clock.install();
+    await page.clock.install({ time: new Date('2020-01-01T00:00:00Z') });
     await page.addInitScript({ path: helpers });
     await page.goto(pageURL(variant, address));
+    /* Installing alone leaves time running. Pause before test actions, with
+       a target well beyond the load timeout so it cannot already be past. */
+    await page.clock.pauseAt(new Date('2020-01-02T00:00:00Z'));
     await page.clock.runFor(SETTLE);
     await use(page);
   }

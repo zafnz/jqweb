@@ -92,9 +92,11 @@ test.describe('the default page', () => {
     expect.soft((await view(page)).results, 'results render before the URL changes').toBe(true);
     expect.soft(await addressQ(page)).toBe(null);
     await page.locator('#q').fill('.items[] | .kind');
-    await settle(page, 600);
+    await settle(page, 120);
+    expect.soft((await view(page)).stats, 'the new query renders').toBe('10 results');
+    await settle(page, 499);
     expect.soft(await addressQ(page), 'another changed view restarts the debounce').toBe(null);
-    await settle(page, 50);
+    await settle(page, 1);
     expect.soft(await addressQ(page)).toBe('.items[] | .kind');
     await page.goBack();
     expect.soft((await view(page)).box, 'coalesced changes make one entry').toBe('');

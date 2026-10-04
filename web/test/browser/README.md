@@ -88,10 +88,10 @@ path and driven like anything else:
 
 ## The clock
 
-`page.clock.install()` runs before the page loads, and `settle(page)` winds it
-forward. The 120ms the search box waits for a pause in typing and the 900ms a
-copy button stays ticked both pass instantly, and the suite takes about nine
-seconds.
+The fixture installs the clock before loading the page and pauses it before
+test actions. `settle(page)` advances it explicitly; browser actions and
+assertions consume no page time, however long they take. Installing the clock
+alone leaves it running and makes debounce assertions depend on machine speed.
 
 Winding the clock is not optional after an action that comes back on a timer.
 Without it the debounce never fires and the box appears not to have searched.

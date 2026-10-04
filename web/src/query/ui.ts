@@ -469,7 +469,9 @@ export function jqui(page: QueryHost): QueryUI {
      way to find out which one you meant. Escape puts the list away without
      clearing the box, which is what Escape does when there is no list.
      Enter runs a half-typed name as written, which nothing does for you
-     while complete() is holding the run back. */
+     while complete() is holding the run back. Tab takes a completion -- the
+     highlighted one, else the first -- as clicking it would; with no
+     completion on offer it moves focus as usual. */
   input.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !suggestions.hidden) {
       hide();
@@ -483,6 +485,12 @@ export function jqui(page: QueryHost): QueryUI {
       return;
     }
     if (suggestions.hidden || !rows.length) return;
+    if (e.key === 'Tab' && completing && !e.shiftKey) {
+      e.preventDefault();
+      const on = Array.from(suggestions.children).findIndex(function (row) { return row.classList.contains('on'); });
+      pick(on < 0 ? 0 : on);
+      return;
+    }
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     e.preventDefault();
     let at = -1;

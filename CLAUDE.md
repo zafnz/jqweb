@@ -80,6 +80,9 @@ switch that checkout back to `main`, `git worktree add .claude/worktrees/<branch
 When opening a pull request, link any GitHub issues it fixes and put the closing
 keyword in the PR body too: `Closes #123`, `Fixes #223` or similar.
 
+Every pull request carries a label, one of `functionality`, `bug`,
+`documentation`, `accessibility` or `optimisation`.
+
 ## What it is
 
 A Go binary that turns a JSON document into one self-contained HTML page, and

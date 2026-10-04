@@ -9,6 +9,11 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+### Added
+
+- Tab in the search box takes the highlighted completion of a key or function
+  name, or the first one, as clicking it would.
+
 ## [0.10.1] - 2026-10-04
 
 ### Faster query editing

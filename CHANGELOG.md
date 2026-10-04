@@ -9,6 +9,8 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-10-04
+
 ### Faster query editing
 
 Typing a query is faster, and suggestions no longer flicker as you type. Results
@@ -321,7 +323,8 @@ The first release: a JSON document rendered as one self-contained HTML page,
 served or written to a file, with a flag to open a browser on it and a flag to
 report the version.
 
-[Unreleased]: https://github.com/zafnz/jqweb/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/zafnz/jqweb/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/zafnz/jqweb/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/zafnz/jqweb/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/zafnz/jqweb/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/zafnz/jqweb/compare/v0.7.1...v0.8.0

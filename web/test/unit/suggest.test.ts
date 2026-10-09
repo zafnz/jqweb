@@ -16,7 +16,7 @@ import type { Segment } from '../../src/model/path.ts';
 import { DOCS } from '../../src/query/docs.ts';
 import { builtins } from '../../src/query/engine/builtins.ts';
 import { compile, isJqError } from '../../src/query/engine/index.ts';
-import { completions, countOf, functionCompletions, splitCall, splitPartial, suggest } from '../../src/query/suggest.ts';
+import { chain, completions, countOf, functionCompletions, splitCall, splitPartial, suggest } from '../../src/query/suggest.ts';
 import type { Candidate } from '../../src/query/suggest.ts';
 
 /* A document with the shapes that have caught the generator out: an object
@@ -183,6 +183,84 @@ test('every query offered for every line runs against the document it came from'
       }
       checked++;
     }
+  }
+  assert.ok(checked > 200, `only ${checked} suggestions checked`);
+});
+
+test('a path that starts with an index is written as a path', () => {
+  /* Written as a suffix with nothing in front, ".[0].x" became "[0].x", an
+     array literal, and the reading quietly found nothing. */
+  for (const segs of allPaths(DOC)) {
+    for (const c of suggest(DOC, segs)) assert.ok(!/select\(\[/.test(c.q), c.q);
+  }
+});
+
+/* ---- carrying on from a query's results ---- */
+
+const ROWS = '.rows[]';
+const results = (lead: string) => compile(lead).run(DOC);
+const chained = (lead: string, n: number, segs: Segment[]) => chain(lead, results(lead), n, segs);
+
+test('a line in the results adds a step to the query they came from', () => {
+  const qs = chained(ROWS, 1, [{ key: 'name' }]).map((c) => c.q);
+  assert.strictEqual(qs[0], '.rows[] | select(.name? == "beta")', qs.join('\n'));
+  for (const q of qs) assert.ok(q.startsWith(ROWS + ' | '), q);
+  assert.strictEqual(compile(qs[0]).run(DOC).length, 1);
+});
+
+test('a step can be added to a step', () => {
+  const lead = '.paths[] | .[]? | select(.tags? | index("Page content")?)';
+  const step = chained(lead, 0, [{ key: 'summary' }])[0];
+  assert.strictEqual(step.q, lead + ' | select(.summary? == "a")');
+  assert.strictEqual(yields(step), 1);
+});
+
+test('a pivot inside a result is taken across every result', () => {
+  /* Guarded, since only the clicked result is known to hold a container
+     there: the second row's flags are empty and the root holds a string. */
+  const qs = chained(ROWS, 0, [{ key: 'flags' }, { index: 0 }]).map((c) => c.q);
+  assert.ok(qs.includes('.rows[] | .flags[]? | select(. == "x")'), qs.join('\n'));
+  const mixed = chained('.[]', 1, [{ key: '/page/' }, { key: 'get' }, { key: 'summary' }]).map((c) => c.q);
+  assert.ok(mixed.includes('.[] | .["/page/"][]? | select(.summary? == "a")'), mixed.join('\n'));
+});
+
+test('with_entries is offered after a query only when it returned one result', () => {
+  /* Over several results it hands back one object for each, narrowing
+     none of them. */
+  assert.ok(!chained(ROWS, 0, [{ key: 'id' }]).some((c) => c.q.includes('with_entries')));
+  const one = chained('.paths', 0, [{ key: '/feed/' }, { key: 'get' }, { key: 'summary' }]);
+  const kept = one.find((c) => c.q === '.paths | with_entries(select(.value.get.summary? == "b"))');
+  assert.ok(kept, one.map((c) => c.q).join('\n'));
+  assert.strictEqual(yields(kept), 1);
+});
+
+test('a line in the results is not offered as a path', () => {
+  /* After a query it would map every result rather than narrow them. */
+  const qs = chained(ROWS, 0, [{ key: 'name' }]).map((c) => c.q);
+  assert.ok(!qs.some((q) => q.endsWith('.name') || q.endsWith('.name?')), qs.join('\n'));
+  assert.ok(!chained(ROWS, 0, [{ key: 'name' }]).some((c) => c.plain));
+  const scalar = chained('.rows[].name', 0, []).map((c) => c.q);
+  assert.deepStrictEqual(scalar.slice(0, 1), ['.rows[].name | select(. == "alpha")']);
+});
+
+test('every query offered after a query runs', () => {
+  let checked = 0;
+  for (const lead of [ROWS, '.[]', '.paths[]', '.paths["/page/"]', '.. | strings']) {
+    const out = results(lead);
+    out.forEach((value, n) => {
+      for (const segs of allPaths(value)) {
+        for (const c of chain(lead, out, n, segs)) {
+          assert.ok(c.q.startsWith(lead + ' | '), c.q);
+          try {
+            compile(c.q).run(DOC);
+          } catch (e) {
+            const why = isJqError(e) ? `${e.jq}: ${e.message}` : String(e);
+            assert.fail(`${c.q}\n  offered for result ${n} of ${lead} at ${JSON.stringify(segs)}\n  ${why}`);
+          }
+          checked++;
+        }
+      }
+    });
   }
   assert.ok(checked > 200, `only ${checked} suggestions checked`);
 });

@@ -231,6 +231,11 @@ stays open, so trying the next one is a keystroke. The `&#x29C9;` on a row
 copies that query. Clicking elsewhere puts the list away, and clicking back
 into the box brings it back.
 
+The lines of a query's results have the same buttons, and `&#x2261;` there adds
+a step to that query instead of starting over, so
+`.items[] | select(.kind? == "Pod")` becomes
+`.items[] | select(.kind? == "Pod") | select(.status.phase? == "Running")`.
+
 A value the size of a whole subtree is asked about by presence instead --
 `select(.value.get? != null)`, "which paths have a get at all" -- because
 pasting the subtree into the query would give a row nobody can read.

@@ -214,3 +214,51 @@ test('where the list sits', async ({ page }) => {
   expect.soft(got.listZ, 'and is drawn over the document')
     .toBeGreaterThanOrEqual(got.headerZ);
 });
+
+/* The line at keys inside result n of whatever the results view is showing. */
+async function openInResult(page: Page, n: number, keys: string[]) {
+  let at = page.locator('#results .result[data-n="' + n + '"] > .node');
+  for (const key of keys) at = at.locator('> .kids > .node[data-key="' + key + '"]');
+  await at.locator('> .line > .fq').click();
+  await settle(page);
+}
+
+const state = (page: Page) => page.evaluate(() => ({
+  box: __t.get('#q', HTMLInputElement).value,
+  stats: __t.text('#stats'),
+  filters: __t.$$('#results .result .fq').length,
+  results: __t.$$('#results .result').length
+}));
+
+test('filtering a line in the results adds a step to the query', async ({ page }) => {
+  await openOn(page, '.items[0].kind');
+  const first = await state(page);
+  expect.soft(first.box, 'the first filter starts from the document')
+    .toBe('.items[] | select(.kind? == "Pod")');
+  expect.soft(first.filters, 'and every line of its results can be filtered again')
+    .toBeGreaterThanOrEqual(first.results);
+
+  await openInResult(page, 0, ['metadata', 'namespace']);
+  const second = await state(page);
+  expect.soft(second.box, 'the second carries on from the first')
+    .toBe('.items[] | select(.kind? == "Pod") | select(.metadata.namespace? == "default")');
+  expect.soft(second.stats, 'and narrows its results').toBe('4 results');
+
+  await openInResult(page, 0, ['status', 'phase']);
+  const third = await state(page);
+  expect.soft(third.box, 'and so on')
+    .toBe('.items[] | select(.kind? == "Pod") | select(.metadata.namespace? == "default")' +
+      ' | select(.status.phase? == "Running")');
+  expect.soft(third.stats).toBe('3 results');
+
+  /* Each row's label is what its query really returns, as for the document. */
+  const rows = await readings(page);
+  const measured = await page.evaluate((queries) => {
+    const doc = window.jqweb.parseJSON(__t.get('#data', HTMLScriptElement).textContent);
+    return queries.map((q) => window.jqjs.compile(q).run(doc).length);
+  }, rows.map((r) => r.query));
+  rows.forEach((row, i) => {
+    if (row.label) expect.soft(measured[i], '"' + row.query + '" really returns ' + row.label)
+      .toBe(+row.label.split(' ')[0]);
+  });
+});

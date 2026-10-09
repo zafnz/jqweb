@@ -55,27 +55,18 @@ too.
 
 ## Example usage
 
-Pipe JSON into jqweb with `-O` to open it immediately in your browser:
+Pipe JSON into jqweb with `-O` to open it in your browser. jqweb serves the
+page from the background and exits once its tab is closed:
 
 ```
 $ curl -s https://jqweb.io/k8s.json | jqweb -O
-jqweb: serving on http://127.0.0.1:52748/ (Ctrl-C to stop)
+jqweb: serving on http://127.0.0.1:52748/ (until the last tab closes)
+jqweb: running in the background, pid 48213
 ```
 
 [<img src="website/demo.png" alt="jqweb filtering running pods in a Kubernetes resource list" width="580">](https://jqweb.io/k8s.html)
 
 *Filtering running Kubernetes pods with a jq-style query.*
-
-Add `-C` (or `--close`) and jqweb returns the prompt straight away, serving
-from the background until the last tab showing the page is closed. Reloading
-the page keeps it running, and if the page is not opened within 5 minutes
-jqweb exits. `-OC` does both:
-
-```
-$ jqweb -OC myfile.json
-jqweb: serving on http://127.0.0.1:52748/ (until the last tab closes)
-jqweb: running in the background, pid 48213
-```
 
 Browsers may unload a tab left unused for an hour or so, which counts as
 closing it.
@@ -91,7 +82,7 @@ $ kubectl get pods -o json | jqweb -o k8s.html
 
 ```
 usage: jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [-O|--open]
-             [-C|--close] [--close-delay <d>] [--simple] [--theme <name>]
+             [--close=false] [--close-delay <d>] [--simple] [--theme <name>]
              [-v|--version] [<query>] [<input-file>]
 
 Reads JSON from <input-file> ("-" or absent: stdin) and renders it as a
@@ -103,16 +94,15 @@ reads the file, since "." is no query.
   -p, --port <port>    serve the page on http://<host>:<port>/
       --host <ip>      bind address for -p (default 127.0.0.1)
   -o, --output <file>  write the page to <file>; "-" writes to stdout
-  -O, --open           open the page in the default browser
-  -C, --close          serve from the background until the last tab closes
-      --close-delay <d>  how long after the last tab closes -C waits
-                       (default 10s); giving it turns on -C
+  -O, --open           open the page in the default browser, serving it from
+                       the background until the last tab closes
+      --close=false    with -O, serve in the foreground until Ctrl-C
+      --close-delay <d>  how long after the last tab closes to exit
+                       (default 10s)
       --simple         leave out the jq query engine, for a smaller page
       --theme <name>   light, dark, or auto to follow the reader's system
                        (default auto)
   -v, --version        print the version and exit
-
--OC does both: open the browser and serve from the background.
 
 With no -p and no -o, it listens on a random available port.
 ```

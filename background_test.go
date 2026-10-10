@@ -188,3 +188,71 @@ func TestFlagConflictIsAUsageError(t *testing.T) {
 		t.Errorf("stat %s = %v, want no file written", file, err)
 	}
 }
+
+func TestJSONStreamInput(t *testing.T) {
+	const input = "{\"z\":1.50,\"a\":123456789012345678901234567890}\n[true,null]\n\"</script>\"\n"
+	const want = `[{"z":1.50,"a":123456789012345678901234567890},[true,null],"\u003c/script>"]`
+	for _, source := range []string{"file", "stdin"} {
+		t.Run(source, func(t *testing.T) {
+			args := []string{"-o", "-"}
+			if source == "file" {
+				file := filepath.Join(t.TempDir(), "input.jsonl")
+				if err := os.WriteFile(file, []byte(input), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				args = append(args, file)
+			}
+			cmd := jqweb(t, args...)
+			if source == "stdin" {
+				cmd.Stdin = strings.NewReader(input)
+			}
+			var stdout, stderr bytes.Buffer
+			cmd.Stdout, cmd.Stderr = &stdout, &stderr
+			if err := cmd.Run(); err != nil {
+				t.Fatalf("jqweb: %v, stderr: %s", err, &stderr)
+			}
+			_, rest, found := strings.Cut(stdout.String(), `<script id="data" type="application/json">`)
+			got, _, closed := strings.Cut(rest, "</script>")
+			if !found || !closed || got != want || stderr.Len() != 0 {
+				t.Fatalf("embedded data = %q; want %q; stderr: %s", got, want, &stderr)
+			}
+		})
+	}
+}
+
+func TestMalformedJSONStreamRejectedBeforeOutput(t *testing.T) {
+	const input = "{}\n[]\noops"
+	for _, source := range []string{"file", "stdin"} {
+		t.Run(source, func(t *testing.T) {
+			out := filepath.Join(t.TempDir(), "page.html")
+			if err := os.WriteFile(out, []byte("existing page"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			args := []string{"-o", out}
+			name := "stdin"
+			if source == "file" {
+				name = filepath.Join(t.TempDir(), "bad.jsonl")
+				if err := os.WriteFile(name, []byte(input), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				args = append(args, name)
+			}
+			cmd := jqweb(t, args...)
+			if source == "stdin" {
+				cmd.Stdin = strings.NewReader(input)
+			}
+			var stdout, stderr bytes.Buffer
+			cmd.Stdout, cmd.Stderr = &stdout, &stderr
+			var exit *exec.ExitError
+			if err := cmd.Run(); !errors.As(err, &exit) || exit.ExitCode() != 1 {
+				t.Fatalf("exit = %v; want status 1; stderr: %s", err, &stderr)
+			}
+			if stdout.Len() != 0 || !strings.Contains(stderr.String(), "jqweb: "+name+": ") || !strings.Contains(stderr.String(), "line 3, column 1") {
+				t.Fatalf("stdout = %q, stderr = %q", &stdout, &stderr)
+			}
+			if got, err := os.ReadFile(out); err != nil || string(got) != "existing page" {
+				t.Fatalf("output changed: %q, %v", got, err)
+			}
+		})
+	}
+}

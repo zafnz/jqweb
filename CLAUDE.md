@@ -93,7 +93,7 @@ The Go side is `main.go` at the root and five packages under `internal`:
 | file | what it holds |
 |---|---|
 | `main.go` | the flag definitions, `reorderArgs`, the variables the linker sets, and the flow of `main` |
-| `internal/check` | `Document` and the error messages it builds for input that is not one well-formed JSON document |
+| `internal/check` | `Normalize` and the error messages it builds for malformed JSON input |
 | `internal/serve` | the HTTP server, the `/alive` count behind `-C`, and `OpenBrowser` |
 | `internal/serve/background.go` | the `-C` parent: starts itself again with `--child` and relays its output until it is ready |
 | `internal/serve/detach_*.go`, `dup2_*.go` | per-platform: how the child is started detached and how it lets go of its outputs |

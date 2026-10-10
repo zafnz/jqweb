@@ -260,7 +260,8 @@ func main() {
 		displayName, title = "stdin", "stdin"
 	}
 
-	if err := check.Document(data); err != nil {
+	data, err = check.Normalize(data)
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "jqweb: %s: %s\n", displayName, err)
 		os.Exit(1)
 	}

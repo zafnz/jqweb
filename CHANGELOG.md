@@ -9,6 +9,11 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+### JSON streams
+
+JSON Lines (JSONL) and other streams of multiple JSON values are automatically
+wrapped in an array; there is no need to pipe through `jq -s .` first.
+
 ### Changed
 
 - `-O` now serves from the background and returns the prompt, exiting once the

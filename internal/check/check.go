@@ -16,85 +16,121 @@ const maxDepth = 128
 
 var errNesting = fmt.Errorf("JSON nesting exceeds the supported limit of %d", maxDepth)
 
-// Document checks for one well-formed JSON document within the nesting limit.
-// The page embeds the document itself and renders it in the browser, so
-// nothing is kept from this pass but the error.
-func Document(data []byte) error {
+// Normalize validates JSON within the nesting limit, returning a single
+// document unchanged or wrapping a stream of values in an array. Values keep
+// their original text so number precision and object key order survive.
+func Normalize(data []byte) ([]byte, error) {
 	// Bytes that are not UTF-8 pass the decoder, and the page shows U+FFFD in
 	// their place. Input that does not start like JSON is left for the decoder
 	// to reject, so that describe can say it is gzip or binary data.
 	if i := invalidUTF8(data); i >= 0 && startsJSON(data) {
 		line, col := lineCol(data, int64(i))
-		return fmt.Errorf("input is not valid UTF-8 (line %d, column %d); "+
+		return nil, fmt.Errorf("input is not valid UTF-8 (line %d, column %d); "+
 			"JSON has to be UTF-8, so convert it first, e.g. with iconv", line, col)
 	}
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
-	if err := checkValue(dec, 0); err != nil {
+	deepest, err := checkValue(dec, 0)
+	if err != nil {
 		if errors.Is(err, errNesting) {
-			return err
+			return nil, err
 		}
-		return describe(data, err)
+		return nil, describe(data, 0, err)
 	}
-	if dec.More() {
-		off := dec.InputOffset()
-		line, col := lineCol(data, off)
-		if moreValues(dec) {
-			return fmt.Errorf("input has more than one top-level JSON value (line %d, column %d); "+
-				"jqweb renders a single document, so pipe a JSON stream through `jq -s .` to wrap it in an array", line, col)
+	end := dec.InputOffset()
+	start := skipSpace(data, end)
+	if start == int64(len(data)) {
+		return data, nil
+	}
+
+	// The array adds a level only for streams; a single document can still
+	// use all maxDepth levels.
+	if deepest >= maxDepth {
+		return nil, errNesting
+	}
+	var out bytes.Buffer
+	out.Grow(len(data) + 2)
+	out.WriteByte('[')
+	out.Write(data[:end])
+	parsed := 1
+	for start < int64(len(data)) {
+		if _, err := checkValue(dec, 1); err != nil {
+			if errors.Is(err, errNesting) {
+				return nil, err
+			}
+			what := "invalid JSON value in stream"
+			if parsed == 1 {
+				what = "trailing data after top-level value"
+			}
+			return nil, fmt.Errorf("%s: %w", what, describe(data, start, err))
 		}
-		return fmt.Errorf("trailing data after top-level value (line %d, column %d)", line, col)
+		parsed++
+		end = dec.InputOffset()
+		out.WriteByte(',')
+		out.Write(data[start:end])
+		start = skipSpace(data, end)
 	}
-	return nil
+	out.WriteByte(']')
+	return out.Bytes(), nil
+}
+
+// skipSpace skips only JSON whitespace, not other Unicode spaces.
+func skipSpace(data []byte, off int64) int64 {
+	for off < int64(len(data)) {
+		switch data[off] {
+		case ' ', '\t', '\r', '\n':
+			off++
+		default:
+			return off
+		}
+	}
+	return off
 }
 
 // checkValue reads one JSON value from dec, recursing into containers, and
-// returns the decoder's error if it is not well formed.
-func checkValue(dec *json.Decoder, depth int) error {
+// returns the deepest container level reached, or an error if malformed.
+func checkValue(dec *json.Decoder, depth int) (int, error) {
 	tok, err := dec.Token()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	d, ok := tok.(json.Delim)
 	if !ok {
-		return nil
+		return depth, nil
 	}
 	if (d == '[' || d == '{') && depth >= maxDepth {
-		return errNesting
+		return 0, errNesting
 	}
+	deepest := depth + 1
 	switch d {
 	case '[':
 		for dec.More() {
-			if err := checkValue(dec, depth+1); err != nil {
-				return err
+			child, err := checkValue(dec, depth+1)
+			if err != nil {
+				return 0, err
 			}
+			deepest = max(deepest, child)
 		}
 	case '{':
 		for dec.More() {
 			kt, err := dec.Token()
 			if err != nil {
-				return err
+				return 0, err
 			}
 			if _, ok := kt.(string); !ok {
-				return fmt.Errorf("object key is not a string: %v", kt)
+				return 0, fmt.Errorf("object key is not a string: %v", kt)
 			}
-			if err := checkValue(dec, depth+1); err != nil {
-				return err
+			child, err := checkValue(dec, depth+1)
+			if err != nil {
+				return 0, err
 			}
+			deepest = max(deepest, child)
 		}
 	default:
-		return fmt.Errorf("unexpected token %v", d)
+		return 0, fmt.Errorf("unexpected token %v", d)
 	}
 	_, err = dec.Token() // consume the closing delimiter
-	return err
-}
-
-// moreValues reports whether the data left in dec begins with at least one
-// further well-formed JSON value, which marks the input as a JSON stream
-// (JSON Lines) rather than a single document with garbage appended.
-func moreValues(dec *json.Decoder) bool {
-	var raw json.RawMessage
-	return dec.Decode(&raw) == nil
+	return deepest, err
 }
 
 // invalidUTF8 is the index of the first byte of data that does not begin a
@@ -116,27 +152,36 @@ func invalidUTF8(data []byte) int {
 // describe turns the decoder's error into the message the user sees: what
 // kind of input this is when it is not JSON at all, and the line and column
 // of the fault, with a hint for the common near-JSON dialects, when it is.
-func describe(data []byte, err error) error {
+func describe(data []byte, start int64, err error) error {
 	if isTruncated(err) {
 		if len(bytes.TrimSpace(data)) == 0 {
 			return fmt.Errorf("empty input")
 		}
-		return fmt.Errorf("unexpected end of input; the document is truncated")
+		if start == 0 {
+			return fmt.Errorf("unexpected end of input; the document is truncated")
+		}
+		line, col := lineCol(data, int64(len(data)))
+		return fmt.Errorf("unexpected end of input (line %d, column %d); the document is truncated", line, col)
 	}
 	what, binary := sniff(data)
-	if binary {
+	if start == 0 && binary {
 		return fmt.Errorf("input is not JSON; it is %s", what)
 	}
-	if !startsJSON(data) {
+	if start == 0 && !startsJSON(data) {
 		return notJSON(data, what)
 	}
 	// The streaming Token API reports the offset of the last token it
-	// consumed, not of the character it choked on, so re-parse the whole
-	// input to locate the fault.
-	if se, ok := exactErr(data); ok {
-		i := int(se.Offset) - 1 // Offset points one past the offending byte
+	// consumed, not of the character it choked on, so re-parse the failing
+	// value and translate its offset back into the original input.
+	if se, ok := exactErr(data[start:]); ok {
+		i := int(start+se.Offset) - 1 // Offset points one past the offending byte
 		if i < 0 {
 			i = 0
+		}
+		// Decoders can report either the first or last byte of a rejected
+		// rune. Point at its start in either case.
+		for i > 0 && data[i]&0xc0 == 0x80 {
+			i--
 		}
 		line, col := lineCol(data, int64(i))
 		msg := fmt.Sprintf("%v (line %d, column %d)", se, line, col)

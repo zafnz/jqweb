@@ -51,7 +51,7 @@ func Serve(host string, port int, page []byte, opt Options) error {
 	}
 	stops := "Ctrl-C to stop"
 	if opt.CloseOnGet {
-		stops = "until the last tab closes"
+		stops = "until tab is closed"
 	}
 	fmt.Fprintf(os.Stderr, "jqweb: serving on http://%s/ (%s)\n", ln.Addr(), stops)
 	// After the serving line, and from a goroutine, so that a slow update
@@ -69,7 +69,7 @@ func Serve(host string, port int, page []byte, opt Options) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(os.Stderr, "%s, pid %d\n", ReadyLine, os.Getpid())
+		fmt.Fprintf(os.Stderr, "%s, pid %d, will auto-terminate.\n", ReadyLine, os.Getpid())
 		// The parent exits once it reads that line, and nothing may be
 		// written to its pipes after it. detachOutputs owns null from here.
 		detachOutputs(null)

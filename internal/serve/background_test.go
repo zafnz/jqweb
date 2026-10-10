@@ -8,8 +8,8 @@ import (
 
 func TestRelayLinesSeesTheReadyLine(t *testing.T) {
 	var out bytes.Buffer
-	in := "jqweb: serving on http://127.0.0.1:1/ (until the last tab closes)\n" +
-		ReadyLine + ", pid 12\n"
+	in := "jqweb: serving on http://127.0.0.1:1/ (until tab is closed)\n" +
+		ReadyLine + ", pid 12, will auto-terminate.\n"
 	if !relayLines(&out, strings.NewReader(in), ReadyLine) {
 		t.Error("relayLines did not report the ready line")
 	}

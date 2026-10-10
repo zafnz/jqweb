@@ -60,7 +60,7 @@ func releaseVersion() string {
 // text in its usage section, and TestReadmeCarriesUsage fails when the two
 // drift apart.
 const usageText = `usage: jqweb [-p|--port <port>] [--host <ip>] [-o|--output <file>] [-O|--open]
-             [-C|--close] [--close-delay <d>] [--simple] [--theme <name>]
+             [--close=false] [--close-delay <d>] [--simple] [--theme <name>]
              [-v|--version] [<query>] [<input-file>]
 
 Reads JSON from <input-file> ("-" or absent: stdin) and renders it as a
@@ -72,16 +72,15 @@ reads the file, since "." is no query.
   -p, --port <port>    serve the page on http://<host>:<port>/
       --host <ip>      bind address for -p (default 127.0.0.1)
   -o, --output <file>  write the page to <file>; "-" writes to stdout
-  -O, --open           open the page in the default browser
-  -C, --close          serve from the background until the last tab closes
-      --close-delay <d>  how long after the last tab closes -C waits
-                       (default 10s); giving it turns on -C
+  -O, --open           open the page in the default browser, serving it from
+                       the background until the last tab closes
+      --close=false    with -O, serve in the foreground until Ctrl-C
+      --close-delay <d>  how long after the last tab closes to exit
+                       (default 10s)
       --simple         leave out the jq query engine, for a smaller page
       --theme <name>   light, dark, or auto to follow the reader's system
                        (default auto)
   -v, --version        print the version and exit
-
--OC does both: open the browser and serve from the background.
 
 With no -p and no -o, it listens on a random available port.
 `
@@ -150,6 +149,11 @@ func parseFlags(fs *flag.FlagSet, args []string) (cliOptions, error) {
 	// Asking for a delay is asking to close, so --close-delay does not also
 	// need -C. Without this the flag on its own would do nothing at all.
 	o.closeOnGet = o.closeOnGet || openClose || set["close-delay"]
+	// -O serves from the background unless --close=false says otherwise. It
+	// only opens the file when -o without -p serves nothing.
+	if o.open && !set["close"] && !set["C"] && (o.portSet || !o.outSet) {
+		o.closeOnGet = true
+	}
 	o.args = fs.Args()
 	return o, nil
 }

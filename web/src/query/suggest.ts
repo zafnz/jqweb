@@ -115,7 +115,8 @@ function suffix(segs: Segment[]): string {
    member itself. The "?" on index covers being handed a value that is not a
    list. */
 function condition(subject: string, test: Segment[], literal: string | null, inArray: boolean): string {
-  const path = subject + suffix(test) + (test.length ? '?' : '');
+  const path = (subject ? subject + suffix(test) : test.length ? pathText(test) : '') +
+    (test.length ? '?' : '');
   if (literal === null) return path + ' != null';
   if (!inArray) return (path || '.') + ' == ' + literal;
   return path ? path + ' | index(' + literal + ')?' : 'index(' + literal + ')?';
@@ -137,16 +138,64 @@ function depths(n: number): number[] {
    ignoring it, and both beat a search that gives up on structure. */
 const RANK = { pivot: 1, anyKey: 2, anywhere: 3, line: 4, unnamed: 1 };
 
+/* Where the readings start from. Over the document there is no lead and the
+   segments begin at its root. After a query, lead is that query, the
+   segments begin with the index of the result the line sits in, and many
+   says whether there is more than one result. */
+interface From {
+  lead: string | null;
+  skip: number;
+  many: boolean;
+}
+
 /* The queries a line might have meant, roughly widest reading first.
 
    The caller decides what to do with them. A query that will not run against
    this document is still in the list, since running them is how the caller
    finds that out. */
 export function suggest(doc: Node, segs: Segment[]): Candidate[] {
+  return readings(doc, segs, { lead: null, skip: 0, many: false });
+}
+
+/* The same readings for a line in the results of the query lead, each one
+   carrying on from it, so that filtering a result adds a step to the query
+   rather than starting again from the document. results are the outputs on
+   screen and n is the one the line sits in, at segs within it.
+
+   The results are read as an array, with lead standing for iterating it. A
+   pivot inside the clicked result is taken across every result rather than
+   that one alone: the step is for narrowing all of them, and one that only
+   made sense for a single output would drop the rest. */
+export function chain(lead: string, results: Node[], n: number, segs: Segment[]): Candidate[] {
+  const at: Segment[] = [{ index: n }];
+  return readings({ t: 'a', v: results }, at.concat(segs),
+    { lead: lead, skip: 1, many: results.length > 1 });
+}
+
+function readings(doc: Node, segs: Segment[], from: From): Candidate[] {
   const out: Candidate[] = [];
   const seen: Record<string, boolean> = {};
   const value = nodeAt(doc, segs);
   if (!value) return out;
+  const lead = from.lead;
+
+  /* q carrying on from the lead, or q itself over the document. */
+  function then(q: string): string {
+    return lead === null ? q : lead + ' | ' + q;
+  }
+  /* The path from where the query starts down to depth d. */
+  function pathTo(d: number): string {
+    return pathText(segs.slice(from.skip, d));
+  }
+  /* The query handing over each member of the pivot at depth d. Under a
+     lead, depth 0 is the results, and the lead already hands those over.
+     Deeper, the pivot is only known to be a container in the result that was
+     clicked, so the iterate is guarded for the others. */
+  function members(d: number): string {
+    if (d < from.skip) return lead as string;
+    const at = pathTo(d);
+    return then((at === '.' ? '.[]' : at + '[]') + (lead === null ? '' : '?'));
+  }
 
   /* A value too big to read is a value too big to paste into a query, so
      past a point the readings ask whether the line is there rather than
@@ -172,12 +221,14 @@ export function suggest(doc: Node, segs: Segment[]): Candidate[] {
   depths(segs.length).forEach(function (d) {
     const pivot = nodeAt(doc, segs.slice(0, d));
     if (!pivot || pivot.t === 'l') return;
-    const at = pathText(segs.slice(0, d));
+    const at = d < from.skip ? null : pathTo(d);
     const test = below.slice(d + 1);
     /* "is it there" needs somewhere to look; asking it of the member itself
        only asks whether the member is null. */
     if (literal === null && !test.length) return;
-    const where = at === '.' ? 'across the document' : 'in ' + at;
+    const where = at === null ? 'across the results'
+      : at === '.' ? (lead === null ? 'across the document' : 'in each result')
+        : 'in ' + at;
     /* Pivoting on the very array the value sits in hands each element
        straight to the test, so there it is the element itself being asked
        about and the question is equality, not containment. */
@@ -185,15 +236,17 @@ export function suggest(doc: Node, segs: Segment[]): Candidate[] {
     /* Pivoting on the document as a whole is a reading of last resort: it
        says nothing about where to look, and a named ancestor almost always
        reads better for the same answer. */
-    const unnamed = at === '.' ? RANK.unnamed : 0;
-    if (pivot.t === 'o') {
-      add((at === '.' ? '' : at + ' | ') +
-        'with_entries(select(' + condition('.value', test, literal, holds) + '))',
+    const unnamed = lead === null && at === '.' ? RANK.unnamed : 0;
+    /* with_entries hands back one object per input, so across several
+       results it would narrow none of them; there an object's values are
+       gone through as an array's would be. */
+    if (pivot.t === 'o' && !from.many) {
+      add(then((at === '.' ? '' : at + ' | ') +
+        'with_entries(select(' + condition('.value', test, literal, holds) + '))'),
       where, 'keys', RANK.pivot + unnamed);
     } else {
-      add((at === '.' ? '.[]' : at + '[]') +
-        ' | select(' + condition('', test, literal, holds) + ')',
-      where, 'results', RANK.pivot + unnamed);
+      add(members(d) + ' | select(' + condition('', test, literal, holds) + ')',
+        where, 'results', RANK.pivot + unnamed);
     }
     /* The same question with the key the value happened to sit under left
        open: a tag on .get is usually wanted across .post and .delete too. */
@@ -201,7 +254,7 @@ export function suggest(doc: Node, segs: Segment[]): Candidate[] {
       /* The second iterate is over whatever the members hold, which need not
          all be containers, so it is the one that needs guarding. The first
          is over the pivot, which the path already proved is one. */
-      add((at === '.' ? '.[]' : at + '[]') + ' | .[]? | select(' +
+      add(members(d) + ' | .[]? | select(' +
         condition('', test.slice(1), literal, holds) + ')',
       where + ', any key', 'results', RANK.anyKey + unnamed);
     }
@@ -213,16 +266,19 @@ export function suggest(doc: Node, segs: Segment[]): Candidate[] {
     const seg = below[i];
     if (seg.key !== undefined) { key = seg.key; break; }
   }
-  add(key === null ? '.. | select(. == ' + literal + ')'
-    : '.. | objects | select(' + condition('', [{ key: key }], literal, inArray) + ')',
+  add(then(key === null ? '.. | select(. == ' + literal + ')'
+    : '.. | objects | select(' + condition('', [{ key: key }], literal, inArray) + ')'),
   'anywhere', 'results', RANK.anywhere);
 
   /* And the line itself, which is what the copy button gives you. plain marks
      it out for the caller: when no reading narrows the document down, every
      one of them returns the line that was clicked, and then this is the one
-     that was meant. */
-  const line = add(pathText(segs), 'this line', 'results', RANK.line);
-  if (line) line.plain = true;
+     that was meant. Under a lead it would map every result to the line
+     rather than narrow them, and with the most results it would sort first. */
+  if (lead === null) {
+    const line = add(pathText(segs), 'this line', 'results', RANK.line);
+    if (line) line.plain = true;
+  }
   return out;
 }
 

@@ -19,6 +19,8 @@ above the commit list GoReleaser generates.
 
 - Tab in the search box takes the highlighted completion of a key or function
   name, or the first one, as clicking it would.
+- The filter button is on the lines of a query's results too, and adds a
+  `select` step to that query, so filters can be chained.
 
 ## [0.10.1] - 2026-10-04
 

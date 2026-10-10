@@ -16,7 +16,7 @@ import type { EntryWrite, QueryHost, QueryUI } from '../page/search.ts';
 import { segsOf } from '../page/tree.ts';
 import { compile, isJqError } from './engine/index.ts';
 import type { Query } from './engine/index.ts';
-import { completions, countOf, functionCompletions, splitCall, splitPartial, suggest } from './suggest.ts';
+import { chain, completions, countOf, functionCompletions, splitCall, splitPartial, suggest } from './suggest.ts';
 import type { Candidate, Shape } from './suggest.ts';
 
 /* A row of the suggestion list: a reading of the clicked line, with count
@@ -65,6 +65,9 @@ export function jqui(page: QueryHost): QueryUI {
   /* Only the values on screen are retained, for comparing the next output.
      This does not save evaluation: a new query still runs in full. */
   let displayed: ValueNode[] | null = null;
+  /* The query those values came from, which filtering a line among them
+     carries on from. */
+  let source: string | null = null;
 
   /* Running every candidate against a large document could take longer than
      anyone will wait for a menu, so counting stops after this and the rest of
@@ -131,6 +134,7 @@ export function jqui(page: QueryHost): QueryUI {
     }
     try {
       const out = query.run(page.value);
+      source = raw;
       return showResults(out);
     } catch (e) {
       if (!(e instanceof Error)) throw e;
@@ -172,7 +176,7 @@ export function jqui(page: QueryHost): QueryUI {
     if (!unchanged) {
       const parts: string[] = [];
       for (let i = 0; i < shown; i++) {
-        parts.push('<div class="result" data-n="' + i + '">' + renderTree(out[i]) + '</div>');
+        parts.push('<div class="result" data-n="' + i + '">' + renderTree(out[i], true) + '</div>');
       }
       results.innerHTML = parts.join('');
       displayed = out.slice(0, shown);
@@ -220,6 +224,7 @@ export function jqui(page: QueryHost): QueryUI {
     results.hidden = true;
     results.innerHTML = '';
     displayed = null;
+    source = null;
     tree.hidden = false;
     return true;
   }
@@ -230,21 +235,27 @@ export function jqui(page: QueryHost): QueryUI {
      you meant, so it offers the ones it can build from that line, runs each,
      and labels it with what came back. Picking by outcome is the point: 14
      results against 1 says which reading you were after without anyone having
-     to think about pivots. And typing a name one letter at a time fills it
-     with the keys that could finish the name, through complete() below.
+     to think about pivots. On a line among a query's results, the readings
+     carry on from that query, so filtering again adds a step to it. And
+     typing a name one letter at a time fills it with the keys that could
+     finish the name, through complete() below.
 
      The list belongs to the search box rather than to whatever filled it, so
      it comes back when the box is focused again and goes away when attention
      moves elsewhere. */
 
-  /* Builds the list for one line of the document, puts the widest reading in
-     the box, and runs it. */
+  /* Builds the list for one line of the document or of the results, puts the
+     widest reading in the box, and runs it. */
   function filter(node: HTMLElement): void {
     completionLead = null;
     completing = false;
     const segs = segsOf(node);
+    const result = node.closest<HTMLElement>('.result');
+    const readings = result && displayed && source !== null
+      ? chain(source, displayed, Number(result.dataset.n), segs)
+      : suggest(page.value, segs);
     const deadline = Date.now() + COUNT_BUDGET_MS;
-    const counted = suggest(page.value, segs).map(function (c) {
+    const counted = readings.map(function (c) {
       return Object.assign(c, { count: Date.now() > deadline ? null : count(c) });
     }).filter(function (c) {
       return c.count !== 0;

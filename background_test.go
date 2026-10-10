@@ -116,7 +116,7 @@ func TestBackgroundOutlivesTheParentUntilTheTabCloses(t *testing.T) {
 	}
 
 	addr := regexp.MustCompile(`serving on http://(\S+)/`).FindStringSubmatch(stderr.String())
-	pid := regexp.MustCompile(regexp.QuoteMeta(serve.ReadyLine) + `, pid (\d+)\n`).FindStringSubmatch(stderr.String())
+	pid := regexp.MustCompile(regexp.QuoteMeta(serve.ReadyLine) + `, pid (\d+), will auto-terminate\.\n`).FindStringSubmatch(stderr.String())
 	if addr == nil || pid == nil {
 		t.Fatalf("stderr = %q, want the serving line and the ready line", stderr.String())
 	}

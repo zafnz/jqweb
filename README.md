@@ -60,8 +60,8 @@ page from the background and exits once its tab is closed:
 
 ```
 $ curl -s https://jqweb.io/k8s.json | jqweb -O
-jqweb: serving on http://127.0.0.1:52748/ (until the last tab closes)
-jqweb: running in the background, pid 48213
+jqweb: serving on http://127.0.0.1:52748/ (until tab is closed)
+jqweb: running in the background, pid 48213, will auto-terminate.
 ```
 
 [<img src="website/demo.png" alt="jqweb filtering running pods in a Kubernetes resource list" width="580">](https://jqweb.io/k8s.html)

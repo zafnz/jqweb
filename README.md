@@ -117,9 +117,13 @@ reads the file, since "." is no query.
 With no -p and no -o, it listens on a random available port.
 ```
 
+JSON Lines (JSONL) and other streams of multiple JSON values are automatically
+wrapped in an array. A single JSON value keeps its original shape.
+
 JSON may contain up to 128 nested arrays or objects, counting the root
-container as level one. Deeper input is rejected before a page is produced;
-queries that create deeper values report an error in the page.
+container as level one, including the array added around a stream. Deeper input
+is rejected before a page is produced; queries that create deeper values report
+an error in the page.
 
 ## Search
 

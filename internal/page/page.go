@@ -21,7 +21,7 @@ type Options struct {
 
 // Render embeds the document in the page as compact JSON; the script in
 // the template parses it and builds the tree in the browser. data has to be
-// one well-formed JSON document, which check.Document establishes, and Render
+// one well-formed JSON document, which check.Normalize establishes, and Render
 // panics on anything else rather than embed it. opt.JQ selects the template
 // that carries the query engine, and opt.Theme is the palette the page starts
 // in, which the reader can change afterwards. opt.Query goes in the search

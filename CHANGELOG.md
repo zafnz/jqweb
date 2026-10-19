@@ -9,6 +9,8 @@ above the commit list GoReleaser generates.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-19
+
 ### JSON streams
 
 JSON Lines (JSONL) and other streams of multiple JSON values are automatically
@@ -341,7 +343,8 @@ The first release: a JSON document rendered as one self-contained HTML page,
 served or written to a file, with a flag to open a browser on it and a flag to
 report the version.
 
-[Unreleased]: https://github.com/zafnz/jqweb/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/zafnz/jqweb/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/zafnz/jqweb/compare/v0.10.1...v1.0.0
 [0.10.1]: https://github.com/zafnz/jqweb/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/zafnz/jqweb/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/zafnz/jqweb/compare/v0.8.0...v0.9.0
